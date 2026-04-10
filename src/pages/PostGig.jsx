@@ -97,7 +97,7 @@ export default function PostGig() {
           <label className="lbl">Title</label>
           <input
             className="inp"
-            placeholder="e.g. Pick up food from Corbet"
+            placeholder="e.g. Pick up food from Corbett"
             value={gigTitle}
             onChange={(e) => setGigTitle(e.target.value)}
           />
@@ -163,7 +163,6 @@ export default function PostGig() {
               onChange={(e) => setPrice(e.target.value)}
             />
           </div>
-          <span className="hint">+1 Rep for posting. You get +9 Rep when you mark the gig done; your taker gets +10.</span>
         </div>
 
         <div className="field">
@@ -224,7 +223,7 @@ export default function PostGig() {
             <Award size={13} />
           </div>
           <span className="ct" style={{ color: "var(--green-text)" }}>
-            <strong>+1 Rep</strong> for posting. You earn <strong>+9</strong> when you mark it done; your taker earns <strong>+10</strong>. They can earn +5 for a 5-star rating from you.
+            <strong>+1 Rep</strong> for posting. When you mark the gig done, you and your taker each earn <strong>+10</strong>. They can earn +5 for a 5-star rating from you.
           </span>
         </div>
 
