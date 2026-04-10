@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, Star, AlertTriangle, Trash2, Lock } from "lucide-react";
+import { Bell, Star, AlertTriangle, Trash2, Lock, CheckCircle, Loader } from "lucide-react";
 import {
-  getMyNotifications, markAllNotificationsRead, deleteNotification, getGigStatusesForNotifications,
+  getMyNotifications, markAllNotificationsRead, markNotificationRead,
+  deleteNotification, getGigStatusesForNotifications, acceptGigRequest,
 } from "../lib/profile";
 import { elapsed } from "../utils/helpers";
 import TopBar from "../components/TopBar";
@@ -28,7 +29,6 @@ function isDeletable(n, gigStatusMap) {
 }
 
 function SwipeRow({ children, canDelete, onDelete }) {
-  const containerRef = useRef(null);
   const startXRef = useRef(0);
   const currentXRef = useRef(0);
   const swipingRef = useRef(false);
@@ -75,8 +75,7 @@ function SwipeRow({ children, canDelete, onDelete }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ position: "relative", overflow: "hidden" }}>
-      {/* Delete action behind */}
+    <div style={{ position: "relative", overflow: "hidden" }}>
       <div style={{
         position: "absolute", right: 0, top: 0, bottom: 0, width: THRESHOLD,
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -101,7 +100,6 @@ function SwipeRow({ children, canDelete, onDelete }) {
         </button>
       </div>
 
-      {/* Main content */}
       <div
         style={{
           position: "relative", zIndex: 1, background: "var(--bg)",
@@ -159,9 +157,11 @@ export default function Alerts({ setScreen, onNotificationsRead }) {
   const [loading, setLoading] = useState(true);
   const [gigStatusMap, setGigStatusMap] = useState({});
   const [selectedNotif, setSelectedNotif] = useState(null);
+  const [acceptingId, setAcceptingId] = useState(null);
 
   useEffect(() => {
     loadNotifications();
+    markAllNotificationsRead().then(() => onNotificationsRead?.());
   }, []);
 
   async function loadNotifications() {
@@ -191,10 +191,31 @@ export default function Alerts({ setScreen, onNotificationsRead }) {
     onNotificationsRead?.();
   }
 
-  function handleNotifClick(n) {
+  async function handleNotifClick(n) {
+    if (!n.read) {
+      markNotificationRead(n.id);
+      setNotifications((prev) =>
+        prev.map((notif) => notif.id === n.id ? { ...notif, read: true } : notif)
+      );
+      onNotificationsRead?.();
+    }
     if (GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id) {
       setSelectedNotif(n);
     }
+  }
+
+  async function handleInlineAccept(e, n) {
+    e.stopPropagation();
+    const meta = n.metadata || {};
+    if (!meta.request_id || !meta.gig_id || !meta.requester_id) return;
+
+    setAcceptingId(n.id);
+    const { error } = await acceptGigRequest(meta.request_id, meta.gig_id, meta.requester_id);
+    if (!error) {
+      await loadNotifications();
+      onNotificationsRead?.();
+    }
+    setAcceptingId(null);
   }
 
   function handleStatusChange() {
@@ -243,6 +264,9 @@ export default function Alerts({ setScreen, onNotificationsRead }) {
           notifications.map((n) => {
             const canDelete = isDeletable(n, gigStatusMap);
             const isClickable = GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id;
+            const showInlineAccept = n.type === "gig_requested" && n.metadata?.request_id;
+            const gigStatus = n.metadata?.gig_id ? gigStatusMap[n.metadata.gig_id] : null;
+            const alreadyAccepted = gigStatus && (gigStatus.status === "active" || gigStatus.status === "completed");
 
             return (
               <SwipeRow key={n.id} canDelete={canDelete} onDelete={() => handleDelete(n.id)}>
@@ -278,11 +302,35 @@ export default function Alerts({ setScreen, onNotificationsRead }) {
                     <span style={{ fontSize: 10, color: "var(--fg4)", fontFamily: "var(--mono)" }}>
                       {elapsed(new Date(n.created_at).getTime())}
                     </span>
-                    {!n.read && (
+                    {showInlineAccept && !alreadyAccepted ? (
+                      <button
+                        className="btn bgreen bsm"
+                        onClick={(e) => handleInlineAccept(e, n)}
+                        disabled={acceptingId === n.id}
+                        style={{
+                          fontSize: 11, padding: "3px 10px", gap: 4,
+                          opacity: acceptingId === n.id ? 0.6 : 1,
+                        }}
+                      >
+                        {acceptingId === n.id ? (
+                          <Loader size={11} className="spin" />
+                        ) : (
+                          <CheckCircle size={11} />
+                        )}
+                        Accept
+                      </button>
+                    ) : showInlineAccept && alreadyAccepted ? (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, fontFamily: "var(--mono)",
+                        color: "var(--green-d)",
+                      }}>
+                        ✓ Accepted
+                      </span>
+                    ) : !n.read ? (
                       <div style={{
-                        width: 7, height: 7, borderRadius: "50%", background: "var(--ink)",
+                        width: 7, height: 7, borderRadius: "50%", background: "var(--err)",
                       }} />
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </SwipeRow>

@@ -127,9 +127,9 @@ export default function App() {
       {screen === "explore" && <Explore setScreen={handleSetScreen} currentUserId={currentUserId} />}
       {screen === "post" && <PostGig setScreen={handleSetScreen} />}
       {screen === "alerts" && <Alerts setScreen={handleSetScreen} onNotificationsRead={refreshUnread} />}
-      {screen === "profile" && <Profile setScreen={handleSetScreen} />}
+      {screen === "profile" && <Profile setScreen={handleSetScreen} currentUserId={currentUserId} />}
       {screen === "editProfile" && <EditProfile setScreen={handleSetScreen} />}
-      {screen === "userProfile" && <UserProfile setScreen={handleSetScreen} userId={viewUserId} />}
+      {screen === "userProfile" && <UserProfile setScreen={handleSetScreen} userId={viewUserId} currentUserId={currentUserId} />}
 
       {["home", "explore", "alerts", "profile", "post"].includes(screen) && (
         <BottomNav screen={screen} setScreen={handleSetScreen} unreadCount={unreadCount} />

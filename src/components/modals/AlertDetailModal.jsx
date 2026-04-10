@@ -4,9 +4,8 @@ import {
   MessageCircle, Phone, AtSign, DollarSign, Smartphone, Lock,
 } from "lucide-react";
 import { getGigDetail, acceptGigRequest, rejectGigRequest, completeGig, getAvatarUrl } from "../../lib/profile";
-import { getLevel, countdown } from "../../utils/helpers";
+import { getLevel, countdown, useTimer } from "../../utils/helpers";
 import LevelBadge from "../LevelBadge";
-import Stars from "../Stars";
 
 const STATUS_CONFIG = {
   requested: { label: "Pending Approval", color: "var(--amber)", bg: "var(--amber-bg)", bd: "var(--amber-bd)", dot: "#f59e0b" },
@@ -120,6 +119,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
   const [requests, setRequests] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const tick = useTimer();
 
   const meta = notification?.metadata || {};
   const role = meta.role;
@@ -221,7 +221,8 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
   const expired = gig.expires_at && new Date(gig.expires_at) < new Date();
   const isActive = gig.status === "active";
   const isCompleted = gig.status === "completed";
-  const isPending = gig.status === "requested";
+  const isPending = gig.status === "requested" || gig.status === "open";
+  const hasPendingRequest = !!pendingReq;
   const showContactInfo = isActive || isCompleted;
 
   const cd = gig.expires_at ? countdown(new Date(gig.expires_at).getTime()) : null;
@@ -244,13 +245,42 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
                 background: "var(--bg3)", border: "1px solid var(--bd)", borderRadius: 4,
                 padding: "2px 8px", color: "var(--fg3)",
               }}>{gig.category?.label || "Gig"}</span>
-              <StatusBadge status={gig.status} expired={expired} />
+              <StatusBadge status={hasPendingRequest && gig.status === "open" ? "requested" : gig.status} expired={expired} />
             </div>
             <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-.02em", color: "var(--fg)", lineHeight: 1.4, marginBottom: 6 }}>
               {gig.title}
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "var(--fg)", fontFamily: "var(--mono)", letterSpacing: "-.04em" }}>
-              ${Number(gig.price).toFixed(2)}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "var(--fg)", fontFamily: "var(--mono)", letterSpacing: "-.04em" }}>
+                ${Number(gig.price).toFixed(2)}
+              </div>
+              {role === "poster" && hasPendingRequest && !isActive && !isCompleted && (
+                <button
+                  className="btn bgreen bsm"
+                  onClick={handleAccept}
+                  disabled={actionLoading}
+                  style={{ fontSize: 12, padding: "6px 14px", gap: 5, opacity: actionLoading ? 0.6 : 1 }}
+                >
+                  {actionLoading ? <Loader size={13} className="spin" /> : <CheckCircle size={13} />}
+                  {actionLoading ? "Accepting…" : "Accept"}
+                </button>
+              )}
+              {isActive && (
+                <span style={{
+                  fontSize: 12, fontWeight: 600, fontFamily: "var(--mono)",
+                  color: "var(--green-d)", display: "flex", alignItems: "center", gap: 4,
+                }}>
+                  <CheckCircle size={13} /> Active
+                </span>
+              )}
+              {isCompleted && (
+                <span style={{
+                  fontSize: 12, fontWeight: 600, fontFamily: "var(--mono)",
+                  color: "var(--green-d)", display: "flex", alignItems: "center", gap: 4,
+                }}>
+                  🏅 Done
+                </span>
+              )}
             </div>
           </div>
 
@@ -270,9 +300,9 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </div>
             )}
 
-            {/* Time */}
+            {/* Time — live ticking via useTimer */}
             {cd && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div key={tick} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: "var(--r)", background: "var(--bg3)",
                   border: "1px solid var(--bd)", display: "flex", alignItems: "center",
@@ -282,8 +312,11 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
                   <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 1 }}>
                     {cd.expired ? "Time ended" : "Time remaining"}
                   </div>
-                  <div style={{ fontSize: 14, color: cd.expired ? "var(--err)" : "var(--fg)", fontWeight: cd.expired ? 600 : 400 }}>
-                    {cd.expired ? "Deadline passed" : cd.text}
+                  <div style={{
+                    fontSize: 14, fontFamily: "var(--mono)", fontWeight: 600,
+                    color: cd.expired ? "var(--err)" : "var(--amber)",
+                  }}>
+                    {cd.expired ? "Deadline passed" : `⏱ ${cd.text}`}
                   </div>
                 </div>
               </div>
@@ -370,8 +403,8 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
 
           {/* Actions */}
           <div style={{ padding: "0 20px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {/* Poster sees accept/decline when pending */}
-            {role === "poster" && isPending && pendingReq && (
+            {/* Poster sees accept/decline when there's a pending request */}
+            {role === "poster" && hasPendingRequest && !isActive && !isCompleted && (
               <>
                 <button
                   className="btn bgreen bfull blg"
@@ -393,7 +426,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
             )}
 
             {/* Requester sees pending status */}
-            {role === "requester" && isPending && (
+            {role === "requester" && isPending && hasPendingRequest && !isActive && !isCompleted && (
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 padding: "12px", borderRadius: "var(--r)",

@@ -141,6 +141,26 @@ export async function getMyGigStats() {
   };
 }
 
+export async function getUserGigStats(userId) {
+  const [takerRes, posterRes] = await Promise.all([
+    supabase
+      .from("gigs")
+      .select("id", { count: "exact", head: true })
+      .eq("taker_id", userId)
+      .eq("status", "completed"),
+    supabase
+      .from("gigs")
+      .select("id", { count: "exact", head: true })
+      .eq("poster_id", userId),
+  ]);
+
+  return {
+    completed: takerRes.count || 0,
+    posted: posterRes.count || 0,
+    error: takerRes.error || posterRes.error,
+  };
+}
+
 export async function getCampusRank(repScore) {
   const { count, error } = await supabase
     .from("users")
@@ -206,7 +226,7 @@ export async function getMyActivity() {
       .limit(10),
     supabase
       .from("gigs")
-      .select("id, title, description, status, created_at, estimated_time, expires_at, category:category_id(label)")
+      .select("id, title, description, status, created_at, estimated_time, expires_at, category:category_id(label), taker:taker_id(first_name, last_name)")
       .eq("poster_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10),
@@ -480,13 +500,13 @@ export async function getUserActivity(userId) {
   const [postedRes, completedRes] = await Promise.all([
     supabase
       .from("gigs")
-      .select("id, title, description, status, created_at, estimated_time, expires_at, price, category:category_id(label)")
+      .select("id, title, description, status, created_at, estimated_time, expires_at, price, category:category_id(label), taker:taker_id(first_name, last_name)")
       .eq("poster_id", userId)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("gigs")
-      .select("id, title, description, price, status, created_at, updated_at, estimated_time, expires_at, category:category_id(label)")
+      .select("id, title, description, price, status, created_at, updated_at, estimated_time, expires_at, category:category_id(label), poster:poster_id(first_name, last_name)")
       .eq("taker_id", userId)
       .eq("status", "completed")
       .order("updated_at", { ascending: false })
@@ -824,6 +844,19 @@ export async function markAllNotificationsRead() {
     .update({ read: true })
     .eq("user_id", user.id)
     .eq("read", false);
+
+  return { error };
+}
+
+export async function markNotificationRead(notificationId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("id", notificationId)
+    .eq("user_id", user.id);
 
   return { error };
 }

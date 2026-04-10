@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Award, Loader, CheckCircle, Package, Timer, Star } from "lucide-react";
-import { getProfileById, getReviewsForUser, getAvatarUrl, getCompletedGigsBetweenUsers, getExistingReview, getUserActivity, getGigById, parseDeadline } from "../lib/profile";
+import { getProfileById, getReviewsForUser, getAvatarUrl, getCompletedGigsBetweenUsers, getExistingReview, getUserActivity, getGigById, parseDeadline, getUserGigStats, getCampusRank, getTotalUsers } from "../lib/profile";
 import { getLevel, useTimer } from "../utils/helpers";
 import TopBar from "../components/TopBar";
 import LevelBadge from "../components/LevelBadge";
@@ -8,7 +8,7 @@ import Stars from "../components/Stars";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
-export default function UserProfile({ setScreen, userId }) {
+export default function UserProfile({ setScreen, userId, currentUserId }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -20,6 +20,9 @@ export default function UserProfile({ setScreen, userId }) {
   const [existingReview, setExistingReview] = useState(null);
   const [upTab, setUpTab] = useState("reviews");
   const [userActivity, setUserActivity] = useState({ postedGigs: [], completedGigs: [] });
+  const [gigStats, setGigStats] = useState({ completed: 0, posted: 0 });
+  const [rank, setRank] = useState(null);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [selectedGig, setSelectedGig] = useState(null);
   const [gigLoading, setGigLoading] = useState(false);
   const tick = useTimer();
@@ -44,15 +47,21 @@ export default function UserProfile({ setScreen, userId }) {
         if (url) setAvatarUrl(url);
       }
 
-      const [reviewsRes, gigsRes, existingRes, actRes] = await Promise.all([
+      const [reviewsRes, gigsRes, existingRes, actRes, statsRes, rankRes, totalRes] = await Promise.all([
         getReviewsForUser(userId),
         getCompletedGigsBetweenUsers(userId),
         getExistingReview(userId),
         getUserActivity(userId),
+        getUserGigStats(userId),
+        getCampusRank(p.rep_score || 0),
+        getTotalUsers(),
       ]);
 
       setReviews(reviewsRes.reviews);
       setUserActivity(actRes);
+      setGigStats(statsRes);
+      setRank(rankRes.rank);
+      setTotalUsers(totalRes.total);
 
       const hasCompletedGigs = gigsRes.gigs.length > 0;
 
@@ -208,6 +217,24 @@ export default function UserProfile({ setScreen, userId }) {
               </div>
             </div>
 
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 14 }}>
+              <div className="stat-box" onClick={() => setUpTab("activity")}>
+                <div className="sval">{gigStats.completed}</div>
+                <div className="skey">gigs done</div>
+                <div style={{ fontSize: 9, color: "var(--green-d)", fontFamily: "var(--mono)", marginTop: 2 }}>tap →</div>
+              </div>
+              <div className="stat-box" onClick={() => setUpTab("activity")}>
+                <div className="sval">{gigStats.posted}</div>
+                <div className="skey">gigs posted</div>
+                <div style={{ fontSize: 9, color: "var(--green-d)", fontFamily: "var(--mono)", marginTop: 2 }}>tap →</div>
+              </div>
+              <div className="stat-box">
+                <div className="sval">#{rank || "—"}</div>
+                <div className="skey">campus rank</div>
+                <div style={{ fontSize: 9, color: "var(--fg4)", fontFamily: "var(--mono)", marginTop: 2 }}>of {totalUsers}</div>
+              </div>
+            </div>
+
             <div className="rep-card" style={{ marginBottom: 16 }}>
               <div className="rc-ey">Rep Score</div>
               <div className="rc-row">
@@ -359,10 +386,17 @@ export default function UserProfile({ setScreen, userId }) {
                     const timeEnded = dl && dl < Date.now();
                     let statusLabel = g.status === "open" ? "open" : g.status;
                     if (timeEnded && g.status === "open") statusLabel = "Time ended";
+                    const takerName = g.taker ? `${g.taker.first_name || ""} ${g.taker.last_name || ""}`.trim() : null;
+                    let subtitle = `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""}`;
+                    if (takerName && (g.status === "active" || g.status === "completed")) {
+                      subtitle += ` · ${g.status === "active" ? "Taken by" : "Done by"} ${takerName}`;
+                    } else {
+                      subtitle += ` · ${statusLabel}`;
+                    }
                     return {
                       icon: timeEnded ? <Timer size={15} /> : <Package size={15} />,
                       t: `${g.category?.label || "Gig"} posted`,
-                      s: `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""} · ${statusLabel}`,
+                      s: subtitle,
                       d: statusLabel,
                       pos: false,
                       expired: timeEnded,
@@ -455,6 +489,7 @@ export default function UserProfile({ setScreen, userId }) {
             setSelectedGig(null);
             setScreen("userProfile", uid);
           }}
+          currentUserId={currentUserId}
         />
       )}
       {gigLoading && (

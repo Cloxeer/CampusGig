@@ -11,7 +11,7 @@ import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
-export default function Profile({ setScreen }) {
+export default function Profile({ setScreen, currentUserId }) {
   const [pTab, setPTab] = useState("activity");
   const [showReviews, setShowReviews] = useState(false);
   const [showRepDetail, setShowRepDetail] = useState(false);
@@ -163,10 +163,17 @@ export default function Profile({ setScreen }) {
       const timeEnded = dl && dl < Date.now();
       let statusLabel = g.status === "open" ? "open" : g.status;
       if (timeEnded && g.status === "open") statusLabel = "Time ended";
+      const takerName = g.taker ? `${g.taker.first_name || ""} ${g.taker.last_name || ""}`.trim() : null;
+      let subtitle = `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""}`;
+      if (takerName && (g.status === "active" || g.status === "completed")) {
+        subtitle += ` · ${g.status === "active" ? "Taken by" : "Done by"} ${takerName}`;
+      } else {
+        subtitle += ` · ${statusLabel}`;
+      }
       return {
         icon: timeEnded ? <Timer size={15} /> : <Package size={15} />,
         t: `${g.category?.label || "Gig"} posted`,
-        s: `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""} · ${statusLabel}`,
+        s: subtitle,
         d: statusLabel,
         pos: false,
         expired: timeEnded,
@@ -282,9 +289,9 @@ export default function Profile({ setScreen }) {
                 <div className="skey">gigs done</div>
                 <div style={{ fontSize: 9, color: "var(--green-d)", fontFamily: "var(--mono)", marginTop: 2 }}>tap →</div>
               </div>
-              <div className="stat-box" onClick={() => setShowRepDetail(true)}>
-                <div className="sval">{repScore}</div>
-                <div className="skey">rep score</div>
+              <div className="stat-box" onClick={() => setPTab("activity")}>
+                <div className="sval">{gigStats.posted}</div>
+                <div className="skey">gigs posted</div>
                 <div style={{ fontSize: 9, color: "var(--green-d)", fontFamily: "var(--mono)", marginTop: 2 }}>tap →</div>
               </div>
               <div className="stat-box" onClick={() => setPTab("leaderboard")}>
@@ -557,6 +564,7 @@ export default function Profile({ setScreen }) {
             setSelectedGig(null);
             setScreen("userProfile", userId);
           }}
+          currentUserId={currentUserId}
         />
       )}
       {gigLoading && (
