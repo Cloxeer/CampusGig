@@ -1,6 +1,6 @@
 import { Mail } from "lucide-react";
 
-export default function MagicLink({ setScreen }) {
+export default function MagicLink({ setScreen, email }) {
   return (
     <div
       className="page fadein"
@@ -29,14 +29,12 @@ export default function MagicLink({ setScreen }) {
       <div style={{ fontSize: 14, color: "var(--fg3)", textAlign: "center", lineHeight: 1.6, marginBottom: 32 }}>
         We sent a magic link to
         <br />
-        <strong style={{ color: "var(--fg)" }}>you@university.edu</strong>
+        <strong style={{ color: "var(--fg)" }}>{email || "your university email"}</strong>
         <br />
         Click it to sign in instantly — no password needed.
       </div>
 
-      <button className="btn bp bfull blg" onClick={() => setScreen("home")}>
-        Open inbox
-      </button>
+
       <button className="btn bg-btn bfull" style={{ marginTop: 8 }} onClick={() => setScreen("auth")}>
         Use a different email
       </button>

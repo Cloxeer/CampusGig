@@ -39,7 +39,7 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
       return;
     }
     
-    setScreen("magic");
+    setScreen("magic", email);
   };
 
   return (

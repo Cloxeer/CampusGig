@@ -16,6 +16,7 @@ import { getMyProfile } from "./lib/profile";
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [authMode, setAuthMode] = useState("signup");
+  const [magicEmail, setMagicEmail] = useState("");
   const [showRepDetail, setShowRepDetail] = useState(false);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -65,9 +66,12 @@ export default function App() {
   }
 
   // Wrapper to handle screen changes with optional auth mode
-  const handleSetScreen = (newScreen, mode) => {
-    if (newScreen === "auth" && mode) {
-      setAuthMode(mode);
+  const handleSetScreen = (newScreen, payload) => {
+    if (newScreen === "auth" && payload) {
+      setAuthMode(payload);
+    }
+    if (newScreen === "magic" && payload) {
+      setMagicEmail(payload);
     }
     if (newScreen === "repDetail") {
       setShowRepDetail(true);
@@ -89,7 +93,7 @@ export default function App() {
     <div className="shell">
       {screen === "splash" && <Splash setScreen={handleSetScreen} />}
       {screen === "auth" && <Auth setScreen={handleSetScreen} initialMode={authMode} />}
-      {screen === "magic" && <MagicLink setScreen={handleSetScreen} />}
+      {screen === "magic" && <MagicLink setScreen={handleSetScreen} email={magicEmail} />}
       {screen === "onboarding" && <Onboarding setScreen={handleSetScreen} />}
       {screen === "home" && <Home setScreen={handleSetScreen} />}
       {screen === "explore" && <Explore setScreen={handleSetScreen} />}
