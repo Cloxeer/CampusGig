@@ -1,0 +1,1198 @@
+import { useState, useEffect, useRef } from "react";
+import {
+  Home, Search, Plus, Bell, User, ArrowLeft, MapPin, Clock,
+  Zap, Check, ChevronRight, Utensils, Printer, Package,
+  FileText, Truck, MessageCircle, Shield, Star, TrendingUp,
+  DollarSign, AtSign, Lock, Mail, Eye, EyeOff, Award, Trophy,
+  CheckCircle, AlertCircle, X, ChevronDown, Send,
+  Bike, Info, AlertTriangle, Filter, Pencil, Navigation,
+  CheckSquare, BarChart2
+} from "lucide-react";
+
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
+// Color system: ONE dark surface (#18181b), ONE accent (green #22c55e).
+// No competing warm/amber on dark backgrounds — that was the clash.
+// Amber reserved for warning states only (lock/pending).
+// ─────────────────────────────────────────────────────────────────────────────
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#ffffff;
+    --bg2:#fafafa;
+    --bg3:#f4f4f5;
+    --bd:#e4e4e7;
+    --bd2:#d4d4d8;
+    --fg:#09090b;
+    --fg2:#3f3f46;
+    --fg3:#71717a;
+    --fg4:#a1a1aa;
+    --ink:#18181b;
+    --ink-fg:#ffffff;
+    /* Single accent — green only */
+    --green:#22c55e;
+    --green-d:#16a34a;
+    --green-bg:#f0fdf4;
+    --green-bd:#bbf7d0;
+    --green-text:#15803d;
+    /* Amber = warnings/pending ONLY, never as brand accent */
+    --amber:#d97706;
+    --amber-bg:#fffbeb;
+    --amber-bd:#fde68a;
+    --err:#dc2626;
+    --err-bg:#fef2f2;
+    --r:8px;--rlg:12px;
+    --font:'Geist',system-ui,sans-serif;
+    --mono:'Geist Mono',monospace;
+  }
+  html,body{height:100%;background:#d4d4d8}
+  body{font-family:var(--font);color:var(--fg);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+  .shell{max-width:393px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 0.5px var(--bd),0 8px 40px rgba(0,0,0,.1)}
+  .page{min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+  .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .scroll::-webkit-scrollbar{display:none}
+
+  /* ── BUTTONS */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r);font-family:var(--font);font-weight:500;font-size:14px;cursor:pointer;border:none;line-height:1;letter-spacing:-.01em;transition:all .12s;white-space:nowrap;flex-shrink:0}
+  .btn:active{transform:scale(.97);opacity:.9}
+  .bp{background:var(--ink);color:var(--ink-fg);height:40px;padding:0 16px}
+  .bp:hover{opacity:.88}
+  .bo{background:transparent;color:var(--fg);border:1px solid var(--bd);height:40px;padding:0 16px}
+  .bo:hover{background:var(--bg3)}
+  .bg-btn{background:transparent;color:var(--fg3);height:34px;padding:0 10px;border:none}
+  .bg-btn:hover{background:var(--bg3);color:var(--fg)}
+  .bgreen{background:var(--green-d);color:#fff;height:40px;padding:0 16px}
+  .bgreen:hover{opacity:.9}
+  .bfull{width:100%}
+  .blg{height:44px;font-size:15px;font-weight:600}
+  .bsm{height:30px;font-size:12px;padding:0 10px;border-radius:6px}
+  .bico{width:34px;height:34px;padding:0;border-radius:var(--r)}
+
+  /* ── INPUTS */
+  .field{display:flex;flex-direction:column;gap:5px}
+  .lbl{font-size:13px;font-weight:500;color:var(--fg);letter-spacing:-.01em}
+  .hint{font-size:12px;color:var(--fg3);line-height:1.4}
+  .inp{height:40px;width:100%;border-radius:var(--r);border:1px solid var(--bd);background:var(--bg);padding:0 12px;font-family:var(--font);font-size:14px;color:var(--fg);outline:none;transition:border-color .12s,box-shadow .12s}
+  .inp::placeholder{color:var(--fg4)}
+  .inp:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(24,24,27,.07)}
+  .ig{display:flex;align-items:center;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg);transition:border-color .12s,box-shadow .12s;overflow:hidden}
+  .ig:focus-within{border-color:var(--ink);box-shadow:0 0 0 3px rgba(24,24,27,.07)}
+  .iad{height:40px;padding:0 10px;display:flex;align-items:center;background:var(--bg3);border-right:1px solid var(--bd);color:var(--fg3);flex-shrink:0}
+  .ii{flex:1;height:40px;border:none;outline:none;padding:0 12px;font-family:var(--font);font-size:14px;color:var(--fg);background:transparent;min-width:0}
+  .ii::placeholder{color:var(--fg4)}
+  .ta{width:100%;border-radius:var(--r);border:1px solid var(--bd);background:var(--bg);padding:10px 12px;font-family:var(--font);font-size:14px;color:var(--fg);outline:none;resize:none;min-height:80px;line-height:1.6;transition:border-color .12s,box-shadow .12s}
+  .ta::placeholder{color:var(--fg4)}
+  .ta:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(24,24,27,.07)}
+
+  /* ── BADGES */
+  .badge{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:2px 7px;font-size:11px;font-weight:500;font-family:var(--mono);white-space:nowrap;letter-spacing:.01em}
+  .bn{background:var(--bg3);color:var(--fg3);border:1px solid var(--bd)}
+  /* Level colors — each level has its own subtle tone */
+  .lv-new{background:var(--bg3);color:var(--fg3);border:1px solid var(--bd)}
+  .lv-reliable{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+  .lv-trusted{background:var(--green-bg);color:var(--green-text);border:1px solid var(--green-bd)}
+  .lv-legend{background:#faf5ff;color:#7c3aed;border:1px solid #e9d5ff}
+
+  /* ── DIVIDERS */
+  .sep{height:1px;background:var(--bd);flex-shrink:0}
+  .or-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--fg4);font-family:var(--mono)}
+  .or-row::before,.or-row::after{content:'';flex:1;height:1px;background:var(--bd)}
+
+  /* ── CALLOUT */
+  .callout{display:flex;align-items:flex-start;gap:8px;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px}
+  .ci{flex-shrink:0;margin-top:1px;color:var(--fg3);display:flex}
+  .ct{font-size:12px;color:var(--fg3);line-height:1.55}
+  .ct strong{color:var(--fg);font-weight:600}
+
+  /* ── TOPBAR */
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd);height:52px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+  .tlogo{display:flex;align-items:center;gap:8px}
+  .tmark{width:26px;height:26px;background:var(--ink);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .av{width:30px;height:30px;border-radius:50%;color:var(--ink-fg);font-size:11px;font-weight:700;font-family:var(--mono);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex-shrink:0}
+  .av-dot{position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:var(--err);border:2px solid var(--bg)}
+
+  /* ── SPLASH */
+  .splash{min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+  .splash-body{flex:1;padding:60px 24px 0;position:relative;overflow:hidden}
+  .sgrid{position:absolute;inset:0;background-image:linear-gradient(var(--bd) 1px,transparent 1px),linear-gradient(90deg,var(--bd) 1px,transparent 1px);background-size:28px 28px;opacity:.5}
+  .sfade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,0) 25%,var(--bg) 82%)}
+  .scontent{position:relative;z-index:1;padding-bottom:40px}
+  .sdot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s ease infinite;flex-shrink:0}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
+  .sfoot{padding:20px 24px 36px;border-top:1px solid var(--bd);background:var(--bg);display:flex;flex-direction:column;gap:8px}
+
+  /* ── REP CARD — ink bg, green accent, clean */
+  .rep-card{background:var(--ink);border-radius:var(--rlg);padding:16px}
+  .rc-ey{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:#52525b;font-family:var(--mono);margin-bottom:6px}
+  .rc-row{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
+  .rc-score{font-size:30px;font-weight:700;letter-spacing:-.05em;color:#e4e4e7;font-family:var(--mono);line-height:1}
+  .rc-pts{font-size:13px;font-weight:400;color:#52525b;margin-left:3px;margin-bottom:2px}
+  /* Level badge on dark: green tint, no amber */
+  .rc-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2);border-radius:5px;padding:3px 8px;font-size:11px;font-weight:500;font-family:var(--mono)}
+  .rc-track{height:2px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;margin-bottom:8px}
+  .rc-fill{height:100%;background:var(--green);border-radius:99px;transition:width .3s}
+  .rc-labels{display:flex;justify-content:space-between}
+  .rc-lbl{font-size:9px;color:#52525b;font-family:var(--mono)}
+  .rc-lbl.cur{color:var(--green);font-weight:600}
+  .rc-footer{margin-top:10px;font-size:11px;color:#52525b;font-family:var(--mono)}
+  .rc-footer .accent{color:var(--green)}
+
+  /* ── TABS */
+  .tabs{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--bd)}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex-shrink:0;padding:9px 14px;font-size:13px;font-weight:500;color:var(--fg3);border:none;background:none;font-family:var(--font);cursor:pointer;letter-spacing:-.01em;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .1s,border-color .1s}
+  .tab.on{color:var(--fg);border-bottom-color:var(--fg)}
+  .tab:hover{color:var(--fg)}
+
+  /* ── GIG CARDS */
+  .gig{border:1px solid var(--bd);border-radius:var(--rlg);padding:13px 14px;cursor:pointer;background:var(--bg);transition:border-color .12s,box-shadow .12s}
+  .gig:hover{border-color:var(--bd2);box-shadow:0 1px 6px rgba(0,0,0,.05)}
+  .gig:active{opacity:.96;transform:scale(.997)}
+  .gprice{font-size:15px;font-weight:700;color:var(--fg);font-family:var(--mono);letter-spacing:-.04em;flex-shrink:0}
+  .gmi{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--fg3);font-family:var(--mono)}
+  .pav{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;flex-shrink:0}
+
+  /* ── MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:flex;align-items:flex-end;justify-content:center;max-width:393px;margin:0 auto}
+  .sheet{width:100%;background:var(--bg);border-radius:20px 20px 0 0;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .sheet::-webkit-scrollbar{display:none}
+  .handle{width:36px;height:4px;background:var(--bd2);border-radius:2px;margin:12px auto 0}
+
+  /* ── ALERTS */
+  .alert-row{display:flex;align-items:flex-start;gap:10px;padding:13px 16px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
+  .alert-row:hover{background:var(--bg2)}
+  .alert-row.unread{background:var(--bg2)}
+  .aico{width:36px;height:36px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+  /* ── PROFILE */
+  .stat-box{background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:10px 8px;text-align:center;cursor:pointer;transition:border-color .12s,background .12s;-webkit-tap-highlight-color:transparent}
+  .stat-box:hover{border-color:var(--bd2);background:var(--bg2)}
+  .stat-box:active{transform:scale(.97)}
+  .sval{font-size:20px;font-weight:700;font-family:var(--mono);letter-spacing:-.04em;color:var(--fg);line-height:1;margin-bottom:2px}
+  .skey{font-size:10px;color:var(--fg3);font-family:var(--mono)}
+  .ptab{flex:1;padding:11px 0;text-align:center;font-size:13px;font-weight:500;color:var(--fg3);border:none;background:none;font-family:var(--font);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .1s}
+  .ptab.on{color:var(--fg);border-bottom-color:var(--fg)}
+
+  /* Editable field */
+  .editable-field{padding:13px 0;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .1s}
+  .editable-field:last-child{border-bottom:none}
+  .editable-field:hover{background:var(--bg2);margin:0 -16px;padding:13px 16px}
+  .ef-body{flex:1;min-width:0}
+  .ef-label{font-size:11px;font-weight:500;color:var(--fg3);font-family:var(--mono);margin-bottom:2px}
+  .ef-val{font-size:14px;color:var(--fg);font-weight:500}
+  .ef-empty{font-size:14px;color:var(--fg4)}
+
+  /* Map */
+  .map-container{border-radius:var(--rlg);overflow:hidden;border:1px solid var(--bd);position:relative;background:#f1f5f9}
+
+  /* ── BOTTOM NAV */
+  .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:393px;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-top:1px solid var(--bd);display:flex;align-items:flex-end;padding:8px 0 20px;z-index:30}
+  .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:none;font-family:var(--font);padding:4px 0;color:var(--fg4);transition:color .1s}
+  .ni.on{color:var(--fg)}
+  .nlbl{font-size:10px;font-weight:500;font-family:var(--mono)}
+  .npost-wrap{flex:1;display:flex;justify-content:center;align-items:flex-end}
+  .npost-btn{width:40px;height:40px;border-radius:10px;background:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;box-shadow:0 2px 10px rgba(0,0,0,.2);transition:transform .1s}
+  .npost-btn:active{transform:scale(.9)}
+  .nb-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--err);border:2px solid var(--bg)}
+
+  /* Leaderboard */
+  .lb-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bd)}
+  .lb-row:last-child{border-bottom:none}
+  .lb-you{background:var(--green-bg)}
+  .lb-rank{width:20px;font-size:12px;font-weight:700;font-family:var(--mono);color:var(--fg3);text-align:center;flex-shrink:0}
+  .lb-rank.top{color:var(--green-text)}
+  .lb-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0}
+
+  /* Reviews */
+  .rev-row{padding:14px 20px;border-bottom:1px solid var(--bd);display:flex;gap:10px}
+  .rev-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0}
+
+  /* Post gig */
+  .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .cat{border:1px solid var(--bd);border-radius:var(--r);padding:10px 6px;text-align:center;cursor:pointer;background:var(--bg);transition:all .1s}
+  .cat:hover{border-color:var(--bd2)}.cat.on{border-color:var(--fg);background:var(--ink)}
+  .cico{display:flex;align-items:center;justify-content:center;margin:0 auto 4px;color:var(--fg3)}.cat.on .cico{color:var(--ink-fg)}
+  .clbl{font-size:11px;font-weight:500;color:var(--fg3)}.cat.on .clbl{color:var(--ink-fg)}
+
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .fadein{animation:fadein .18s ease forwards}
+  @keyframes slidein{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .slidein{animation:slidein .22s ease forwards}
+`;
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const nowMs = Date.now();
+const mkGig = (id,title,price,cat,loc,eta,poster,initials,color,levelLabel,minsAgo) => ({
+  id,title,price,cat,loc,eta,poster,initials,color,levelLabel,
+  postedAt: nowMs - minsAgo*60*1000,
+  notes:"Please text when you're on the way. Front desk will let you up.",
+});
+const ALL_GIGS = [
+  mkGig(1,"Grab Chick-fil-A #1 combo from Corbet → Science Hall Rm 225","$3.00","Food","Sci Hall","~15 min","Maya T.","MT","#6366f1","Reliable",3),
+  mkGig(2,"Print 12-page PDF at Shields Library → Dorm B Rm 104","$4.00","Print","Dorm B","~20 min","Jordan K.","JK","#0891b2","Trusted",12),
+  mkGig(3,"Return 3 overdue library books — in lecture until 5pm","$5.00","Errand","Main Library","~25 min","Alex R.","AR","#9333ea","Legend",28),
+  mkGig(4,"Scan + email BIO 101 lecture notes from today","$6.00","Notes","Remote","~10 min","Sam L.","SL","#0f766e","New",47),
+  mkGig(5,"Pick up my laptop from Kemper Hall 1065 → MU","$8.00","Errand","MU","~30 min","Chris M.","CM","#b45309","Reliable",62),
+  mkGig(6,"Coffee run — large oat milk latte from Coffee House","$5.00","Food","Quad","~12 min","Dana P.","DP","#be185d","New",5),
+];
+
+const REP_LEVELS = [
+  { label:"New",      min:0,   max:49,  cls:"lv-new" },
+  { label:"Reliable", min:50,  max:149, cls:"lv-reliable" },
+  { label:"Trusted",  min:150, max:299, cls:"lv-trusted" },
+  { label:"Legend",   min:300, max:Infinity, cls:"lv-legend" },
+];
+function getLevel(rep) {
+  const idx = REP_LEVELS.findIndex(r => rep >= r.min && rep <= r.max);
+  const l = REP_LEVELS[idx];
+  const next = REP_LEVELS[idx+1];
+  const pct = next ? Math.round((rep-l.min)/(l.max-l.min)*100) : 100;
+  return { ...l, pct:Math.min(pct,100), next:next?.label, toNext:next ? next.min-rep : 0 };
+}
+const MY_REP = 142;
+const lvl = getLevel(MY_REP);
+
+const LEADERBOARD = [
+  { rank:1,name:"Alex R.",  initials:"AR",color:"#9333ea",gigs:31,rep:203,isYou:false },
+  { rank:2,name:"Jordan K.",initials:"JK",color:"#0891b2",gigs:27,rep:187,isYou:false },
+  { rank:3,name:"Maya T.",  initials:"MT",color:"#6366f1",gigs:22,rep:142,isYou:true  },
+  { rank:4,name:"Sam L.",   initials:"SL",color:"#0f766e",gigs:18,rep:118,isYou:false },
+  { rank:5,name:"Chris M.", initials:"CM",color:"#b45309",gigs:14,rep:95, isYou:false },
+  { rank:6,name:"Dana P.",  initials:"DP",color:"#be185d",gigs:11,rep:72, isYou:false },
+];
+const ACTIVITY = [
+  { icon:<CheckCircle size={15}/>, t:"Food Run completed",      s:"Sci Hall 225 · $3.00 received", d:"+15 pts", pos:true  },
+  { icon:<Star size={15}/>,        t:"5-star rating received",   s:'From Jordan K. — "Super fast!"', d:"+5 pts",  pos:true  },
+  { icon:<CheckCircle size={15}/>, t:"Notes gig completed",     s:"BIO 101 · $6.00 received",       d:"+10 pts", pos:true  },
+  { icon:<Package size={15}/>,     t:"Errand posted",           s:"Library return · waiting",       d:"open",    pos:false },
+];
+const REVIEWS = [
+  { name:"Jordan K.",initials:"JK",color:"#0891b2",rating:5,text:'Super fast and reliable! Delivered exactly as asked.',time:"2 days ago"},
+  { name:"Alex R.",  initials:"AR",color:"#9333ea",rating:5,text:'Showed up on time, very communicative. Great campus helper!',time:"1 week ago"},
+  { name:"Sam L.",   initials:"SL",color:"#0f766e",rating:4,text:'Good communication, took a little longer than expected.',time:"2 weeks ago"},
+  { name:"Chris M.", initials:"CM",color:"#b45309",rating:5,text:'Amazing! Saved me during finals week. Highly recommend.',time:"3 weeks ago"},
+];
+const ALERTS_DATA = [
+  { id:1,iconBg:"#f0fdf4",iconColor:"#16a34a",icon:<CheckCircle size={16}/>,title:"Jordan K. accepted your gig",sub:"Library book return · payment pending",time:"2m ago",unread:true},
+  { id:2,iconBg:"#f0fdf4",iconColor:"#16a34a",icon:<DollarSign size={16}/>,title:"Payment received — $4.00",sub:"Print gig completed by Jordan K.",time:"18m ago",unread:true},
+  { id:3,iconBg:"#fefce8",iconColor:"#ca8a04",icon:<Star size={16}/>,title:"New review from Alex R.",sub:'"Super fast and reliable!" · ★★★★★',time:"2h ago",unread:true},
+  { id:4,iconBg:"#fef2f2",iconColor:"#dc2626",icon:<AlertTriangle size={16}/>,title:"Issue reported on gig #1042",sub:"User reported incomplete delivery",time:"1d ago",unread:false},
+  { id:5,iconBg:"#f4f4f5",iconColor:"#71717a",icon:<Clock size={16}/>,title:"Your gig expires in 2 hours",sub:"Food run · Corbet → Sci Hall 225",time:"1d ago",unread:false},
+  { id:6,iconBg:"#f0fdf4",iconColor:"#16a34a",icon:<Award size={16}/>,title:"Gig completed! +10 Rep earned",sub:"Notes · BIO 101 · $6.00",time:"3d ago",unread:false},
+];
+const CATS = [
+  {icon:<Utensils size={15}/>,label:"Food"},
+  {icon:<Printer size={15}/>,label:"Print"},
+  {icon:<Package size={15}/>,label:"Errand"},
+  {icon:<FileText size={15}/>,label:"Notes"},
+  {icon:<Bike size={15}/>,label:"Delivery"},
+  {icon:<MessageCircle size={15}/>,label:"Other"},
+];
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function useTimer() {
+  const [t,setT] = useState(0);
+  useEffect(() => { const id=setInterval(()=>setT(x=>x+1),1000); return ()=>clearInterval(id); },[]);
+  return t;
+}
+function elapsed(ts) {
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return `${s}s ago`;
+  const m=Math.floor(s/60); if(m<60) return `${m}m ago`;
+  const h=Math.floor(m/60); if(h<24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+
+// ── COMPONENTS ────────────────────────────────────────────────────────────────
+const WM = ({size=15}) => (
+  <span style={{fontSize:size,fontWeight:700,letterSpacing:"-.04em",color:"var(--fg)"}}>
+    Campus<span style={{color:"var(--green)"}}>Gig</span>
+  </span>
+);
+
+const LevelBadge = ({label,small}) => {
+  const cls = {New:"lv-new",Reliable:"lv-reliable",Trusted:"lv-trusted",Legend:"lv-legend"}[label]||"lv-new";
+  return <span className={`badge ${cls}`} style={{fontSize:small?10:11}}>{label}</span>;
+};
+
+const Stars = ({n=5,size=12,filled=false}) => (
+  <span style={{display:"inline-flex",gap:1}}>
+    {[1,2,3,4,5].map(i=>(
+      <Star key={i} size={size}
+        fill={i<=n&&filled?"#fbbf24":"none"}
+        color={i<=n?"#fbbf24":"#d4d4d8"}
+        strokeWidth={1.5}/>
+    ))}
+  </span>
+);
+
+// Simple SVG campus map
+const CampusMap = () => (
+  <svg width="100%" viewBox="0 0 360 200" style={{display:"block"}}>
+    <rect width="360" height="200" fill="#f1f5f9"/>
+    {/* Roads */}
+    <rect x="0" y="90" width="360" height="12" fill="#e2e8f0"/>
+    <rect x="160" y="0" width="12" height="200" fill="#e2e8f0"/>
+    <rect x="0" y="155" width="360" height="10" fill="#e2e8f0"/>
+    <rect x="60" y="0" width="10" height="200" fill="#e2e8f0"/>
+    <rect x="270" y="0" width="10" height="200" fill="#e2e8f0"/>
+    {/* Buildings */}
+    <rect x="20" y="20" width="32" height="24" rx="3" fill="#cbd5e1"/>
+    <text x="36" y="35" textAnchor="middle" fontSize="7" fill="#475569" fontFamily="var(--mono)">Sci</text>
+    <rect x="20" y="115" width="32" height="22" rx="3" fill="#cbd5e1"/>
+    <text x="36" y="129" textAnchor="middle" fontSize="7" fill="#475569" fontFamily="var(--mono)">Library</text>
+    <rect x="185" y="20" width="38" height="26" rx="3" fill="#cbd5e1"/>
+    <text x="204" y="35" textAnchor="middle" fontSize="7" fill="#475569" fontFamily="var(--mono)">Dorm B</text>
+    <rect x="185" y="115" width="36" height="24" rx="3" fill="#cbd5e1"/>
+    <text x="203" y="130" textAnchor="middle" fontSize="7" fill="#475569" fontFamily="var(--mono)">MU</text>
+    <rect x="80" y="20" width="60" height="60" rx="4" fill="#bfdbfe"/>
+    <text x="110" y="54" textAnchor="middle" fontSize="8" fill="#1d4ed8" fontFamily="var(--mono)">Campus</text>
+    <text x="110" y="64" textAnchor="middle" fontSize="8" fill="#1d4ed8" fontFamily="var(--mono)">Quad</text>
+    <rect x="290" y="20" width="55" height="30" rx="3" fill="#cbd5e1"/>
+    <text x="317" y="38" textAnchor="middle" fontSize="7" fill="#475569" fontFamily="var(--mono)">Kemper</text>
+    <rect x="80" y="115" width="60" height="28" rx="3" fill="#cbd5e1"/>
+    <text x="110" y="132" textAnchor="middle" fontSize="7" fill="#475569" fontFamily="var(--mono)">Corbet</text>
+    {/* You marker */}
+    <circle cx="166" cy="96" r="8" fill="var(--green)" opacity=".9"/>
+    <circle cx="166" cy="96" r="4" fill="white"/>
+    <circle cx="166" cy="96" r="14" fill="var(--green)" opacity=".15"/>
+    <text x="166" y="120" textAnchor="middle" fontSize="8" fill="var(--green-text)" fontFamily="var(--mono)" fontWeight="600">You</text>
+    {/* Gig pins */}
+    <circle cx="36" cy="20" r="5" fill="#6366f1"/>
+    <text x="36" y="13" textAnchor="middle" fontSize="8" fill="#6366f1" fontFamily="var(--mono)">$3</text>
+    <circle cx="204" cy="20" r="5" fill="#0891b2"/>
+    <text x="204" y="13" textAnchor="middle" fontSize="8" fill="#0891b2" fontFamily="var(--mono)">$4</text>
+    <circle cx="36" cy="115" r="5" fill="#9333ea"/>
+    <text x="36" y="108" textAnchor="middle" fontSize="8" fill="#9333ea" fontFamily="var(--mono)">$5</text>
+    <circle cx="317" cy="20" r="5" fill="#b45309"/>
+    <text x="317" y="13" textAnchor="middle" fontSize="8" fill="#b45309" fontFamily="var(--mono)">$8</text>
+    <circle cx="110" cy="115" r="5" fill="#be185d"/>
+    <text x="110" y="108" textAnchor="middle" fontSize="8" fill="#be185d" fontFamily="var(--mono)">$5</text>
+  </svg>
+);
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [screen,setScreen]     = useState("splash");
+  const [authMode,setAuthMode] = useState("signup");
+  const [tab,setTab]           = useState("Near Me");
+  const [cat,setCat]           = useState("Food");
+  const [pTab,setPTab]         = useState("activity");
+  const [selectedGig,setSelectedGig]   = useState(null);
+  const [showReviews,setShowReviews]   = useState(false);
+  const [showRepDetail,setShowRepDetail] = useState(false);
+  const [showMap,setShowMap]           = useState(false);
+  const [requested,setRequested]       = useState(false);
+  const [searchQ,setSearchQ]           = useState("");
+  const [newRating,setNewRating]       = useState(0);
+  const [editField,setEditField]       = useState(null);
+  const [contactInfo,setContactInfo]   = useState({
+    venmo:"@mayavenmo", cashapp:"$maya-torres", paypal:"maya@aggiemail.edu",
+    phone:"+1 (530) 555-0192", preferred:"Venmo + text"
+  });
+  // Onboarding profile state
+  const [profile,setProfile] = useState({
+    venmo:"",cashapp:"",paypal:"",phone:"",bio:""
+  });
+  const tick = useTimer();
+
+  const filteredGigs = ALL_GIGS.filter(g => {
+    if(tab==="Near Me") return true;
+    if(tab==="Food")    return g.cat==="Food";
+    if(tab==="Errands") return g.cat==="Errand";
+    if(tab==="Notes")   return g.cat==="Notes";
+    return true;
+  });
+  const searchResults = ALL_GIGS.filter(g =>
+    searchQ.trim()===""?false:
+    g.title.toLowerCase().includes(searchQ.toLowerCase())||
+    g.cat.toLowerCase().includes(searchQ.toLowerCase())||
+    g.loc.toLowerCase().includes(searchQ.toLowerCase())
+  );
+
+  const goHome = () => { setScreen("home"); setSelectedGig(null); };
+  const Nav = () => (
+    <nav className="bnav">
+      <button className={`ni ${screen==="home"?"on":""}`} onClick={goHome}><Home size={18}/><span className="nlbl">home</span></button>
+      <button className={`ni ${screen==="explore"?"on":""}`} onClick={()=>setScreen("explore")}><Search size={18}/><span className="nlbl">explore</span></button>
+      <div className="npost-wrap">
+        <button className="npost-btn" onClick={()=>setScreen("post")}><Plus size={20} color="#fff" strokeWidth={2.5}/></button>
+      </div>
+      <button className={`ni ${screen==="alerts"?"on":""}`} onClick={()=>setScreen("alerts")} style={{position:"relative"}}>
+        <Bell size={18}/><span className="nlbl">alerts</span>
+        <div className="nb-dot"/>
+      </button>
+      <button className={`ni ${screen==="profile"?"on":""}`} onClick={()=>setScreen("profile")}><User size={18}/><span className="nlbl">profile</span></button>
+    </nav>
+  );
+
+  // ── SPLASH ────────────────────────────────────────────────────────────────
+  if(screen==="splash") return (
+    <div className="shell"><style>{css}</style>
+      <div className="splash fadein">
+        <div className="splash-body">
+          <div className="sgrid"/><div className="sfade"/>
+          <div className="scontent">
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:44}}>
+              <div style={{width:32,height:32,background:"var(--ink)",borderRadius:"var(--r)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <Zap size={16} color="#fff" strokeWidth={2.5}/>
+              </div>
+              <WM size={17}/>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14}}>
+              <div className="sdot"/>
+              <span style={{fontSize:12,fontFamily:"var(--mono)",color:"var(--fg3)"}}>student-to-student · .edu verified</span>
+            </div>
+            {/* "Money" is green */}
+            <div style={{fontSize:38,fontWeight:700,letterSpacing:"-.045em",lineHeight:1.05,color:"var(--fg)",marginBottom:14}}>
+              Small tasks.<br/>Real{" "}
+              <span style={{color:"var(--green)"}}>money.</span>
+            </div>
+            <p style={{fontSize:14,color:"var(--fg3)",lineHeight:1.65,maxWidth:280}}>
+              Post an errand. Pick one up. Build your campus reputation.
+            </p>
+          </div>
+        </div>
+        <div className="sfoot">
+          <button className="btn bp bfull blg" onClick={()=>{setAuthMode("signup");setScreen("auth");}}>Get started</button>
+          <button className="btn bo bfull blg" onClick={()=>{setAuthMode("login");setScreen("auth");}}>Sign in</button>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,paddingTop:2}}>
+            <Lock size={11} color="var(--fg4)"/>
+            <span style={{fontSize:11,fontFamily:"var(--mono)",color:"var(--fg4)"}}>.edu only · verified students</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── AUTH ──────────────────────────────────────────────────────────────────
+  if(screen==="auth") return (
+    <div className="shell"><style>{css}</style>
+      <div className="page fadein">
+        <div style={{padding:"52px 20px 18px",borderBottom:"1px solid var(--bd)"}}>
+          <button className="btn bg-btn" style={{padding:0,gap:4,marginBottom:20}} onClick={()=>setScreen("splash")}>
+            <ArrowLeft size={13}/> Back
+          </button>
+          <div style={{fontSize:20,fontWeight:700,letterSpacing:"-.035em",marginBottom:2}}>
+            {authMode==="signup"?"Create account":"Welcome back"}
+          </div>
+          <div style={{fontSize:13,color:"var(--fg3)"}}>
+            {authMode==="signup"
+              ? "We'll send a magic link to your .edu email."
+              : "We'll send a magic link to sign you in."}
+          </div>
+        </div>
+        <div className="scroll" style={{padding:"24px 20px",display:"flex",flexDirection:"column",gap:16}}>
+          {authMode==="signup" && (
+            <div className="field">
+              <label className="lbl">Full name</label>
+              <input className="inp" placeholder="Your full name"/>
+            </div>
+          )}
+          <div className="field">
+            <label className="lbl">School email</label>
+            <div className="ig">
+              <div className="iad"><Mail size={13}/></div>
+              <input className="ii" placeholder="you@university.edu" type="email"/>
+            </div>
+            <div className="callout" style={{marginTop:4}}>
+              <div className="ci"><Shield size={13}/></div>
+              <span className="ct">
+                <strong>.edu required.</strong>{" "}
+                {authMode==="signup"
+                  ?"Only verified students can join CampusGig."
+                  :"A magic link will be sent to your inbox."}
+              </span>
+            </div>
+          </div>
+          <button className="btn bp bfull blg"
+            onClick={()=>authMode==="signup"?setScreen("onboarding"):setScreen("magic")}>
+            {authMode==="signup"?"Continue →":"Send magic link"}
+          </button>
+          <div className="or-row">or</div>
+          <button style={{background:"none",border:"none",cursor:"pointer",fontFamily:"var(--font)",fontSize:13,color:"var(--fg3)",textAlign:"center",padding:"6px 0"}}
+            onClick={()=>setAuthMode(authMode==="signup"?"login":"signup")}>
+            {authMode==="signup"?"Already have an account? Sign in":"New here? Create account"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── MAGIC LINK SENT ───────────────────────────────────────────────────────
+  if(screen==="magic") return (
+    <div className="shell"><style>{css}</style>
+      <div className="page fadein" style={{alignItems:"center",justifyContent:"center",padding:"0 32px",gap:0}}>
+        <div style={{width:56,height:56,background:"var(--green-bg)",border:"1px solid var(--green-bd)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
+          <Mail size={24} color="var(--green-d)"/>
+        </div>
+        <div style={{fontSize:20,fontWeight:700,letterSpacing:"-.03em",marginBottom:8,textAlign:"center"}}>Check your inbox</div>
+        <div style={{fontSize:14,color:"var(--fg3)",textAlign:"center",lineHeight:1.6,marginBottom:32}}>
+          We sent a magic link to<br/>
+          <strong style={{color:"var(--fg)"}}>you@university.edu</strong><br/>
+          Click it to sign in instantly — no password needed.
+        </div>
+        <button className="btn bp bfull blg" onClick={()=>setScreen("home")}>
+          Open inbox
+        </button>
+        <button className="btn bg-btn bfull" style={{marginTop:8}} onClick={()=>setScreen("auth")}>
+          Use a different email
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── ONBOARDING ────────────────────────────────────────────────────────────
+  if(screen==="onboarding") return (
+    <div className="shell"><style>{css}</style>
+      <div className="page fadein">
+        <div style={{padding:"52px 20px 18px",borderBottom:"1px solid var(--bd)"}}>
+          <div style={{fontSize:20,fontWeight:700,letterSpacing:"-.035em",marginBottom:4}}>Set up your profile</div>
+          <div style={{fontSize:13,color:"var(--fg3)"}}>All optional — you can update this anytime.</div>
+        </div>
+        <div className="scroll" style={{padding:"24px 20px",display:"flex",flexDirection:"column",gap:14}}>
+          <div className="callout">
+            <div className="ci"><Lock size={13}/></div>
+            <span className="ct"><strong>Payment info is private.</strong> Only shared with the other party once you both accept a gig.</span>
+          </div>
+          <div className="field">
+            <label className="lbl">Venmo <span style={{color:"var(--fg4)",fontSize:11,fontWeight:400}}>optional</span></label>
+            <div className="ig">
+              <div className="iad" style={{fontFamily:"var(--mono)",fontSize:14,fontWeight:500}}>@</div>
+              <input className="ii" placeholder="yourvenmo" value={profile.venmo} onChange={e=>setProfile({...profile,venmo:e.target.value})}/>
+            </div>
+          </div>
+          <div className="field">
+            <label className="lbl">Cash App <span style={{color:"var(--fg4)",fontSize:11,fontWeight:400}}>optional</span></label>
+            <div className="ig">
+              <div className="iad" style={{fontFamily:"var(--mono)",fontSize:14,fontWeight:500}}>$</div>
+              <input className="ii" placeholder="yourcashtag" value={profile.cashapp} onChange={e=>setProfile({...profile,cashapp:e.target.value})}/>
+            </div>
+          </div>
+          <div className="field">
+            <label className="lbl">PayPal <span style={{color:"var(--fg4)",fontSize:11,fontWeight:400}}>optional</span></label>
+            <div className="ig">
+              <div className="iad"><AtSign size={13}/></div>
+              <input className="ii" placeholder="email or @handle" value={profile.paypal} onChange={e=>setProfile({...profile,paypal:e.target.value})}/>
+            </div>
+          </div>
+          <div className="field">
+            <label className="lbl">Phone <span style={{color:"var(--fg4)",fontSize:11,fontWeight:400}}>optional</span></label>
+            <input className="inp" placeholder="+1 (000) 000-0000" type="tel" value={profile.phone} onChange={e=>setProfile({...profile,phone:e.target.value})}/>
+          </div>
+          <div className="field">
+            <label className="lbl">Short bio <span style={{color:"var(--fg4)",fontSize:11,fontWeight:400}}>optional</span></label>
+            <textarea className="ta" placeholder="e.g. UC Davis junior, quick and reliable!" style={{minHeight:64}} value={profile.bio} onChange={e=>setProfile({...profile,bio:e.target.value})}/>
+          </div>
+          <button className="btn bp bfull blg" style={{marginTop:4}} onClick={()=>setScreen("magic")}>
+            Finish setup
+          </button>
+          <button className="btn bg-btn bfull" onClick={()=>setScreen("magic")}>
+            Skip for now
+          </button>
+          <div style={{height:8}}/>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── MAIN SCREENS ──────────────────────────────────────────────────────────
+  return (
+    <div className="shell"><style>{css}</style>
+
+      {/* HOME */}
+      {screen==="home" && (
+        <div className="page fadein">
+          <div className="topbar">
+            <div className="tlogo">
+              <div className="tmark"><Zap size={14} color="#fff" strokeWidth={2.5}/></div>
+              <WM/>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <button className="btn bg-btn bico" onClick={()=>setScreen("explore")}><Search size={15}/></button>
+              <div className="av" style={{background:"#6366f1"}} onClick={()=>setScreen("profile")}>MT<div className="av-dot"/></div>
+            </div>
+          </div>
+          <div className="scroll" style={{paddingBottom:80}}>
+            {/* Rep card — ink bg, green accent */}
+            <div style={{margin:"14px 16px 0"}}>
+              <div className="rep-card" style={{cursor:"pointer"}} onClick={()=>setShowRepDetail(true)}>
+                <div className="rc-ey">Rep Score · tap for details</div>
+                <div className="rc-row">
+                  <div style={{display:"flex",alignItems:"baseline",gap:3}}>
+                    <span className="rc-score">{MY_REP}</span>
+                    <span className="rc-pts">pts</span>
+                  </div>
+                  <div className="rc-badge"><Award size={10}/> {lvl.label}</div>
+                </div>
+                <div className="rc-track"><div className="rc-fill" style={{width:`${lvl.pct}%`}}/></div>
+                <div className="rc-labels">
+                  {["New","Reliable","Trusted","Legend"].map(l=>(
+                    <span key={l} className={`rc-lbl ${lvl.label===l?"cur":""}`}>{l}</span>
+                  ))}
+                </div>
+                <div className="rc-footer">
+                  {lvl.next?<>+{lvl.toNext} pts to <span className="accent">{lvl.next}</span> · +10 per gig · +5 for 5★</>:"Max level reached"}
+                </div>
+              </div>
+            </div>
+
+            {/* Near Me map toggle */}
+            {tab==="Near Me" && (
+              <div style={{margin:"12px 16px 0"}}>
+                <button className="btn bo bfull bsm" style={{justifyContent:"center",gap:6,height:34}}
+                  onClick={()=>setShowMap(true)}>
+                  <Navigation size={12}/> View gigs on map
+                </button>
+              </div>
+            )}
+
+            <div style={{padding:"0 16px"}}>
+              <div className="tabs" style={{margin:"14px -16px 0",padding:"0 16px"}}>
+                {["Near Me","Food","Errands","Notes","All"].map(t=>(
+                  <button key={t} className={`tab ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{t}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{padding:"14px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:13,fontWeight:600,color:"var(--fg)",letterSpacing:"-.01em"}}>
+                {filteredGigs.length} open gig{filteredGigs.length!==1?"s":""}
+              </span>
+            </div>
+
+            <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:7}}>
+              {filteredGigs.map(g=>(
+                <div key={g.id} className="gig" onClick={()=>{setSelectedGig(g);setRequested(false);}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:7}}>
+                    <span style={{fontSize:14,fontWeight:500,color:"var(--fg)",lineHeight:1.45,letterSpacing:"-.01em",flex:1}}>{g.title}</span>
+                    <span className="gprice">{g.price}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:9}}>
+                    <span className="gmi"><MapPin size={10}/> {g.loc}</span>
+                    <span className="gmi"><Clock size={10}/> {g.eta}</span>
+                    <span className="badge bn">{g.cat}</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:9,borderTop:"1px solid var(--bd)"}}>
+                    <div className="pav" style={{background:g.color}}>{g.initials}</div>
+                    <span style={{fontSize:12,color:"var(--fg3)",flex:1}}>{g.poster}</span>
+                    <LevelBadge label={g.levelLabel} small/>
+                    <span style={{fontSize:10,color:"var(--fg4)",fontFamily:"var(--mono)"}} key={tick}>{elapsed(g.postedAt)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{height:16}}/>
+          </div>
+          <Nav/>
+        </div>
+      )}
+
+      {/* EXPLORE */}
+      {screen==="explore" && (
+        <div className="page fadein">
+          <div className="topbar">
+            <button className="btn bg-btn bico" onClick={goHome}><ArrowLeft size={15}/></button>
+            <span style={{fontSize:15,fontWeight:600,letterSpacing:"-.02em"}}>Search</span>
+            <div style={{width:34}}/>
+          </div>
+          <div style={{padding:"12px 16px 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,background:"var(--bg3)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"0 12px",height:42}}>
+              <Search size={15} color="var(--fg3)"/>
+              <input style={{flex:1,border:"none",outline:"none",background:"transparent",fontFamily:"var(--font)",fontSize:14,color:"var(--fg)"}}
+                placeholder="Search gigs, categories, locations…"
+                value={searchQ} onChange={e=>setSearchQ(e.target.value)} autoFocus/>
+              {searchQ&&<button style={{background:"none",border:"none",cursor:"pointer",color:"var(--fg3)",display:"flex"}} onClick={()=>setSearchQ("")}><X size={14}/></button>}
+            </div>
+          </div>
+          <div className="scroll" style={{paddingBottom:80}}>
+            {searchQ.trim()==="" ? (
+              <div style={{padding:"48px 16px",textAlign:"center"}}>
+                <Search size={28} color="var(--fg4)" style={{marginBottom:10}}/>
+                <div style={{fontSize:14,fontWeight:500,color:"var(--fg3)",marginBottom:4}}>Search for anything</div>
+                <div style={{fontSize:12,color:"var(--fg4)"}}>Food runs, errands, notes, deliveries…</div>
+              </div>
+            ) : searchResults.length===0 ? (
+              <div style={{padding:"48px 16px",textAlign:"center"}}>
+                <div style={{fontSize:14,fontWeight:500,color:"var(--fg3)",marginBottom:4}}>No results for "{searchQ}"</div>
+                <div style={{fontSize:12,color:"var(--fg4)"}}>Try a different search term</div>
+              </div>
+            ) : (
+              <div style={{paddingTop:10}}>
+                <div style={{padding:"0 16px 8px",fontSize:12,color:"var(--fg3)",fontFamily:"var(--mono)"}}>
+                  {searchResults.length} result{searchResults.length!==1?"s":""}
+                </div>
+                <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:7}}>
+                  {searchResults.map(g=>(
+                    <div key={g.id} className="gig" onClick={()=>{setSelectedGig(g);setRequested(false);setScreen("home");}}>
+                      <div style={{display:"flex",justifyContent:"space-between",gap:10,marginBottom:7}}>
+                        <span style={{fontSize:14,fontWeight:500,flex:1,lineHeight:1.45}}>{g.title}</span>
+                        <span className="gprice">{g.price}</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:9}}>
+                        <span className="gmi"><MapPin size={10}/> {g.loc}</span>
+                        <span className="gmi"><Clock size={10}/> {g.eta}</span>
+                        <span className="badge bn">{g.cat}</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,paddingTop:9,borderTop:"1px solid var(--bd)"}}>
+                        <div className="pav" style={{background:g.color}}>{g.initials}</div>
+                        <span style={{fontSize:12,color:"var(--fg3)",flex:1}}>{g.poster}</span>
+                        <span style={{fontSize:10,color:"var(--fg4)",fontFamily:"var(--mono)"}} key={tick}>{elapsed(g.postedAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <Nav/>
+        </div>
+      )}
+
+      {/* POST GIG */}
+      {screen==="post" && (
+        <div className="page fadein">
+          <div className="topbar">
+            <button className="btn bg-btn bico" onClick={goHome}><ArrowLeft size={15}/></button>
+            <span style={{fontSize:15,fontWeight:600,letterSpacing:"-.02em"}}>Post a gig</span>
+            <div style={{width:34}}/>
+          </div>
+          <div className="scroll" style={{padding:"20px 16px",display:"flex",flexDirection:"column",gap:14,paddingBottom:100}}>
+            <div className="field">
+              <label className="lbl">Category</label>
+              <div className="cat-grid">
+                {CATS.map(c=>(
+                  <div key={c.label} className={`cat ${cat===c.label?"on":""}`} onClick={()=>setCat(c.label)}>
+                    <div className="cico">{c.icon}</div>
+                    <span className="clbl">{c.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label className="lbl">Task description</label>
+              <textarea className="ta" placeholder="Describe exactly what you need. Be specific — better descriptions get done faster."/>
+            </div>
+            <div className="field">
+              <label className="lbl">Offer <span style={{color:"var(--fg4)",fontSize:11,fontWeight:400}}>— $0 is fine</span></label>
+              <div style={{display:"flex",alignItems:"center",border:"1px solid var(--bd)",borderRadius:"var(--r)",background:"var(--bg)",overflow:"hidden",transition:"border-color .12s"}}>
+                <div style={{height:40,padding:"0 12px",display:"flex",alignItems:"center",background:"var(--bg3)",borderRight:"1px solid var(--bd)",fontFamily:"var(--mono)",fontWeight:600,fontSize:15}}>$</div>
+                <input style={{flex:1,height:40,border:"none",outline:"none",padding:"0 12px",fontFamily:"var(--mono)",fontSize:22,fontWeight:700,color:"var(--fg)",letterSpacing:"-.04em",background:"transparent"}} type="number" min="0" defaultValue="0"/>
+              </div>
+              <span className="hint">$0 gigs still earn you Rep when completed.</span>
+            </div>
+            <div className="field">
+              <label className="lbl">Drop-off location</label>
+              <div className="ig"><div className="iad"><MapPin size={13}/></div><input className="ii" placeholder="e.g. Science Hall Room 225"/></div>
+            </div>
+            <div className="callout">
+              <div className="ci"><Lock size={13}/></div>
+              <span className="ct"><strong>Payment info is private.</strong> Your Venmo/Cash App from your profile is only shared once both parties accept the gig.</span>
+            </div>
+            <div className="callout" style={{background:"var(--green-bg)",borderColor:"var(--green-bd)"}}>
+              <div className="ci" style={{color:"var(--green-d)"}}><Award size={13}/></div>
+              <span className="ct" style={{color:"var(--green-text)"}}><strong>+10 Rep</strong> for completing this gig. +5 bonus for a 5-star rating.</span>
+            </div>
+            <button className="btn bp bfull blg" onClick={goHome}>Post gig</button>
+          </div>
+          <Nav/>
+        </div>
+      )}
+
+      {/* ALERTS */}
+      {screen==="alerts" && (
+        <div className="page fadein">
+          <div className="topbar">
+            <button className="btn bg-btn bico" onClick={goHome}><ArrowLeft size={15}/></button>
+            <span style={{fontSize:15,fontWeight:600,letterSpacing:"-.02em"}}>Alerts</span>
+            <button className="btn bg-btn bsm">Mark read</button>
+          </div>
+          <div className="scroll" style={{paddingBottom:80}}>
+            {ALERTS_DATA.map(a=>(
+              <div key={a.id} className={`alert-row ${a.unread?"unread":""}`}>
+                <div className="aico" style={{background:a.iconBg,color:a.iconColor}}>{a.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:500,color:"var(--fg)",lineHeight:1.4,marginBottom:2}}>{a.title}</div>
+                  <div style={{fontSize:12,color:"var(--fg3)",fontFamily:"var(--mono)"}}>{a.sub}</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
+                  <span style={{fontSize:10,color:"var(--fg4)",fontFamily:"var(--mono)"}}>{a.time}</span>
+                  {a.unread&&<div style={{width:7,height:7,borderRadius:"50%",background:"var(--ink)"}}/>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <Nav/>
+        </div>
+      )}
+
+      {/* PROFILE */}
+      {screen==="profile" && (
+        <div className="page fadein">
+          <div className="topbar">
+            <button className="btn bg-btn bico" onClick={goHome}><ArrowLeft size={15}/></button>
+            <WM/>
+            <button className="btn bg-btn bsm">Edit</button>
+          </div>
+          <div className="scroll" style={{paddingBottom:80}}>
+            {/* Identity row */}
+            <div style={{padding:"20px 16px 0"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:16}}>
+                <div style={{width:56,height:56,borderRadius:"50%",background:"#6366f1",color:"white",fontSize:20,fontWeight:700,fontFamily:"var(--mono)",display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid var(--bd)",flexShrink:0}}>MT</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:18,fontWeight:700,letterSpacing:"-.03em",marginBottom:2}}>Maya Torres</div>
+                  <div style={{fontSize:11,color:"var(--fg3)",fontFamily:"var(--mono)",marginBottom:6}}>maya.torres@aggiemail.ucdavis.edu</div>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                    <LevelBadge label={lvl.label}/>
+                    <span className="badge bn"><Shield size={9}/> .edu</span>
+                  </div>
+                </div>
+                {/* Rating tap → reviews */}
+                <div style={{textAlign:"right",cursor:"pointer",WebkitTapHighlightColor:"transparent"}} onClick={()=>setShowReviews(true)}>
+                  <Stars n={5} size={13} filled/>
+                  <div style={{fontSize:15,fontWeight:700,fontFamily:"var(--mono)",letterSpacing:"-.03em",marginTop:2}}>4.9</div>
+                  <div style={{fontSize:10,color:"var(--fg3)",fontFamily:"var(--mono)"}}>28 reviews</div>
+                  <div style={{fontSize:10,color:"var(--fg4)",fontFamily:"var(--mono)"}}>tap to view</div>
+                </div>
+              </div>
+
+              {/* Stat boxes — all clickable */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:14}}>
+                <div className="stat-box" onClick={()=>setPTab("activity")}>
+                  <div className="sval">28</div>
+                  <div className="skey">gigs done</div>
+                  <div style={{fontSize:9,color:"var(--green-d)",fontFamily:"var(--mono)",marginTop:2}}>tap →</div>
+                </div>
+                <div className="stat-box" style={{cursor:"pointer"}} onClick={()=>setShowRepDetail(true)}>
+                  <div className="sval">{MY_REP}</div>
+                  <div className="skey">rep score</div>
+                  <div style={{fontSize:9,color:"var(--green-d)",fontFamily:"var(--mono)",marginTop:2}}>tap →</div>
+                </div>
+                <div className="stat-box" onClick={()=>setPTab("leaderboard")}>
+                  <div className="sval">#3</div>
+                  <div className="skey">campus rank</div>
+                  <div style={{fontSize:9,color:"var(--green-d)",fontFamily:"var(--mono)",marginTop:2}}>tap →</div>
+                </div>
+              </div>
+
+              {/* Rep card */}
+              <div className="rep-card" style={{marginBottom:16,cursor:"pointer"}} onClick={()=>setShowRepDetail(true)}>
+                <div className="rc-ey">Rep Score · tap for details</div>
+                <div className="rc-row">
+                  <div style={{display:"flex",alignItems:"baseline",gap:3}}>
+                    <span className="rc-score">{MY_REP}</span>
+                    <span className="rc-pts">pts</span>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div className="rc-badge" style={{marginBottom:4}}><Award size={10}/> {lvl.label}</div>
+                    <div style={{fontSize:10,color:"#52525b",fontFamily:"var(--mono)"}}>#3 of 847 students</div>
+                  </div>
+                </div>
+                <div className="rc-track"><div className="rc-fill" style={{width:`${lvl.pct}%`}}/></div>
+                <div className="rc-labels">
+                  {["New","Reliable","Trusted","Legend"].map(l=>(
+                    <span key={l} className={`rc-lbl ${lvl.label===l?"cur":""}`}>{l}</span>
+                  ))}
+                </div>
+                <div className="rc-footer">
+                  {lvl.next?<>+{lvl.toNext} pts to <span className="accent">{lvl.next}</span> · +10 per gig · +5 for 5★</>:"Max level reached"}
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-tabs */}
+            <div style={{display:"flex",borderBottom:"1px solid var(--bd)"}}>
+              {[["activity","Activity"],["leaderboard","Board"],["contact","Contact"]].map(([k,l])=>(
+                <button key={k} className={`ptab ${pTab===k?"on":""}`} onClick={()=>setPTab(k)}>{l}</button>
+              ))}
+            </div>
+
+            {/* Activity */}
+            {pTab==="activity" && (
+              <div style={{padding:"0 16px"}}>
+                {ACTIVITY.map((a,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 0",borderBottom:i<ACTIVITY.length-1?"1px solid var(--bd)":"none"}}>
+                    <div style={{width:34,height:34,borderRadius:"var(--r)",background:"var(--bg3)",border:"1px solid var(--bd)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"var(--fg3)"}}>{a.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:500,color:"var(--fg)"}}>{a.t}</div>
+                      <div style={{fontSize:11,color:"var(--fg3)",fontFamily:"var(--mono)",marginTop:1}}>{a.s}</div>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:600,fontFamily:"var(--mono)",color:a.pos?"var(--green-d)":"var(--fg3)",flexShrink:0}}>{a.d}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Leaderboard */}
+            {pTab==="leaderboard" && (
+              <div>
+                <div style={{padding:"10px 16px 6px",display:"flex",alignItems:"center",gap:4}}>
+                  <Trophy size={12} color="var(--fg3)"/>
+                  <span style={{fontSize:12,color:"var(--fg3)",fontFamily:"var(--mono)"}}>Campus · this week</span>
+                </div>
+                {LEADERBOARD.map(p=>(
+                  <div key={p.rank} className={`lb-row ${p.isYou?"lb-you":""}`}>
+                    <span className={`lb-rank ${p.rank<=3?"top":""}`}>{p.rank}</span>
+                    <div className="lb-av" style={{background:p.color}}>{p.initials}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:500,color:"var(--fg)"}}>
+                        {p.name}
+                        {p.isYou&&<span style={{fontSize:10,color:"var(--fg3)",fontFamily:"var(--mono)",marginLeft:5}}>you</span>}
+                      </div>
+                      <div style={{fontSize:11,color:"var(--fg3)",fontFamily:"var(--mono)",display:"flex",alignItems:"center",gap:6}}>
+                        {p.gigs} gigs · <LevelBadge label={getLevel(p.rep).label} small/>
+                      </div>
+                    </div>
+                    <span style={{fontSize:14,fontWeight:700,color:"var(--fg2)",fontFamily:"var(--mono)",flexShrink:0}}>{p.rep}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Contact */}
+            {pTab==="contact" && (
+              <div style={{padding:"10px 16px 0"}}>
+                <div style={{fontSize:12,color:"var(--fg3)",marginBottom:10,lineHeight:1.5}}>
+                  Tap any field to edit. Contact info is <strong style={{color:"var(--fg)"}}>private</strong> until both parties accept a gig.
+                </div>
+                {[
+                  {key:"venmo",  label:"Venmo",              prefix:"@"},
+                  {key:"cashapp",label:"Cash App",           prefix:"$"},
+                  {key:"paypal", label:"PayPal",             prefix:""},
+                  {key:"phone",  label:"Phone",              prefix:""},
+                  {key:"preferred",label:"Best way to reach",prefix:""},
+                ].map(f=>(
+                  <div key={f.key} className="editable-field" onClick={()=>setEditField(f.key)}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className="ef-label">{f.label}</div>
+                      {editField===f.key
+                        ? <input
+                            autoFocus
+                            className="inp" style={{height:32,marginTop:2,padding:"0 8px",fontSize:13}}
+                            value={contactInfo[f.key]}
+                            onChange={e=>setContactInfo({...contactInfo,[f.key]:e.target.value})}
+                            onBlur={()=>setEditField(null)}
+                          />
+                        : <div className={contactInfo[f.key]?"ef-val":"ef-empty"}>
+                            {contactInfo[f.key]||"Tap to add"}
+                          </div>
+                      }
+                    </div>
+                    <Pencil size={13} color="var(--fg4)"/>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{height:16}}/>
+          </div>
+          <Nav/>
+        </div>
+      )}
+
+      {/* ── GIG DETAIL MODAL */}
+      {selectedGig&&(
+        <div className="overlay" onClick={()=>setSelectedGig(null)}>
+          <div className="sheet slidein" onClick={e=>e.stopPropagation()}>
+            <div className="handle"/>
+            <div style={{padding:"16px 20px 14px",borderBottom:"1px solid var(--bd)"}}>
+              <div style={{fontSize:16,fontWeight:600,letterSpacing:"-.02em",color:"var(--fg)",lineHeight:1.4,marginBottom:8}}>{selectedGig.title}</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:22,fontWeight:700,color:"var(--fg)",fontFamily:"var(--mono)",letterSpacing:"-.04em"}}>{selectedGig.price}</span>
+                <span style={{fontSize:11,color:"var(--fg4)",fontFamily:"var(--mono)"}} key={tick}>{elapsed(selectedGig.postedAt)}</span>
+              </div>
+            </div>
+            <div style={{padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+              {[
+                {icon:<MapPin size={14}/>,label:"Drop-off",val:selectedGig.loc},
+                {icon:<Clock size={14}/>, label:"Est. time",val:selectedGig.eta},
+                {icon:<FileText size={14}/>,label:"Notes",val:selectedGig.notes},
+              ].map(r=>(
+                <div key={r.label} style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                  <div style={{width:32,height:32,borderRadius:"var(--r)",background:"var(--bg3)",border:"1px solid var(--bd)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"var(--fg3)"}}>{r.icon}</div>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:500,color:"var(--fg3)",fontFamily:"var(--mono)",marginBottom:1}}>{r.label}</div>
+                    <div style={{fontSize:14,color:"var(--fg)"}}>{r.val}</div>
+                  </div>
+                </div>
+              ))}
+              {/* Poster */}
+              <div>
+                <div style={{fontSize:11,fontWeight:500,color:"var(--fg3)",fontFamily:"var(--mono)",marginBottom:6}}>Posted by</div>
+                <div style={{background:"var(--bg3)",border:"1px solid var(--bd)",borderRadius:"var(--r)",padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:40,height:40,borderRadius:"50%",background:selectedGig.color,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"white",flexShrink:0}}>{selectedGig.initials}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>{selectedGig.poster}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <LevelBadge label={selectedGig.levelLabel}/>
+                      <Stars n={5} size={11} filled/>
+                      <span style={{fontSize:11,color:"var(--fg3)"}}>4.8</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,background:"var(--amber-bg)",border:"1px solid var(--amber-bd)",borderRadius:"var(--r)",padding:"10px 12px",fontSize:12,color:"var(--amber)"}}>
+                <Lock size={13} style={{flexShrink:0}}/>
+                <span style={{fontFamily:"var(--mono)"}}>Payment details shared only after both parties accept.</span>
+              </div>
+            </div>
+            <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:8}}>
+              {!requested
+                ?<button className="btn bgreen bfull blg" onClick={()=>setRequested(true)}><CheckCircle size={16}/> Accept this gig</button>
+                :<div className="callout" style={{background:"var(--green-bg)",borderColor:"var(--green-bd)"}}>
+                  <div className="ci" style={{color:"var(--green-d)"}}><Check size={13}/></div>
+                  <span className="ct" style={{color:"var(--green-text)"}}><strong>Request sent!</strong> {selectedGig.poster} will confirm and payment details will be shared.</span>
+                </div>
+              }
+              <button className="btn bo bfull" onClick={()=>setSelectedGig(null)}>Close</button>
+            </div>
+            <div style={{height:24}}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── REVIEW SHEET */}
+      {showReviews&&(
+        <div className="overlay" onClick={()=>setShowReviews(false)}>
+          <div className="sheet slidein" onClick={e=>e.stopPropagation()}>
+            <div className="handle"/>
+            <div style={{padding:"14px 20px 12px",borderBottom:"1px solid var(--bd)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:16,fontWeight:600,letterSpacing:"-.02em",marginBottom:3}}>Reviews</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <Stars n={5} size={14} filled/>
+                  <span style={{fontSize:15,fontWeight:700,fontFamily:"var(--mono)"}}>4.9</span>
+                  <span style={{fontSize:12,color:"var(--fg3)"}}>28 reviews</span>
+                </div>
+              </div>
+              <button className="btn bg-btn bico" onClick={()=>setShowReviews(false)}><X size={15}/></button>
+            </div>
+            {/* Leave review */}
+            <div style={{padding:"14px 20px",borderBottom:"1px solid var(--bd)",background:"var(--bg2)"}}>
+              <div style={{fontSize:13,fontWeight:500,marginBottom:8}}>Leave a review</div>
+              <div style={{display:"flex",gap:4,marginBottom:10}}>
+                {[1,2,3,4,5].map(i=>(
+                  <button key={i} style={{background:"none",border:"none",cursor:"pointer",padding:2}} onClick={()=>setNewRating(i)}>
+                    <Star size={22} fill={newRating>=i?"#fbbf24":"none"} color={newRating>=i?"#fbbf24":"#d4d4d8"} strokeWidth={1.5}/>
+                  </button>
+                ))}
+              </div>
+              <textarea className="ta" style={{minHeight:60}} placeholder="Share your experience…"/>
+              <button className="btn bp bfull" style={{marginTop:8}}><Send size={13}/> Submit</button>
+            </div>
+            {REVIEWS.map((r,i)=>(
+              <div key={i} className="rev-row">
+                <div className="rev-av" style={{background:r.color}}>{r.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--fg)"}}>{r.name}</span>
+                    <Stars n={r.rating} size={11} filled/>
+                  </div>
+                  <div style={{fontSize:13,color:"var(--fg2)",lineHeight:1.5}}>{r.text}</div>
+                  <div style={{fontSize:11,color:"var(--fg4)",fontFamily:"var(--mono)",marginTop:3}}>{r.time}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{height:16}}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── REP DETAIL SHEET */}
+      {showRepDetail&&(
+        <div className="overlay" onClick={()=>setShowRepDetail(false)}>
+          <div className="sheet slidein" onClick={e=>e.stopPropagation()}>
+            <div className="handle"/>
+            <div style={{padding:"16px 20px 14px",borderBottom:"1px solid var(--bd)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:16,fontWeight:600,letterSpacing:"-.02em"}}>Rep Score</div>
+              <button className="btn bg-btn bico" onClick={()=>setShowRepDetail(false)}><X size={15}/></button>
+            </div>
+            <div style={{padding:"20px"}}>
+              <div className="rep-card" style={{marginBottom:20}}>
+                <div className="rc-ey">Current score</div>
+                <div className="rc-row">
+                  <div style={{display:"flex",alignItems:"baseline",gap:3}}>
+                    <span className="rc-score">{MY_REP}</span>
+                    <span className="rc-pts">pts</span>
+                  </div>
+                  <div className="rc-badge"><Award size={10}/> {lvl.label}</div>
+                </div>
+                <div className="rc-track"><div className="rc-fill" style={{width:`${lvl.pct}%`}}/></div>
+                <div className="rc-labels">
+                  {["New","Reliable","Trusted","Legend"].map(l=>(
+                    <span key={l} className={`rc-lbl ${lvl.label===l?"cur":""}`}>{l}</span>
+                  ))}
+                </div>
+              </div>
+              {/* Level breakdown */}
+              <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>Level breakdown</div>
+              {REP_LEVELS.map((l,i)=>(
+                <div key={l.label} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:i<REP_LEVELS.length-1?"1px solid var(--bd)":"none"}}>
+                  <LevelBadge label={l.label}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,color:"var(--fg3)",fontFamily:"var(--mono)"}}>
+                      {l.max===Infinity?`${l.min}+ pts`:`${l.min}–${l.max} pts`}
+                    </div>
+                  </div>
+                  {MY_REP>=l.min&&<Check size={14} color="var(--green-d)"/>}
+                </div>
+              ))}
+              {/* How to earn */}
+              <div style={{fontSize:13,fontWeight:600,margin:"16px 0 10px"}}>How to earn Rep</div>
+              {[
+                {t:"Complete a gig",d:"+10 pts"},
+                {t:"Receive a 5-star rating",d:"+5 pts"},
+                {t:"Receive a 4-star rating",d:"+2 pts"},
+                {t:"Post a gig (encourages activity)",d:"+1 pt"},
+              ].map((r,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",borderBottom:i<3?"1px solid var(--bd)":"none"}}>
+                  <span style={{fontSize:13,color:"var(--fg)"}}>{r.t}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:"var(--green-d)",fontFamily:"var(--mono)"}}>{r.d}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{height:16}}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── MAP SHEET */}
+      {showMap&&(
+        <div className="overlay" onClick={()=>setShowMap(false)}>
+          <div className="sheet slidein" onClick={e=>e.stopPropagation()}>
+            <div className="handle"/>
+            <div style={{padding:"16px 20px 14px",borderBottom:"1px solid var(--bd)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:16,fontWeight:600,letterSpacing:"-.02em"}}>Gigs near you</div>
+                <div style={{fontSize:12,color:"var(--fg3)",fontFamily:"var(--mono)",marginTop:2}}>{filteredGigs.length} open · UC Davis campus</div>
+              </div>
+              <button className="btn bg-btn bico" onClick={()=>setShowMap(false)}><X size={15}/></button>
+            </div>
+            <div style={{padding:"16px"}}>
+              <div className="map-container">
+                <CampusMap/>
+              </div>
+              <div style={{marginTop:12,fontSize:12,color:"var(--fg3)",display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:10,height:10,borderRadius:"50%",background:"var(--green)",flexShrink:0}}/>
+                <span>Your location &nbsp;·&nbsp; Colored dots = open gigs</span>
+              </div>
+            </div>
+            <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:6}}>
+              {filteredGigs.slice(0,3).map(g=>(
+                <div key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"var(--bg3)",borderRadius:"var(--r)",border:"1px solid var(--bd)",cursor:"pointer"}}
+                  onClick={()=>{setShowMap(false);setSelectedGig(g);setRequested(false);}}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:g.color,flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:500,color:"var(--fg)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.title}</div>
+                    <div style={{fontSize:11,color:"var(--fg3)",fontFamily:"var(--mono)"}}>{g.loc} · {g.eta}</div>
+                  </div>
+                  <span style={{fontSize:14,fontWeight:700,fontFamily:"var(--mono)",color:"var(--fg)",flexShrink:0}}>{g.price}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{height:24}}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
