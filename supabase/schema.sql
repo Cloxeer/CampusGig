@@ -271,8 +271,8 @@ CREATE TRIGGER set_reviews_updated_at
 
 -- ============================================================
 -- 8. REP SCORE TRIGGER
---    +1 for posting a gig, +10 each to poster and taker when a gig is completed,
---    +5 for receiving a 5-star review
+--    +1 for posting a gig, +9 poster / +10 taker when a gig is completed,
+--    +N Rep when reviewed (N = rounded star rating); rating edits adjust rep by delta
 -- ============================================================
 
 -- Award +1 rep to poster when a gig is created
@@ -289,12 +289,12 @@ CREATE TRIGGER trg_rep_gig_post
     FOR EACH ROW
     EXECUTE FUNCTION award_rep_on_gig_post();
 
--- Award +10 rep to poster and taker when gig status changes to 'completed'
+-- Award +9 rep to poster and +10 to taker when gig status changes to 'completed'
 CREATE OR REPLACE FUNCTION award_rep_on_gig_complete()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
-        UPDATE users SET rep_score = rep_score + 10 WHERE id = NEW.poster_id;
+        UPDATE users SET rep_score = rep_score + 9 WHERE id = NEW.poster_id;
         IF NEW.taker_id IS NOT NULL THEN
             UPDATE users SET rep_score = rep_score + 10 WHERE id = NEW.taker_id;
         END IF;
@@ -308,21 +308,85 @@ CREATE TRIGGER trg_rep_gig_complete
     FOR EACH ROW
     EXECUTE FUNCTION award_rep_on_gig_complete();
 
--- Award +5 rep for a 5-star review
-CREATE OR REPLACE FUNCTION award_rep_on_5star_review()
+-- Rep + notification when reviewed (see supabase/review_rep_and_notify_trigger.sql for full DDL)
+CREATE OR REPLACE FUNCTION after_review_change()
 RETURNS TRIGGER AS $$
+DECLARE
+  rf TEXT;
+  rl TEXT;
+  ra TEXT;
+  disp_name TEXT;
+  initials TEXT;
+  title_txt TEXT;
+  body_txt TEXT;
+  r_new INT;
+  r_old INT;
 BEGIN
-    IF NEW.rating = 5 THEN
-        UPDATE users SET rep_score = rep_score + 5 WHERE id = NEW.reviewee_id;
+  r_new := ROUND(NEW.rating)::INT;
+  IF TG_OP = 'INSERT' THEN
+    UPDATE users SET rep_score = rep_score + r_new WHERE id = NEW.reviewee_id;
+  ELSIF TG_OP = 'UPDATE' THEN
+    r_old := ROUND(OLD.rating)::INT;
+    IF r_new IS DISTINCT FROM r_old THEN
+      UPDATE users SET rep_score = rep_score + (r_new - r_old) WHERE id = NEW.reviewee_id;
     END IF;
+  END IF;
+  IF TG_OP = 'UPDATE'
+     AND NEW.rating IS NOT DISTINCT FROM OLD.rating
+     AND NEW.text IS NOT DISTINCT FROM OLD.text THEN
     RETURN NEW;
+  END IF;
+  SELECT u.first_name, u.last_name, u.avatar_color INTO rf, rl, ra
+  FROM users u WHERE u.id = NEW.reviewer_id;
+  disp_name := CASE
+    WHEN rl IS NOT NULL AND btrim(rl) <> '' THEN btrim(rf) || ' ' || substring(btrim(rl) FROM 1 FOR 1) || '.'
+    ELSE COALESCE(NULLIF(btrim(COALESCE(rf, '')), ''), 'Someone')
+  END;
+  initials := upper(
+    COALESCE(substring(btrim(COALESCE(rf, '')) FROM 1 FOR 1), '?')
+    || COALESCE(substring(btrim(COALESCE(rl, '')) FROM 1 FOR 1), '')
+  );
+  IF TG_OP = 'INSERT' THEN
+    title_txt := 'You received a ' || r_new || '-star review';
+    body_txt := disp_name || ' rated you · +' || r_new || ' Rep';
+  ELSE
+    IF r_new IS DISTINCT FROM r_old THEN
+      title_txt := 'A review was updated (' || r_new || ' stars)';
+      body_txt := disp_name || ' changed their rating · your Rep was adjusted';
+    ELSE
+      title_txt := 'A review was updated';
+      body_txt := disp_name || ' edited their review';
+    END IF;
+  END IF;
+  INSERT INTO notifications (user_id, type, title, body, metadata)
+  VALUES (
+    NEW.reviewee_id,
+    'review_received',
+    title_txt,
+    body_txt,
+    jsonb_build_object(
+      'reviewer_id', NEW.reviewer_id,
+      'reviewee_id', NEW.reviewee_id,
+      'gig_id', NEW.gig_id,
+      'rating', NEW.rating,
+      'other_avatar_color', COALESCE(ra, '#6366f1'),
+      'other_initials', initials,
+      'other_name', disp_name
+    )
+  );
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER trg_rep_5star_review
+CREATE TRIGGER trg_after_review_insert
     AFTER INSERT ON reviews
     FOR EACH ROW
-    EXECUTE FUNCTION award_rep_on_5star_review();
+    EXECUTE FUNCTION after_review_change();
+
+CREATE TRIGGER trg_after_review_update
+    AFTER UPDATE ON reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION after_review_change();
 
 -- ============================================================
 -- 9. AVATAR STORAGE BUCKET

@@ -346,7 +346,7 @@ export default function Profile({ currentUserId }) {
               <div className="rc-footer">
                 {lvl.next ? (
                   <>
-                    +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +10 per gig completed · +1 per gig posted
+                    +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +9 marking done · +10 as taker · +1 per post
                   </>
                 ) : (
                   "Max level reached"

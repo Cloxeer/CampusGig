@@ -759,7 +759,7 @@ export async function completeGig(gigId) {
       user_id: gig.taker_id,
       type: "gig_completed",
       title: "Gig completed! +10 Rep",
-      body: `${gig.title} · ${_userDisplayName(gig.poster)} marked it done — you both earned +10`,
+      body: `${gig.title} · ${_userDisplayName(gig.poster)} marked it done — you earned +10 Rep`,
       metadata: _buildNotifMeta(gigId, null, gig.taker_id, gig.poster_id, "requester", gig.poster),
     });
   }
@@ -767,10 +767,10 @@ export async function completeGig(gigId) {
   await supabase.from("notifications").insert({
     user_id: user.id,
     type: "gig_completed",
-    title: "Gig marked as done! +10 Rep",
+    title: "Gig marked as done! +9 Rep",
     body: gig.taker_id
-      ? `${gig.title} · You and ${_userDisplayName(gig.taker)} both earned +10`
-      : `${gig.title} · +10 Rep`,
+      ? `${gig.title} · You earned +9 · ${_userDisplayName(gig.taker)} earned +10`
+      : `${gig.title} · +9 Rep`,
     metadata: _buildNotifMeta(gigId, null, gig.taker_id, gig.poster_id, "poster", gig.taker),
   });
 

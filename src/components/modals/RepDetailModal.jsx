@@ -119,7 +119,8 @@ export default function RepDetailModal({ onClose, repScore: repScoreProp }) {
 
               <div style={{ fontSize: 13, fontWeight: 600, margin: "16px 0 10px" }}>How to earn Rep</div>
               {[
-                { t: "Complete a gig", d: "+10 pts" },
+                { t: "Mark your gig done (poster)", d: "+9 pts" },
+                { t: "Complete a gig you took (taker)", d: "+10 pts" },
                 { t: "Receive a 5-star rating", d: "+5 pts" },
                 { t: "Receive a 4-star rating", d: "+2 pts" },
                 { t: "Post a gig (encourages activity)", d: "+1 pt" },
@@ -131,7 +132,7 @@ export default function RepDetailModal({ onClose, repScore: repScoreProp }) {
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "9px 0",
-                    borderBottom: i < 3 ? "1px solid var(--bd)" : "none",
+                    borderBottom: i < 4 ? "1px solid var(--bd)" : "none",
                   }}
                 >
                   <span style={{ fontSize: 13, color: "var(--fg)" }}>{r.t}</span>

@@ -163,7 +163,7 @@ export default function PostGig() {
               onChange={(e) => setPrice(e.target.value)}
             />
           </div>
-          <span className="hint">+1 Rep just for posting. Your taker earns +10 Rep when they complete it.</span>
+          <span className="hint">+1 Rep for posting. You get +9 Rep when you mark the gig done; your taker gets +10.</span>
         </div>
 
         <div className="field">
@@ -224,7 +224,7 @@ export default function PostGig() {
             <Award size={13} />
           </div>
           <span className="ct" style={{ color: "var(--green-text)" }}>
-            <strong>+1 Rep</strong> for posting this gig. Taker earns +10 on completion, +5 for a 5-star rating from you.
+            <strong>+1 Rep</strong> for posting. You earn <strong>+9</strong> when you mark it done; your taker earns <strong>+10</strong>. They can earn +5 for a 5-star rating from you.
           </span>
         </div>
 

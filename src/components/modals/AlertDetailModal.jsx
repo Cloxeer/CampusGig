@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Loader, MapPin, Timer, FileText, CheckCircle, XCircle, Clock,
-  MessageCircle, Phone, AtSign, DollarSign, Smartphone, Lock,
+  Phone, AtSign, DollarSign, Smartphone, Lock,
 } from "lucide-react";
 import { getGigDetail, acceptGigRequest, rejectGigRequest, completeGig, getAvatarUrl } from "../../lib/profile";
 import { getLevel, countdown, useTimer } from "../../utils/helpers";
@@ -371,19 +371,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               {role === "poster" && requesterUser && <ContactSection user={requesterUser} label={`${requesterUser.first_name || "Taker"}`} />}
               {role === "requester" && requesterUser && <ContactSection user={requesterUser} label="Your info (shared)" />}
               {role === "poster" && poster && <ContactSection user={poster} label="Your info (shared)" />}
-
-              <div style={{
-                display: "flex", alignItems: "flex-start", gap: 8,
-                background: "var(--bg3)", border: "1px solid var(--bd)",
-                borderRadius: "var(--r)", padding: "10px 12px",
-                fontSize: 12, color: "var(--fg2)", lineHeight: 1.5,
-              }}>
-                <MessageCircle size={14} style={{ flexShrink: 0, marginTop: 2, color: "var(--fg3)" }} />
-                <span>
-                  <strong>Add them on Snapchat</strong> or text them to coordinate pickup/delivery.
-                  Payment and task completion happen off-app.
-                </span>
-              </div>
             </div>
           )}
 
