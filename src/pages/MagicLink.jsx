@@ -1,6 +1,11 @@
+import { useNavigate, useLocation } from "react-router-dom";
 import { Mail } from "lucide-react";
 
-export default function MagicLink({ setScreen, email }) {
+export default function MagicLink() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const email = location.state?.email;
+
   return (
     <div
       className="page fadein"
@@ -26,7 +31,7 @@ export default function MagicLink({ setScreen, email }) {
         Check your inbox
       </div>
 
-      <div style={{ fontSize: 14, color: "var(--fg3)", textAlign: "center", lineHeight: 1.6, marginBottom: 32 }}>
+      <div style={{ fontSize: 14, color: "var(--fg3)", textAlign: "center", lineHeight: 1.6, marginBottom: 20 }}>
         We sent a magic link to
         <br />
         <strong style={{ color: "var(--fg)" }}>{email || "your university email"}</strong>
@@ -34,8 +39,25 @@ export default function MagicLink({ setScreen, email }) {
         Click it to sign in instantly — no password needed.
       </div>
 
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--fg3)",
+          textAlign: "center",
+          lineHeight: 1.55,
+          marginBottom: 28,
+          maxWidth: 300,
+        }}
+      >
+        Don&apos;t see it within a few minutes? Check your <strong style={{ color: "var(--fg)" }}>spam</strong> or{" "}
+        <strong style={{ color: "var(--fg)" }}>junk</strong> folder — magic links often land there.
+      </div>
 
-      <button className="btn bg-btn bfull" style={{ marginTop: 8 }} onClick={() => setScreen("auth")}>
+      <button
+        className="btn bg-btn bfull"
+        style={{ marginTop: 8 }}
+        onClick={() => navigate("/auth?mode=login")}
+      >
         Use a different email
       </button>
     </div>

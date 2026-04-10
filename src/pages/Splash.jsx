@@ -1,7 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
 import Logo, { LogoMark } from "../components/Logo";
 
-export default function Splash({ setScreen }) {
+export default function Splash() {
+  const navigate = useNavigate();
+
   return (
     <div className="splash fadein">
       <div className="splash-body">
@@ -44,14 +47,11 @@ export default function Splash({ setScreen }) {
       <div className="sfoot">
         <button
           className="btn bp bfull blg"
-          onClick={() => setScreen("auth", "signup")}
+          onClick={() => navigate("/auth?mode=signup")}
         >
           Get started
         </button>
-        <button
-          className="btn bo bfull blg"
-          onClick={() => setScreen("auth", "login")}
-        >
+        <button className="btn bo bfull blg" onClick={() => navigate("/auth")}>
           Sign in
         </button>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, paddingTop: 2 }}>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
 import MagicLink from "./pages/MagicLink";
@@ -10,22 +11,25 @@ import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import UserProfile from "./pages/UserProfile";
-import RepDetailModal from "./components/modals/RepDetailModal";
 import BottomNav from "./components/BottomNav";
 import { supabase } from "./lib/supabase";
 import { getMyProfile, getUnreadNotificationCount } from "./lib/profile";
 
+function NavLayout({ unreadCount }) {
+  return (
+    <>
+      <Outlet />
+      <BottomNav unreadCount={unreadCount} />
+    </>
+  );
+}
+
 export default function App() {
-  const [screen, setScreen] = useState("splash");
-  const [authMode, setAuthMode] = useState("signup");
-  const [magicEmail, setMagicEmail] = useState("");
-  const [showRepDetail, setShowRepDetail] = useState(false);
-  const [viewUserId, setViewUserId] = useState(null);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [hasProfile, setHasProfile] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
-
+  const [unreadCount, setUnreadCount] = useState(0);
   const refreshUnread = useCallback(async () => {
     const { count } = await getUnreadNotificationCount();
     setUnreadCount(count);
@@ -36,7 +40,7 @@ export default function App() {
       setSession(s);
       if (s) {
         setCurrentUserId(s.user.id);
-        checkProfileAndRoute(s);
+        checkProfile(s);
       } else {
         setAuthLoading(false);
       }
@@ -48,11 +52,11 @@ export default function App() {
       setSession(s);
       if (s) {
         setCurrentUserId(s.user.id);
-        checkProfileAndRoute(s);
+        checkProfile(s);
       } else {
         setCurrentUserId(null);
         setUnreadCount(0);
-        setScreen("splash");
+        setHasProfile(false);
       }
     });
 
@@ -78,36 +82,15 @@ export default function App() {
     };
   }, [currentUserId, refreshUnread]);
 
-  async function checkProfileAndRoute(s) {
+  async function checkProfile(s) {
     if (!s) {
       setAuthLoading(false);
       return;
     }
     const { profile } = await getMyProfile();
-    if (profile) {
-      setScreen("home");
-    } else {
-      setScreen("onboarding");
-    }
+    setHasProfile(!!profile);
     setAuthLoading(false);
   }
-
-  const handleSetScreen = (newScreen, payload) => {
-    if (newScreen === "auth" && payload) {
-      setAuthMode(payload);
-    }
-    if (newScreen === "magic" && payload) {
-      setMagicEmail(payload);
-    }
-    if (newScreen === "repDetail") {
-      setShowRepDetail(true);
-      return;
-    }
-    if (newScreen === "userProfile" && payload) {
-      setViewUserId(payload);
-    }
-    setScreen(newScreen);
-  };
 
   if (authLoading) {
     return (
@@ -117,25 +100,47 @@ export default function App() {
     );
   }
 
+  if (!session) {
+    return (
+      <div className="shell">
+        <Routes>
+          <Route path="/welcome" element={<Splash />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/magic" element={<MagicLink />} />
+          <Route path="*" element={<Navigate to="/welcome" replace />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  if (!hasProfile) {
+    return (
+      <div className="shell">
+        <Routes>
+          <Route
+            path="/onboarding"
+            element={<Onboarding onComplete={() => setHasProfile(true)} />}
+          />
+          <Route path="*" element={<Navigate to="/onboarding" replace />} />
+        </Routes>
+      </div>
+    );
+  }
+
   return (
     <div className="shell">
-      {screen === "splash" && <Splash setScreen={handleSetScreen} />}
-      {screen === "auth" && <Auth setScreen={handleSetScreen} initialMode={authMode} />}
-      {screen === "magic" && <MagicLink setScreen={handleSetScreen} email={magicEmail} />}
-      {screen === "onboarding" && <Onboarding setScreen={handleSetScreen} />}
-      {screen === "home" && <Home setScreen={handleSetScreen} currentUserId={currentUserId} />}
-      {screen === "explore" && <Explore setScreen={handleSetScreen} currentUserId={currentUserId} />}
-      {screen === "post" && <PostGig setScreen={handleSetScreen} />}
-      {screen === "alerts" && <Alerts setScreen={handleSetScreen} onNotificationsRead={refreshUnread} />}
-      {screen === "profile" && <Profile setScreen={handleSetScreen} currentUserId={currentUserId} />}
-      {screen === "editProfile" && <EditProfile setScreen={handleSetScreen} />}
-      {screen === "userProfile" && <UserProfile setScreen={handleSetScreen} userId={viewUserId} currentUserId={currentUserId} />}
-
-      {["home", "explore", "alerts", "profile", "post"].includes(screen) && (
-        <BottomNav screen={screen} setScreen={handleSetScreen} unreadCount={unreadCount} />
-      )}
-
-      {showRepDetail && <RepDetailModal onClose={() => setShowRepDetail(false)} />}
+      <Routes>
+        <Route element={<NavLayout unreadCount={unreadCount} />}>
+          <Route path="/" element={<Home currentUserId={currentUserId} />} />
+          <Route path="/explore" element={<Explore currentUserId={currentUserId} />} />
+          <Route path="/post" element={<PostGig />} />
+          <Route path="/alerts" element={<Alerts onNotificationsRead={refreshUnread} />} />
+          <Route path="/profile" element={<Profile currentUserId={currentUserId} />} />
+        </Route>
+        <Route path="/profile/edit" element={<EditProfile />} />
+        <Route path="/users/:userId" element={<UserProfile currentUserId={currentUserId} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </div>
   );
 }

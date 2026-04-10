@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MapPin, Lock, Award, Clock, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
 import { postNewGig } from "../lib/profile";
 import TopBar from "../components/TopBar";
@@ -31,7 +32,8 @@ const TIME_OPTIONS = [
   { label: "24 hours", minutes: 1440 },
 ];
 
-export default function PostGig({ setScreen }) {
+export default function PostGig() {
+  const navigate = useNavigate();
   const [cat, setCat] = useState("Food");
   const [gigTitle, setGigTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -71,12 +73,12 @@ export default function PostGig({ setScreen }) {
       return;
     }
 
-    setScreen("home");
+    navigate("/", { replace: true });
   }
 
   return (
     <div className="page fadein">
-      <TopBar title="Post a gig" onBack={() => setScreen("home")} />
+      <TopBar title="Post a gig" />
 
       <div className="scroll" style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14, paddingBottom: 100 }}>
         <div className="field">

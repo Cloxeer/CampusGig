@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Loader, MapPin, Timer, FileText, CheckCircle, XCircle, Clock,
   MessageCircle, Phone, AtSign, DollarSign, Smartphone, Lock,
@@ -113,7 +114,8 @@ function ContactSection({ user, label }) {
   );
 }
 
-export default function AlertDetailModal({ notification, onClose, onStatusChange, setScreen }) {
+export default function AlertDetailModal({ notification, onClose, onStatusChange }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [gig, setGig] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -178,6 +180,11 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
     onStatusChange?.();
   }
 
+  function handleViewProfile(userId) {
+    onClose();
+    navigate(`/users/${userId}`);
+  }
+
   if (loading) {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 30, maxWidth: 393, margin: "0 auto", background: "var(--bg)" }}>
@@ -237,7 +244,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
         </div>
 
         <div className="scroll" style={{ paddingBottom: 80 }}>
-          {/* Gig header */}
           <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--bd)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <span style={{
@@ -285,7 +291,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
           </div>
 
           <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Location */}
             {gig.location && (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
@@ -300,7 +305,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </div>
             )}
 
-            {/* Time — live ticking via useTimer */}
             {cd && (
               <div key={tick} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
@@ -322,7 +326,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </div>
             )}
 
-            {/* Description */}
             {gig.description && (
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div style={{
@@ -338,7 +341,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
             )}
           </div>
 
-          {/* People section */}
           <div style={{ padding: "0 20px 16px" }}>
             <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 8 }}>
               People
@@ -347,19 +349,18 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               <UserCard
                 user={poster}
                 label="Posted"
-                onClick={() => { onClose(); setScreen("userProfile", poster.id); }}
+                onClick={() => handleViewProfile(poster.id)}
               />
               {requesterUser && (
                 <UserCard
                   user={requesterUser}
                   label={isCompleted ? "Completed" : isActive ? "Taking" : "Requested"}
-                  onClick={() => { onClose(); setScreen("userProfile", requesterUser.id); }}
+                  onClick={() => handleViewProfile(requesterUser.id)}
                 />
               )}
             </div>
           </div>
 
-          {/* Contact info — shown when active or completed */}
           {showContactInfo && (
             <div style={{ padding: "0 20px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
@@ -386,7 +387,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
             </div>
           )}
 
-          {/* Payment privacy notice — shown when pending */}
           {isPending && (
             <div style={{ padding: "0 20px 16px" }}>
               <div style={{
@@ -401,9 +401,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
             </div>
           )}
 
-          {/* Actions */}
           <div style={{ padding: "0 20px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {/* Poster sees accept/decline when there's a pending request */}
             {role === "poster" && hasPendingRequest && !isActive && !isCompleted && (
               <>
                 <button
@@ -425,7 +423,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </>
             )}
 
-            {/* Requester sees pending status */}
             {role === "requester" && isPending && hasPendingRequest && !isActive && !isCompleted && (
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -438,7 +435,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </div>
             )}
 
-            {/* Poster sees mark-as-done when active */}
             {role === "poster" && isActive && !expired && (
               <button
                 className="btn bp bfull blg"
@@ -451,7 +447,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </button>
             )}
 
-            {/* Poster with expired active gig */}
             {role === "poster" && isActive && expired && (
               <button
                 className="btn bp bfull blg"
@@ -464,7 +459,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </button>
             )}
 
-            {/* Requester sees active status */}
             {role === "requester" && isActive && (
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -477,7 +471,6 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
               </div>
             )}
 
-            {/* Completed badge */}
             {isCompleted && (
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,

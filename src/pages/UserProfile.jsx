@@ -1,19 +1,25 @@
 import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Award, Loader, CheckCircle, Package, Timer, Star } from "lucide-react";
 import { getProfileById, getReviewsForUser, getAvatarUrl, getCompletedGigsBetweenUsers, getExistingReview, getUserActivity, getGigById, parseDeadline, getUserGigStats, getCampusRank, getTotalUsers } from "../lib/profile";
 import { getLevel, useTimer } from "../utils/helpers";
+import { useModalParam } from "../hooks/useModalParam";
 import TopBar from "../components/TopBar";
 import LevelBadge from "../components/LevelBadge";
 import Stars from "../components/Stars";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
-export default function UserProfile({ setScreen, userId, currentUserId }) {
+export default function UserProfile({ currentUserId }) {
+  const navigate = useNavigate();
+  const { userId } = useParams();
+  const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
+  const [gigParam, openGig, closeGig] = useModalParam("gig");
+
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [avatarUrl, setAvatarUrl] = useState(null);
-  const [showReviews, setShowReviews] = useState(false);
   const [canReview, setCanReview] = useState(false);
   const [reviewGigId, setReviewGigId] = useState(null);
   const [alreadyReviewed, setAlreadyReviewed] = useState(false);
@@ -28,8 +34,22 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
   const tick = useTimer();
 
   useEffect(() => {
+    if (userId === currentUserId) {
+      navigate("/profile", { replace: true });
+      return;
+    }
     loadData();
   }, [userId]);
+
+  useEffect(() => {
+    if (!gigParam) {
+      setSelectedGig(null);
+      return;
+    }
+    if (!gigLoading && !selectedGig) {
+      fetchGig(gigParam);
+    }
+  }, [gigParam]);
 
   async function loadData() {
     setLoading(true);
@@ -80,18 +100,19 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
     setLoading(false);
   }
 
-  async function handleOpenGig(gigId) {
+  async function fetchGig(gigId) {
     if (!gigId || gigLoading) return;
     setGigLoading(true);
     const { gig } = await getGigById(gigId);
     if (gig) setSelectedGig(gig);
+    else closeGig();
     setGigLoading(false);
   }
 
   if (loading) {
     return (
       <div className="page fadein">
-        <TopBar title="" onBack={() => setScreen("home")} />
+        <TopBar title="" />
         <div className="scroll" style={{ paddingBottom: 80 }}>
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
@@ -132,7 +153,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
   if (!profile) {
     return (
       <div className="page fadein">
-        <TopBar title="Profile" onBack={() => setScreen("home")} />
+        <TopBar title="Profile" />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 300 }}>
           <div style={{ fontSize: 13, color: "var(--fg3)", fontFamily: "var(--mono)" }}>User not found</div>
         </div>
@@ -151,7 +172,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
   return (
     <>
       <div className="page fadein">
-        <TopBar title={fullName} onBack={() => setScreen("home")} />
+        <TopBar title={fullName} />
 
         <div className="scroll" style={{ paddingBottom: 80 }}>
           <div style={{ padding: "20px 16px 0" }}>
@@ -198,7 +219,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
               </div>
               <div
                 style={{ textAlign: "right", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
-                onClick={() => setShowReviews(true)}
+                onClick={() => openReviews()}
               >
                 <Stars rating={avgRating} size={13} />
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--mono)", letterSpacing: "-.03em", marginTop: 2 }}>
@@ -329,7 +350,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
                   <button
                     className="btn bsm"
                     style={{ background: "transparent", color: "var(--green-text)", border: "1px solid var(--green-bd)" }}
-                    onClick={() => setShowReviews(true)}
+                    onClick={() => openReviews()}
                   >
                     Update
                   </button>
@@ -338,7 +359,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
                 <button
                   className="btn bp bfull"
                   style={{ marginTop: 16 }}
-                  onClick={() => setShowReviews(true)}
+                  onClick={() => openReviews()}
                 >
                   <Star size={14} />
                   Leave a review
@@ -417,7 +438,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
                         borderBottom: i < arr.length - 1 ? "1px solid var(--bd)" : "none",
                         cursor: a.gigId ? "pointer" : "default",
                       }}
-                      onClick={() => a.gigId && handleOpenGig(a.gigId)}
+                      onClick={() => a.gigId && openGig(a.gigId)}
                     >
                       <div
                         style={{
@@ -460,9 +481,9 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
         </div>
       </div>
 
-      {showReviews && (
+      {reviewsOpen && (
         <ReviewSheetModal
-          onClose={() => setShowReviews(false)}
+          onClose={closeReviews}
           reviews={reviews}
           avgRating={avgRating}
           reviewCount={reviews.length}
@@ -473,7 +494,7 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
           alreadyReviewed={alreadyReviewed}
           existingReview={existingReview}
           onReviewSubmitted={() => {
-            setShowReviews(false);
+            closeReviews();
             loadData();
           }}
         />
@@ -484,11 +505,8 @@ export default function UserProfile({ setScreen, userId, currentUserId }) {
           tick={tick}
           requested={false}
           onRequest={() => {}}
-          onClose={() => setSelectedGig(null)}
-          onViewProfile={(uid) => {
-            setSelectedGig(null);
-            setScreen("userProfile", uid);
-          }}
+          onClose={closeGig}
+          onViewProfile={(uid) => navigate(`/users/${uid}`)}
           currentUserId={currentUserId}
         />
       )}

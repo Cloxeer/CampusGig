@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader, Timer } from "lucide-react";
 
 import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl, getGigById, parseDeadline } from "../lib/profile";
 import { logout } from "../lib/auth";
 import { getLevel, useTimer } from "../utils/helpers";
+import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import LevelBadge from "../components/LevelBadge";
 import Stars from "../components/Stars";
@@ -11,10 +13,13 @@ import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
-export default function Profile({ setScreen, currentUserId }) {
+export default function Profile({ currentUserId }) {
+  const navigate = useNavigate();
+  const [repOpen, openRep, closeRep] = useModalParam("rep");
+  const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
+  const [gigParam, openGig, closeGig] = useModalParam("gig");
+
   const [pTab, setPTab] = useState("activity");
-  const [showReviews, setShowReviews] = useState(false);
-  const [showRepDetail, setShowRepDetail] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [selectedGig, setSelectedGig] = useState(null);
@@ -33,6 +38,16 @@ export default function Profile({ setScreen, currentUserId }) {
   useEffect(() => {
     loadProfileData();
   }, []);
+
+  useEffect(() => {
+    if (!gigParam) {
+      setSelectedGig(null);
+      return;
+    }
+    if (!gigLoading && !selectedGig) {
+      fetchGig(gigParam);
+    }
+  }, [gigParam]);
 
   async function loadProfileData() {
     setLoading(true);
@@ -68,11 +83,12 @@ export default function Profile({ setScreen, currentUserId }) {
     await logout();
   }
 
-  async function handleOpenGig(gigId) {
+  async function fetchGig(gigId) {
     if (!gigId || gigLoading) return;
     setGigLoading(true);
     const { gig } = await getGigById(gigId);
     if (gig) setSelectedGig(gig);
+    else closeGig();
     setGigLoading(false);
   }
 
@@ -187,7 +203,7 @@ export default function Profile({ setScreen, currentUserId }) {
     <>
       <div className="page fadein">
         <div className="topbar">
-          <button className="btn bg-btn bico" onClick={() => setScreen("home")}>
+          <button className="btn bg-btn bico" onClick={() => navigate("/")}>
             <span style={{ fontSize: 15 }}>←</span>
           </button>
           <div className="tlogo">
@@ -260,7 +276,7 @@ export default function Profile({ setScreen, currentUserId }) {
                   <span
                     className="badge bn"
                     style={{ cursor: "pointer" }}
-                    onClick={() => setScreen("editProfile")}
+                    onClick={() => navigate("/profile/edit")}
                   >
                     <Pencil size={9} /> Edit
                   </span>
@@ -268,7 +284,7 @@ export default function Profile({ setScreen, currentUserId }) {
               </div>
               <div
                 style={{ textAlign: "right", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
-                onClick={() => setShowReviews(true)}
+                onClick={() => openReviews()}
               >
                 <Stars rating={parseFloat(avgRating)} size={13} />
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--mono)", letterSpacing: "-.03em", marginTop: 2 }}>
@@ -301,7 +317,7 @@ export default function Profile({ setScreen, currentUserId }) {
               </div>
             </div>
 
-            <div className="rep-card" style={{ marginBottom: 16, cursor: "pointer" }} onClick={() => setShowRepDetail(true)}>
+            <div className="rep-card" style={{ marginBottom: 16, cursor: "pointer" }} onClick={() => openRep()}>
               <div className="rc-ey">Rep Score · tap for details</div>
               <div className="rc-row">
                 <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
@@ -368,7 +384,7 @@ export default function Profile({ setScreen, currentUserId }) {
                     borderBottom: i < activityItems.length - 1 ? "1px solid var(--bd)" : "none",
                     cursor: a.gigId ? "pointer" : "default",
                   }}
-                  onClick={() => a.gigId && handleOpenGig(a.gigId)}
+                  onClick={() => a.gigId && openGig(a.gigId)}
                 >
                   <div
                     style={{
@@ -430,7 +446,7 @@ export default function Profile({ setScreen, currentUserId }) {
                     className={`lb-row ${p.isYou ? "lb-you" : ""}`}
                     style={{ cursor: p.isYou ? "default" : "pointer" }}
                     onClick={() => {
-                      if (!p.isYou && p.userId) setScreen("userProfile", p.userId);
+                      if (!p.isYou && p.userId) navigate(`/users/${p.userId}`);
                     }}
                   >
                     <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
@@ -538,18 +554,18 @@ export default function Profile({ setScreen, currentUserId }) {
         </div>
       </div>
 
-      {showReviews && (
+      {reviewsOpen && (
         <ReviewSheetModal
-          onClose={() => setShowReviews(false)}
+          onClose={closeReviews}
           reviews={reviews}
           avgRating={parseFloat(avgRating)}
           reviewCount={reviews.length}
           isOwnProfile
         />
       )}
-      {showRepDetail && (
+      {repOpen && (
         <RepDetailModal
-          onClose={() => setShowRepDetail(false)}
+          onClose={closeRep}
           repScore={repScore}
         />
       )}
@@ -559,11 +575,8 @@ export default function Profile({ setScreen, currentUserId }) {
           tick={tick}
           requested={false}
           onRequest={() => {}}
-          onClose={() => setSelectedGig(null)}
-          onViewProfile={(userId) => {
-            setSelectedGig(null);
-            setScreen("userProfile", userId);
-          }}
+          onClose={closeGig}
+          onViewProfile={(userId) => navigate(`/users/${userId}`)}
           currentUserId={currentUserId}
         />
       )}

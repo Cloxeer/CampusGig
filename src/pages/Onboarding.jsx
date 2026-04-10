@@ -3,7 +3,7 @@ import { Lock, AtSign, Phone, Loader, Camera } from "lucide-react";
 import { createProfile, uploadAvatar } from "../lib/profile";
 import { supabase } from "../lib/supabase";
 
-export default function Onboarding({ setScreen }) {
+export default function Onboarding({ onComplete }) {
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState({
     venmo: "",
@@ -80,7 +80,7 @@ export default function Onboarding({ setScreen }) {
         }
       }
 
-      setScreen("home");
+      onComplete();
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, Star, AlertTriangle, Trash2, Lock, CheckCircle, Loader } from "lucide-react";
 import {
   getMyNotifications, markAllNotificationsRead, markNotificationRead,
@@ -152,7 +153,8 @@ function NotifAvatar({ notification }) {
   );
 }
 
-export default function Alerts({ setScreen, onNotificationsRead }) {
+export default function Alerts({ onNotificationsRead }) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [gigStatusMap, setGigStatusMap] = useState({});
@@ -229,7 +231,6 @@ export default function Alerts({ setScreen, onNotificationsRead }) {
     <div className="page fadein">
       <TopBar
         title="Alerts"
-        onBack={() => setScreen("home")}
         right={
           hasUnread ? (
             <button className="btn bg-btn bsm" onClick={handleMarkRead}>Mark read</button>
@@ -344,7 +345,6 @@ export default function Alerts({ setScreen, onNotificationsRead }) {
           notification={selectedNotif}
           onClose={() => { setSelectedNotif(null); loadNotifications(); }}
           onStatusChange={handleStatusChange}
-          setScreen={setScreen}
         />
       )}
     </div>

@@ -1,22 +1,30 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { getOpenGigs, normalizeGig, requestGig } from "../lib/profile";
 import { useTimer } from "../utils/helpers";
+import { useModalParam } from "../hooks/useModalParam";
 import TopBar from "../components/TopBar";
 import GigCard from "../components/GigCard";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
-export default function Explore({ setScreen, currentUserId }) {
+export default function Explore({ currentUserId }) {
+  const navigate = useNavigate();
+  const [gigParam, openGig, closeGig] = useModalParam("gig");
+
   const [searchQ, setSearchQ] = useState("");
   const [allGigs, setAllGigs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedGig, setSelectedGig] = useState(null);
   const [requested, setRequested] = useState(false);
   const tick = useTimer();
 
   useEffect(() => {
     loadGigs();
   }, []);
+
+  useEffect(() => {
+    setRequested(false);
+  }, [gigParam]);
 
   async function loadGigs() {
     setLoading(true);
@@ -34,9 +42,13 @@ export default function Explore({ setScreen, currentUserId }) {
         g.poster.toLowerCase().includes(searchQ.toLowerCase())
   );
 
+  const selectedGig = gigParam && !loading
+    ? allGigs.find((g) => g.id === gigParam) || null
+    : null;
+
   return (
     <div className="page fadein">
-      <TopBar title="Search" onBack={() => setScreen("home")} />
+      <TopBar title="Search" />
 
       <div style={{ padding: "12px 16px 0" }}>
         <div
@@ -109,10 +121,7 @@ export default function Explore({ setScreen, currentUserId }) {
                   key={g.id}
                   gig={g}
                   tick={tick}
-                  onClick={() => {
-                    setSelectedGig(g);
-                    setRequested(false);
-                  }}
+                  onClick={() => openGig(g.id)}
                 />
               ))}
             </div>
@@ -134,11 +143,8 @@ export default function Explore({ setScreen, currentUserId }) {
             }
             return result;
           }}
-          onClose={() => setSelectedGig(null)}
-          onViewProfile={(userId) => {
-            setSelectedGig(null);
-            setScreen("userProfile", userId);
-          }}
+          onClose={closeGig}
+          onViewProfile={(userId) => navigate(`/users/${userId}`)}
         />
       )}
     </div>

@@ -1,9 +1,34 @@
 import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Mail, Shield, Loader } from "lucide-react";
 import { sendMagicLink, isEduEmail } from "../lib/auth";
 
-export default function Auth({ setScreen, initialMode = "signup" }) {
-  const [authMode, setAuthMode] = useState(initialMode);
+function modeFromParams(searchParams) {
+  return searchParams.get("mode") === "signup" ? "signup" : "login";
+}
+
+/**
+ * Magic link OTP does not return "email already exists" for existing users —
+ * Supabase sends a sign-in link either way. This only maps errors that OTP actually returns.
+ */
+function magicLinkErrorMessage(mlError, authMode) {
+  const code = mlError?.code;
+  const msg = (mlError?.message || "").toLowerCase();
+
+  if (
+    authMode === "login" &&
+    (msg.includes("signups not allowed") || code === "otp_disabled")
+  ) {
+    return "No account for this email yet. Use Create account if you're new to CampusGig.";
+  }
+
+  return mlError?.message || "Something went wrong. Please try again.";
+}
+
+export default function Auth() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const authMode = modeFromParams(searchParams);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -28,27 +53,30 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
       return;
     }
 
-    const options = authMode === "signup" ? { firstName, lastName } : {};
-    
+    const options =
+      authMode === "signup"
+        ? { firstName, lastName, shouldCreateUser: true }
+        : { shouldCreateUser: false };
+
     const { error: mlError } = await sendMagicLink(email, options);
-    
+
     setLoading(false);
-    
+
     if (mlError) {
-      setError(mlError.message);
+      setError(magicLinkErrorMessage(mlError, authMode));
       return;
     }
     
-    setScreen("magic", email);
+    navigate("/magic", { state: { email } });
   };
 
   return (
     <div className="page fadein">
-      <div style={{ padding: "52px 20px 18px", borderBottom: "1px solid var(--bd)" }}>
+      <div style={{ padding: "16px 20px 18px", borderBottom: "1px solid var(--bd)" }}>
         <button
           className="btn bg-btn"
           style={{ padding: 0, gap: 4, marginBottom: 20 }}
-          onClick={() => setScreen("splash")}
+          onClick={() => navigate("/welcome")}
         >
           <ArrowLeft size={13} /> Back
         </button>
@@ -57,7 +85,7 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
           {authMode === "signup"
-            ? "Sign up with your .edu email. We'll send a magic link."
+            ? "Sign up with your .edu email. We'll send a magic link. Already joined? The link signs you in too."
             : "Sign in with your .edu email. We'll send a magic link."}
         </div>
       </div>
@@ -156,8 +184,12 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
             padding: "6px 0",
           }}
           onClick={() => {
-            setAuthMode(authMode === "signup" ? "login" : "signup");
             setError("");
+            if (authMode === "signup") {
+              setSearchParams({});
+            } else {
+              setSearchParams({ mode: "signup" });
+            }
           }}
         >
           {authMode === "signup" ? "Already have an account? Sign in" : "New here? Create account"}

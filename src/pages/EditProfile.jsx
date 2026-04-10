@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Lock, AtSign, Phone, Loader, Camera } from "lucide-react";
 import { getMyProfile, updateMyProfile, uploadAvatar, getAvatarUrl } from "../lib/profile";
 
-/** Strip to US NANP digits: optional leading 1, then up to 10 national digits. */
 function nanpDigitsFromInput(raw) {
   const d = String(raw).replace(/\D/g, "");
   if (d.length === 0) return "";
@@ -10,7 +10,6 @@ function nanpDigitsFromInput(raw) {
   return d.slice(0, 10);
 }
 
-/** Format NANP digit string (from nanpDigitsFromInput) as +1 (AAA) BBB-CCCC */
 function formatNanpDisplay(digits) {
   if (!digits) return "";
   const rest = digits[0] === "1" ? digits.slice(1) : digits;
@@ -30,7 +29,8 @@ function phoneFromStored(stored) {
   return formatNanpDisplay(d.slice(0, 10));
 }
 
-export default function EditProfile({ setScreen }) {
+export default function EditProfile() {
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState({
     venmo: "",
@@ -132,7 +132,7 @@ export default function EditProfile({ setScreen }) {
         return;
       }
 
-      setScreen("profile");
+      navigate("/profile");
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -156,7 +156,7 @@ export default function EditProfile({ setScreen }) {
         <button
           type="button"
           className="btn bg-btn bico"
-          onClick={() => setScreen("profile")}
+          onClick={() => navigate("/profile")}
           aria-label="Back to profile"
           style={{ marginBottom: 10 }}
         >
@@ -171,7 +171,6 @@ export default function EditProfile({ setScreen }) {
       </div>
 
       <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* Profile photo */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
           <div
             style={{ position: "relative", cursor: "pointer" }}
@@ -363,7 +362,7 @@ export default function EditProfile({ setScreen }) {
         >
           {saving ? <Loader size={16} className="spin" /> : "Save changes"}
         </button>
-        <button className="btn bg-btn bfull" onClick={() => setScreen("profile")} disabled={saving}>
+        <button className="btn bg-btn bfull" onClick={() => navigate("/profile")} disabled={saving}>
           Cancel
         </button>
         <div style={{ height: 8 }} />

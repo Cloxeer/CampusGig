@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Award } from "lucide-react";
 import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig, requestGig } from "../lib/profile";
 import { getLevel, useTimer } from "../utils/helpers";
+import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
 import GigDetailModal from "../components/modals/GigDetailModal";
+import RepDetailModal from "../components/modals/RepDetailModal";
 
 const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
 
@@ -52,9 +55,12 @@ function HomeSkeleton() {
   );
 }
 
-export default function Home({ setScreen, currentUserId }) {
+export default function Home({ currentUserId }) {
+  const navigate = useNavigate();
+  const [repOpen, openRep, closeRep] = useModalParam("rep");
+  const [gigParam, openGig, closeGig] = useModalParam("gig");
+
   const [tab, setTab] = useState("Recent");
-  const [selectedGig, setSelectedGig] = useState(null);
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -65,6 +71,10 @@ export default function Home({ setScreen, currentUserId }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    setRequested(false);
+  }, [gigParam]);
 
   async function loadData() {
     setLoading(true);
@@ -101,6 +111,10 @@ export default function Home({ setScreen, currentUserId }) {
     return true;
   });
 
+  const selectedGig = gigParam && !loading
+    ? gigs.find((g) => g.id === gigParam) || null
+    : null;
+
   if (loading) return <HomeSkeleton />;
 
   return (
@@ -111,14 +125,14 @@ export default function Home({ setScreen, currentUserId }) {
           <Logo />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <button className="btn bg-btn bico" onClick={() => setScreen("explore")}>
+          <button className="btn bg-btn bico" onClick={() => navigate("/explore")}>
             <Search size={15} />
           </button>
           {avatarUrl ? (
             <img
               src={avatarUrl}
               alt=""
-              onClick={() => setScreen("profile")}
+              onClick={() => navigate("/profile")}
               style={{
                 width: 30,
                 height: 30,
@@ -132,7 +146,7 @@ export default function Home({ setScreen, currentUserId }) {
             <div
               className="av"
               style={{ background: profile?.avatar_color || "#6366f1" }}
-              onClick={() => setScreen("profile")}
+              onClick={() => navigate("/profile")}
             >
               {initials}
               <div className="av-dot" />
@@ -143,7 +157,7 @@ export default function Home({ setScreen, currentUserId }) {
 
       <div className="scroll" style={{ paddingBottom: 80 }}>
         <div style={{ margin: "14px 16px 0" }}>
-          <div className="rep-card" style={{ cursor: "pointer" }} onClick={() => setScreen("repDetail")}>
+          <div className="rep-card" style={{ cursor: "pointer" }} onClick={() => openRep()}>
             <div className="rc-ey">Rep Score · tap for details</div>
             <div className="rc-row">
               <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
@@ -203,10 +217,7 @@ export default function Home({ setScreen, currentUserId }) {
                 key={g.id}
                 gig={g}
                 tick={tick}
-                onClick={() => {
-                  setSelectedGig(g);
-                  setRequested(false);
-                }}
+                onClick={() => openGig(g.id)}
               />
             ))
           )}
@@ -228,13 +239,12 @@ export default function Home({ setScreen, currentUserId }) {
             }
             return result;
           }}
-          onClose={() => setSelectedGig(null)}
-          onViewProfile={(userId) => {
-            setSelectedGig(null);
-            setScreen("userProfile", userId);
-          }}
+          onClose={closeGig}
+          onViewProfile={(userId) => navigate(`/users/${userId}`)}
         />
       )}
+
+      {repOpen && <RepDetailModal onClose={closeRep} />}
     </div>
   );
 }

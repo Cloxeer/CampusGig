@@ -15,6 +15,7 @@ export function isEduEmail(email) {
 
 /**
  * Sends a magic link to the supplied .edu email.
+ * With shouldCreateUser true, existing users still receive a link and sign in — no duplicate-email error.
  *
  * @param {string} email
  * @param {object} [options]
@@ -31,6 +32,9 @@ export async function sendMagicLink(email, options = {}) {
   }
 
   const otpOptions = {};
+  if (typeof options.shouldCreateUser === "boolean") {
+    otpOptions.shouldCreateUser = options.shouldCreateUser;
+  }
   if (options.firstName || options.lastName) {
     otpOptions.data = {
       first_name: options.firstName?.trim(),
