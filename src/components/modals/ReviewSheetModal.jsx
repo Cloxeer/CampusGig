@@ -46,7 +46,12 @@ export default function ReviewSheetModal({
     });
 
     if (error) {
-      setSubmitError(error.message || "Failed to submit review.");
+      const msg = error.message || "";
+      if (msg.includes("not-null") || msg.includes("gig_id")) {
+        setSubmitError("Complete a gig with this user before leaving a review.");
+      } else {
+        setSubmitError(msg || "Failed to submit review.");
+      }
       setSubmitting(false);
       return;
     }

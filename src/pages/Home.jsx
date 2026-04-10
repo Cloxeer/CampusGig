@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Award } from "lucide-react";
-import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig } from "../lib/profile";
+import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig, requestGig } from "../lib/profile";
 import { getLevel, useTimer } from "../utils/helpers";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
@@ -52,7 +52,7 @@ function HomeSkeleton() {
   );
 }
 
-export default function Home({ setScreen }) {
+export default function Home({ setScreen, currentUserId }) {
   const [tab, setTab] = useState("Recent");
   const [selectedGig, setSelectedGig] = useState(null);
   const [requested, setRequested] = useState(false);
@@ -219,7 +219,15 @@ export default function Home({ setScreen }) {
           gig={selectedGig}
           tick={tick}
           requested={requested}
-          onRequest={() => setRequested(true)}
+          currentUserId={currentUserId}
+          onRequest={async () => {
+            const result = await requestGig(selectedGig.id);
+            if (!result.error) {
+              setRequested(true);
+              return { error: null };
+            }
+            return result;
+          }}
           onClose={() => setSelectedGig(null)}
           onViewProfile={(userId) => {
             setSelectedGig(null);

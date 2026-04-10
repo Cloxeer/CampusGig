@@ -275,6 +275,17 @@ export async function submitReview({ gigId, revieweeId, rating, text }) {
     .select()
     .single();
 
+  if (error?.message?.includes("not-null") && error.message.includes("gig_id")) {
+    const rowNoGig = { ...row };
+    delete rowNoGig.gig_id;
+    const { data: d2, error: e2 } = await supabase
+      .from("reviews")
+      .insert(rowNoGig)
+      .select()
+      .single();
+    return { review: d2, error: e2 };
+  }
+
   return { review: data, error };
 }
 
@@ -427,6 +438,17 @@ export async function postNewGig({ title, description, categoryLabel, price, loc
 
   if (!user) return { gig: null, error: { message: "Not authenticated" } };
 
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count: recentCount } = await supabase
+    .from("gigs")
+    .select("id", { count: "exact", head: true })
+    .eq("poster_id", user.id)
+    .gte("created_at", oneHourAgo);
+
+  if (recentCount >= 5) {
+    return { gig: null, error: { message: "You can only post 5 gigs per hour. Try again later." } };
+  }
+
   const { data: cat } = await supabase
     .from("categories")
     .select("id")
@@ -507,14 +529,268 @@ export async function getGigById(gigId) {
 }
 
 // ──────────────────────────────────────────────────
+// Gig Requests
+// ──────────────────────────────────────────────────
+
+function _userDisplayName(u) {
+  if (!u) return "Someone";
+  return u.last_name ? `${u.first_name} ${u.last_name.charAt(0)}.` : u.first_name || "Someone";
+}
+
+function _userInitials(u) {
+  if (!u) return "?";
+  return `${u.first_name?.charAt(0) || ""}${u.last_name?.charAt(0) || ""}`.toUpperCase();
+}
+
+function _buildNotifMeta(gig_id, request_id, requester_id, poster_id, role, otherUser) {
+  return {
+    gig_id,
+    request_id,
+    requester_id,
+    poster_id,
+    role,
+    other_avatar_url: otherUser?.avatar_url ? getAvatarUrl(otherUser.avatar_url) : null,
+    other_avatar_color: otherUser?.avatar_color || "#6366f1",
+    other_initials: _userInitials(otherUser),
+    other_name: _userDisplayName(otherUser),
+  };
+}
+
+export async function getMyRequestForGig(gigId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { request: null, error: null };
+
+  const { data, error } = await supabase
+    .from("gig_requests")
+    .select("id, status")
+    .eq("gig_id", gigId)
+    .eq("requester_id", user.id)
+    .maybeSingle();
+
+  return { request: data || null, error };
+}
+
+export async function requestGig(gigId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { request: null, error: { message: "Not authenticated" } };
+
+  const { data: gig } = await supabase
+    .from("gigs")
+    .select("id, poster_id, title, poster:poster_id(id, first_name, last_name, avatar_color, avatar_url)")
+    .eq("id", gigId)
+    .single();
+
+  if (!gig) return { request: null, error: { message: "Gig not found" } };
+  if (gig.poster_id === user.id) return { request: null, error: { message: "You cannot request your own gig" } };
+
+  const { data: existing } = await supabase
+    .from("gig_requests")
+    .select("id")
+    .eq("gig_id", gigId)
+    .eq("requester_id", user.id)
+    .maybeSingle();
+
+  if (existing) return { request: existing, error: { message: "You already requested this gig" } };
+
+  const { data, error } = await supabase
+    .from("gig_requests")
+    .insert({ gig_id: gigId, requester_id: user.id })
+    .select()
+    .single();
+
+  if (error) return { request: null, error };
+
+  const { data: me } = await supabase
+    .from("users")
+    .select("first_name, last_name, avatar_color, avatar_url")
+    .eq("id", user.id)
+    .single();
+
+  const poster = gig.poster || {};
+  const baseMeta = { gig_id: gigId, request_id: data.id, requester_id: user.id, poster_id: gig.poster_id };
+
+  await supabase.from("notifications").insert({
+    user_id: gig.poster_id,
+    type: "gig_requested",
+    title: `${_userDisplayName(me)} wants to take your gig`,
+    body: gig.title,
+    metadata: _buildNotifMeta(gigId, data.id, user.id, gig.poster_id, "poster", me),
+  });
+
+  await supabase.from("notifications").insert({
+    user_id: user.id,
+    type: "gig_request_sent",
+    title: "You requested a gig",
+    body: `${gig.title} · Waiting for ${_userDisplayName(poster)} to accept`,
+    metadata: _buildNotifMeta(gigId, data.id, user.id, gig.poster_id, "requester", poster),
+  });
+
+  await supabase
+    .from("gigs")
+    .update({ status: "requested" })
+    .eq("id", gigId)
+    .eq("status", "open");
+
+  return { request: data, error: null };
+}
+
+export async function acceptGigRequest(requestId, gigId, requesterId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { error: reqError } = await supabase
+    .from("gig_requests")
+    .update({ status: "accepted" })
+    .eq("id", requestId);
+  if (reqError) return { error: reqError };
+
+  const { error: gigError } = await supabase
+    .from("gigs")
+    .update({ taker_id: requesterId, status: "active" })
+    .eq("id", gigId);
+  if (gigError) return { error: gigError };
+
+  const [gigRes, meRes, reqRes] = await Promise.all([
+    supabase.from("gigs").select("title").eq("id", gigId).single(),
+    supabase.from("users").select("first_name, last_name, avatar_color, avatar_url").eq("id", user.id).single(),
+    supabase.from("users").select("first_name, last_name, avatar_color, avatar_url").eq("id", requesterId).single(),
+  ]);
+
+  const me = meRes.data;
+  const requester = reqRes.data;
+  const gigTitle = gigRes.data?.title || "Gig";
+
+  await supabase.from("notifications").insert({
+    user_id: requesterId,
+    type: "gig_accepted",
+    title: `${_userDisplayName(me)} accepted your request!`,
+    body: `${gigTitle} · Tap to see contact info`,
+    metadata: _buildNotifMeta(gigId, requestId, requesterId, user.id, "requester", me),
+  });
+
+  await supabase.from("notifications").insert({
+    user_id: user.id,
+    type: "gig_accepted",
+    title: `You accepted ${_userDisplayName(requester)}'s request`,
+    body: `${gigTitle} · Tap to see contact info`,
+    metadata: _buildNotifMeta(gigId, requestId, requesterId, user.id, "poster", requester),
+  });
+
+  return { error: null };
+}
+
+export async function rejectGigRequest(requestId, gigId, requesterId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { error: reqError } = await supabase
+    .from("gig_requests")
+    .update({ status: "rejected" })
+    .eq("id", requestId);
+  if (reqError) return { error: reqError };
+
+  await supabase
+    .from("gigs")
+    .update({ status: "open" })
+    .eq("id", gigId)
+    .eq("status", "requested");
+
+  const [gigRes, meRes] = await Promise.all([
+    supabase.from("gigs").select("title").eq("id", gigId).single(),
+    supabase.from("users").select("first_name, last_name, avatar_color, avatar_url").eq("id", user.id).single(),
+  ]);
+
+  await supabase.from("notifications").insert({
+    user_id: requesterId,
+    type: "gig_rejected",
+    title: "Your gig request was declined",
+    body: gigRes.data?.title || "The poster chose someone else",
+    metadata: _buildNotifMeta(gigId, requestId, requesterId, user.id, "requester", meRes.data),
+  });
+
+  return { error: null };
+}
+
+export async function completeGig(gigId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { data: gig } = await supabase
+    .from("gigs")
+    .select(`
+      id, title, poster_id, taker_id,
+      poster:poster_id(first_name, last_name, avatar_color, avatar_url),
+      taker:taker_id(first_name, last_name, avatar_color, avatar_url)
+    `)
+    .eq("id", gigId)
+    .single();
+
+  if (!gig) return { error: { message: "Gig not found" } };
+  if (gig.poster_id !== user.id) return { error: { message: "Only the poster can mark a gig as done" } };
+
+  const { error } = await supabase
+    .from("gigs")
+    .update({ status: "completed" })
+    .eq("id", gigId);
+  if (error) return { error };
+
+  if (gig.taker_id) {
+    await supabase.from("notifications").insert({
+      user_id: gig.taker_id,
+      type: "gig_completed",
+      title: "Gig completed! +10 Rep",
+      body: `${gig.title} · ${_userDisplayName(gig.poster)} marked this as done`,
+      metadata: _buildNotifMeta(gigId, null, gig.taker_id, gig.poster_id, "requester", gig.poster),
+    });
+  }
+
+  await supabase.from("notifications").insert({
+    user_id: user.id,
+    type: "gig_completed",
+    title: "Gig marked as done!",
+    body: gig.title,
+    metadata: _buildNotifMeta(gigId, null, gig.taker_id, gig.poster_id, "poster", gig.taker),
+  });
+
+  return { error: null };
+}
+
+// ──────────────────────────────────────────────────
+// Gig Detail (for alert detail modal)
+// ──────────────────────────────────────────────────
+
+export async function getGigDetail(gigId) {
+  const { data: gig, error: gigError } = await supabase
+    .from("gigs")
+    .select(`
+      id, title, description, price, location, estimated_time, expires_at, status, created_at, updated_at,
+      category:category_id(label),
+      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, venmo, cashapp, snapchat, paypal, rep_score, phone),
+      taker:taker_id(id, first_name, last_name, avatar_color, avatar_url, venmo, cashapp, snapchat, paypal, rep_score, phone)
+    `)
+    .eq("id", gigId)
+    .single();
+
+  if (gigError || !gig) return { gig: null, requests: [], error: gigError };
+
+  const { data: requests } = await supabase
+    .from("gig_requests")
+    .select(`
+      id, requester_id, status, created_at,
+      requester:requester_id(id, first_name, last_name, avatar_color, avatar_url, venmo, cashapp, snapchat, paypal, rep_score, phone)
+    `)
+    .eq("gig_id", gigId)
+    .order("created_at", { ascending: false });
+
+  return { gig, requests: requests || [], error: null };
+}
+
+// ──────────────────────────────────────────────────
 // Notifications
 // ──────────────────────────────────────────────────
 
 export async function getMyNotifications() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { notifications: [], error: { message: "Not authenticated" } };
 
   const { data, error } = await supabase
@@ -526,11 +802,21 @@ export async function getMyNotifications() {
   return { notifications: data || [], error };
 }
 
-export async function markAllNotificationsRead() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function getUnreadNotificationCount() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { count: 0 };
 
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("read", false);
+
+  return { count: error ? 0 : (count || 0) };
+}
+
+export async function markAllNotificationsRead() {
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: { message: "Not authenticated" } };
 
   const { error } = await supabase
@@ -540,6 +826,33 @@ export async function markAllNotificationsRead() {
     .eq("read", false);
 
   return { error };
+}
+
+export async function deleteNotification(notificationId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("id", notificationId)
+    .eq("user_id", user.id);
+
+  return { error };
+}
+
+export async function getGigStatusesForNotifications(gigIds) {
+  if (!gigIds.length) return {};
+  const { data } = await supabase
+    .from("gigs")
+    .select("id, status, expires_at")
+    .in("id", gigIds);
+
+  const map = {};
+  for (const g of data || []) {
+    map[g.id] = { status: g.status, expires_at: g.expires_at };
+  }
+  return map;
 }
 
 // ──────────────────────────────────────────────────

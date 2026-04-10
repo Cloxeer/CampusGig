@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
 import MagicLink from "./pages/MagicLink";
@@ -13,7 +13,7 @@ import UserProfile from "./pages/UserProfile";
 import RepDetailModal from "./components/modals/RepDetailModal";
 import BottomNav from "./components/BottomNav";
 import { supabase } from "./lib/supabase";
-import { getMyProfile } from "./lib/profile";
+import { getMyProfile, getUnreadNotificationCount } from "./lib/profile";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -23,34 +23,60 @@ export default function App() {
   const [viewUserId, setViewUserId] = useState(null);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  // ── Auth state listener ──────────────────────────────
+  const refreshUnread = useCallback(async () => {
+    const { count } = await getUnreadNotificationCount();
+    setUnreadCount(count);
+  }, []);
+
   useEffect(() => {
-    // Check initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       if (s) {
-        // User is logged in — check if they have a profile
+        setCurrentUserId(s.user.id);
         checkProfileAndRoute(s);
       } else {
         setAuthLoading(false);
       }
     });
 
-    // Subscribe to auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (s) {
+        setCurrentUserId(s.user.id);
         checkProfileAndRoute(s);
       } else {
+        setCurrentUserId(null);
+        setUnreadCount(0);
         setScreen("splash");
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    refreshUnread();
+
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${currentUserId}` },
+        () => refreshUnread()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, refreshUnread]);
 
   async function checkProfileAndRoute(s) {
     if (!s) {
@@ -59,16 +85,13 @@ export default function App() {
     }
     const { profile } = await getMyProfile();
     if (profile) {
-      // Has profile → go to home
       setScreen("home");
     } else {
-      // No profile yet → needs onboarding
       setScreen("onboarding");
     }
     setAuthLoading(false);
   }
 
-  // Wrapper to handle screen changes with optional auth mode
   const handleSetScreen = (newScreen, payload) => {
     if (newScreen === "auth" && payload) {
       setAuthMode(payload);
@@ -86,7 +109,6 @@ export default function App() {
     setScreen(newScreen);
   };
 
-  // Show nothing while checking initial auth
   if (authLoading) {
     return (
       <div className="shell" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -101,16 +123,16 @@ export default function App() {
       {screen === "auth" && <Auth setScreen={handleSetScreen} initialMode={authMode} />}
       {screen === "magic" && <MagicLink setScreen={handleSetScreen} email={magicEmail} />}
       {screen === "onboarding" && <Onboarding setScreen={handleSetScreen} />}
-      {screen === "home" && <Home setScreen={handleSetScreen} />}
-      {screen === "explore" && <Explore setScreen={handleSetScreen} />}
+      {screen === "home" && <Home setScreen={handleSetScreen} currentUserId={currentUserId} />}
+      {screen === "explore" && <Explore setScreen={handleSetScreen} currentUserId={currentUserId} />}
       {screen === "post" && <PostGig setScreen={handleSetScreen} />}
-      {screen === "alerts" && <Alerts setScreen={handleSetScreen} />}
+      {screen === "alerts" && <Alerts setScreen={handleSetScreen} onNotificationsRead={refreshUnread} />}
       {screen === "profile" && <Profile setScreen={handleSetScreen} />}
       {screen === "editProfile" && <EditProfile setScreen={handleSetScreen} />}
       {screen === "userProfile" && <UserProfile setScreen={handleSetScreen} userId={viewUserId} />}
 
       {["home", "explore", "alerts", "profile", "post"].includes(screen) && (
-        <BottomNav screen={screen} setScreen={handleSetScreen} />
+        <BottomNav screen={screen} setScreen={handleSetScreen} unreadCount={unreadCount} />
       )}
 
       {showRepDetail && <RepDetailModal onClose={() => setShowRepDetail(false)} />}

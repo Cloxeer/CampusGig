@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
-import { getOpenGigs, normalizeGig } from "../lib/profile";
+import { getOpenGigs, normalizeGig, requestGig } from "../lib/profile";
 import { useTimer } from "../utils/helpers";
 import TopBar from "../components/TopBar";
 import GigCard from "../components/GigCard";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
-export default function Explore({ setScreen }) {
+export default function Explore({ setScreen, currentUserId }) {
   const [searchQ, setSearchQ] = useState("");
   const [allGigs, setAllGigs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +125,15 @@ export default function Explore({ setScreen }) {
           gig={selectedGig}
           tick={tick}
           requested={requested}
-          onRequest={() => setRequested(true)}
+          currentUserId={currentUserId}
+          onRequest={async () => {
+            const result = await requestGig(selectedGig.id);
+            if (!result.error) {
+              setRequested(true);
+              return { error: null };
+            }
+            return result;
+          }}
           onClose={() => setSelectedGig(null)}
           onViewProfile={(userId) => {
             setSelectedGig(null);

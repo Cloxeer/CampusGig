@@ -1,6 +1,6 @@
 import { Home, Search, Plus, Bell, User } from "lucide-react";
 
-export default function BottomNav({ screen, setScreen }) {
+export default function BottomNav({ screen, setScreen, unreadCount = 0 }) {
   return (
     <nav className="bnav">
       <button
@@ -32,7 +32,7 @@ export default function BottomNav({ screen, setScreen }) {
       >
         <Bell size={18} />
         <span className="nlbl">alerts</span>
-        <div className="nb-dot" />
+        {unreadCount > 0 && <div className="nb-dot" />}
       </button>
 
       <button

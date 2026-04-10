@@ -1,11 +1,46 @@
-import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer, Loader } from "lucide-react";
 import LevelBadge from "../LevelBadge";
 import Stars from "../Stars";
 import { elapsed, countdown } from "../../utils/helpers";
+import { getMyRequestForGig } from "../../lib/profile";
 
-export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile }) {
+export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile, currentUserId }) {
   const cd = countdown(gig.deadline);
   const taskDesc = gig.description || gig.notes || "No additional details.";
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState(null);
+  const [existingRequest, setExistingRequest] = useState(null);
+  const [checkingRequest, setCheckingRequest] = useState(true);
+
+  const isOwnGig = currentUserId && gig.posterId === currentUserId;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function check() {
+      if (!gig?.id || isOwnGig || !currentUserId) {
+        setExistingRequest(null);
+        setCheckingRequest(false);
+        return;
+      }
+      setCheckingRequest(true);
+      const { request } = await getMyRequestForGig(gig.id);
+      if (!cancelled) {
+        setExistingRequest(request);
+        setCheckingRequest(false);
+      }
+    }
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, [gig.id, isOwnGig, currentUserId]);
+
+  const showAlreadyRequested =
+    requested ||
+    existingRequest?.status === "pending" ||
+    existingRequest?.status === "accepted";
+  const showRejected = existingRequest?.status === "rejected";
 
   const detailRows = [
     { icon: <MapPin size={14} />, label: "Location", val: gig.loc },
@@ -21,6 +56,16 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
     detailRows.push({ icon: <Clock size={14} />, label: "Est. time", val: gig.eta });
   }
   detailRows.push({ icon: <FileText size={14} />, label: "Task description", val: taskDesc });
+
+  async function handleRequest() {
+    setRequesting(true);
+    setRequestError(null);
+    const result = await onRequest();
+    if (result?.error) {
+      setRequestError(result.error.message || result.error);
+    }
+    setRequesting(false);
+  }
 
   return (
     <div
@@ -204,17 +249,59 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
           </div>
 
           <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {!requested ? (
-              <button className="btn bgreen bfull blg" onClick={onRequest}>
-                <CheckCircle size={16} /> Accept this gig
-              </button>
+            {isOwnGig ? (
+              <div className="callout" style={{ background: "var(--bg3)", borderColor: "var(--bd)" }}>
+                <span className="ct" style={{ color: "var(--fg3)" }}>
+                  This is your gig. You'll be notified when someone requests it.
+                </span>
+              </div>
+            ) : checkingRequest ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px 0" }}>
+                <Loader size={18} className="spin" color="var(--fg3)" />
+                <span style={{ fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Checking request…</span>
+              </div>
+            ) : showRejected ? (
+              <div className="callout" style={{ background: "var(--err-bg)", borderColor: "#fecaca" }}>
+                <span className="ct" style={{ color: "var(--err)" }}>
+                  <strong>Request declined.</strong> This gig is open again — you can’t send another request from this account.
+                </span>
+              </div>
+            ) : !showAlreadyRequested ? (
+              <>
+                <button
+                  className="btn bgreen bfull blg"
+                  onClick={handleRequest}
+                  disabled={requesting}
+                  style={{ opacity: requesting ? 0.7 : 1 }}
+                >
+                  {requesting ? (
+                    <Loader size={16} className="spin" />
+                  ) : (
+                    <CheckCircle size={16} />
+                  )}
+                  {requesting ? "Sending…" : "Request this gig"}
+                </button>
+                {requestError && (
+                  <div style={{ fontSize: 12, color: "var(--err)", fontFamily: "var(--mono)", textAlign: "center" }}>
+                    {requestError}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="callout" style={{ background: "var(--green-bg)", borderColor: "var(--green-bd)" }}>
                 <div className="ci" style={{ color: "var(--green-d)" }}>
                   <Check size={13} />
                 </div>
                 <span className="ct" style={{ color: "var(--green-text)" }}>
-                  <strong>Request sent!</strong> {gig.poster} will confirm and payment details will be shared.
+                  {existingRequest?.status === "accepted" ? (
+                    <>
+                      <strong>You’re on this gig.</strong> Open Alerts for contact details and updates.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Already requested.</strong> {gig.poster} hasn’t responded yet — check Alerts for updates.
+                    </>
+                  )}
                 </span>
               </div>
             )}

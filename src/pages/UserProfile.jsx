@@ -54,7 +54,9 @@ export default function UserProfile({ setScreen, userId }) {
       setReviews(reviewsRes.reviews);
       setUserActivity(actRes);
 
-      if (gigsRes.gigs.length > 0) {
+      const hasCompletedGigs = gigsRes.gigs.length > 0;
+
+      if (hasCompletedGigs) {
         setReviewGigId(gigsRes.gigs[0].id);
       }
 
@@ -63,7 +65,7 @@ export default function UserProfile({ setScreen, userId }) {
         setExistingReview(existingRes.review);
         setCanReview(true);
       } else {
-        setCanReview(true);
+        setCanReview(hasCompletedGigs);
       }
     }
     setLoading(false);
@@ -198,9 +200,11 @@ export default function UserProfile({ setScreen, userId }) {
                     ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""}`
                     : "No reviews"}
                 </div>
-                <div style={{ fontSize: 10, color: "var(--ink)", fontFamily: "var(--mono)", fontWeight: 600 }}>
-                  {alreadyReviewed ? "Tap to update" : "Tap to review"}
-                </div>
+                {(canReview || alreadyReviewed) && (
+                  <div style={{ fontSize: 10, color: "var(--ink)", fontFamily: "var(--mono)", fontWeight: 600 }}>
+                    {alreadyReviewed ? "Tap to update" : "Tap to review"}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -303,7 +307,7 @@ export default function UserProfile({ setScreen, userId }) {
                     Update
                   </button>
                 </div>
-              ) : (
+              ) : canReview ? (
                 <button
                   className="btn bp bfull"
                   style={{ marginTop: 16 }}
@@ -312,6 +316,22 @@ export default function UserProfile({ setScreen, userId }) {
                   <Star size={14} />
                   Leave a review
                 </button>
+              ) : (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 12px",
+                    background: "var(--bg3)",
+                    border: "1px solid var(--bd)",
+                    borderRadius: "var(--r)",
+                    fontSize: 12,
+                    color: "var(--fg3)",
+                    fontFamily: "var(--mono)",
+                    textAlign: "center",
+                  }}
+                >
+                  Complete a gig with {fullName} to leave a review.
+                </div>
               )}
             </div>
           )}
@@ -415,7 +435,7 @@ export default function UserProfile({ setScreen, userId }) {
           isOwnProfile={false}
           revieweeId={userId}
           gigId={reviewGigId}
-          canReview={true}
+          canReview={canReview || alreadyReviewed}
           alreadyReviewed={alreadyReviewed}
           existingReview={existingReview}
           onReviewSubmitted={() => {
