@@ -320,6 +320,7 @@ export async function getExistingReview(revieweeId) {
 
 export async function getOpenGigs() {
   const nowIso = new Date().toISOString();
+  // PostgREST splits on "." — ISO timestamps must be double-quoted or the filter matches nothing.
   const { data, error } = await supabase
     .from("gigs")
     .select(`
@@ -328,7 +329,7 @@ export async function getOpenGigs() {
       poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score)
     `)
     .eq("status", "open")
-    .or(`expires_at.is.null,expires_at.gt.${encodeURIComponent(nowIso)}`)
+    .or(`expires_at.is.null,expires_at.gt."${nowIso}"`)
     .order("created_at", { ascending: false });
 
   if (error || !data) return { gigs: data || [], error };

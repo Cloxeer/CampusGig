@@ -420,3 +420,5 @@ CREATE POLICY "Users can delete own avatar"
 --   ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_gig_id_fkey;
 --   ALTER TABLE reviews ADD CONSTRAINT reviews_gig_id_fkey
 --     FOREIGN KEY (gig_id) REFERENCES gigs(id) ON DELETE SET NULL;
+--
+-- --- FEED EMPTY AFTER MIGRATION? (copy-paste below, run as plain SQL — not comments) ---
