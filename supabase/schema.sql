@@ -310,18 +310,14 @@ CREATE TRIGGER trg_rep_gig_complete
 
 -- Award +5 rep for a 5-star review
 CREATE OR REPLACE FUNCTION award_rep_on_5star_review()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.rating = 5 THEN
         UPDATE users SET rep_score = rep_score + 5 WHERE id = NEW.reviewee_id;
     END IF;
     RETURN NEW;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER trg_rep_5star_review
     AFTER INSERT ON reviews
@@ -349,14 +345,14 @@ CREATE POLICY "Users can upload own avatar"
     ON storage.objects FOR INSERT TO authenticated
     WITH CHECK (
         bucket_id = 'avatars'
-        AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
+        AND (storage.foldername(name))[1] = auth.uid()::text
     );
 
 CREATE POLICY "Users can update own avatar"
     ON storage.objects FOR UPDATE TO authenticated
     USING (
         bucket_id = 'avatars'
-        AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
+        AND (storage.foldername(name))[1] = auth.uid()::text
     );
 
 -- Anyone can view avatars (public bucket)
@@ -369,7 +365,7 @@ CREATE POLICY "Users can delete own avatar"
     ON storage.objects FOR DELETE TO authenticated
     USING (
         bucket_id = 'avatars'
-        AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
+        AND (storage.foldername(name))[1] = auth.uid()::text
     );
 
 -- ============================================================
