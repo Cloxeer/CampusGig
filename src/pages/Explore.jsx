@@ -125,6 +125,10 @@ export default function Explore({ setScreen }) {
           requested={requested}
           onRequest={() => setRequested(true)}
           onClose={() => setSelectedGig(null)}
+          onViewProfile={(userId) => {
+            setSelectedGig(null);
+            setScreen("userProfile", userId);
+          }}
         />
       )}
     </div>

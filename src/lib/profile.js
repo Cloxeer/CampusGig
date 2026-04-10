@@ -170,6 +170,7 @@ export async function getLeaderboard(limit = 10) {
     .limit(limit);
 
   const leaderboard = (data || []).map((u, i) => ({
+    userId: u.id,
     rank: i + 1,
     name: `${u.first_name} ${u.last_name?.charAt(0)}.`,
     initials: `${u.first_name?.charAt(0) || ""}${u.last_name?.charAt(0) || ""}`.toUpperCase(),
@@ -220,6 +221,78 @@ export async function getMyActivity() {
 }
 
 // ──────────────────────────────────────────────────
+// Reviews (for any user)
+// ──────────────────────────────────────────────────
+
+export async function getReviewsForUser(userId) {
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("id, rating, text, created_at, reviewer:reviewer_id(first_name, last_name, avatar_color)")
+    .eq("reviewee_id", userId)
+    .order("created_at", { ascending: false });
+
+  return { reviews: data || [], error };
+}
+
+export async function submitReview({ gigId, revieweeId, rating, text }) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { review: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .insert({
+      gig_id: gigId,
+      reviewer_id: user.id,
+      reviewee_id: revieweeId,
+      rating: Math.round(rating),
+      text: text || null,
+    })
+    .select()
+    .single();
+
+  return { review: data, error };
+}
+
+export async function getCompletedGigsBetweenUsers(otherUserId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { gigs: [], error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("gigs")
+    .select("id, title")
+    .eq("status", "completed")
+    .or(
+      `and(poster_id.eq.${user.id},taker_id.eq.${otherUserId}),and(poster_id.eq.${otherUserId},taker_id.eq.${user.id})`
+    )
+    .order("updated_at", { ascending: false });
+
+  return { gigs: data || [], error };
+}
+
+export async function getExistingReview(revieweeId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { review: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("id")
+    .eq("reviewer_id", user.id)
+    .eq("reviewee_id", revieweeId)
+    .maybeSingle();
+
+  return { review: data, error };
+}
+
+// ──────────────────────────────────────────────────
 // Gigs (open feed + posting)
 // ──────────────────────────────────────────────────
 
@@ -234,7 +307,34 @@ export async function getOpenGigs() {
     .eq("status", "open")
     .order("created_at", { ascending: false });
 
-  return { gigs: data || [], error };
+  if (error || !data) return { gigs: data || [], error };
+
+  const posterIds = [...new Set(data.map((g) => g.poster?.id).filter(Boolean))];
+  let posterReviewMap = {};
+
+  if (posterIds.length > 0) {
+    const { data: allReviews } = await supabase
+      .from("reviews")
+      .select("reviewee_id, rating")
+      .in("reviewee_id", posterIds);
+
+    if (allReviews) {
+      for (const r of allReviews) {
+        if (!posterReviewMap[r.reviewee_id]) {
+          posterReviewMap[r.reviewee_id] = { sum: 0, count: 0 };
+        }
+        posterReviewMap[r.reviewee_id].sum += r.rating;
+        posterReviewMap[r.reviewee_id].count += 1;
+      }
+    }
+  }
+
+  const enriched = data.map((g) => ({
+    ...g,
+    _reviewStats: posterReviewMap[g.poster?.id] || null,
+  }));
+
+  return { gigs: enriched, error };
 }
 
 export function normalizeGig(g) {
@@ -245,6 +345,10 @@ export function normalizeGig(g) {
   const posterName = lastName ? `${firstName} ${lastName.charAt(0)}.` : firstName;
   const repScore = poster.rep_score || 0;
   const level = getLevel(repScore);
+
+  const reviewStats = g._reviewStats;
+  const posterAvgRating = reviewStats ? reviewStats.sum / reviewStats.count : 0;
+  const posterReviewCount = reviewStats ? reviewStats.count : 0;
 
   return {
     id: g.id,
@@ -259,6 +363,8 @@ export function normalizeGig(g) {
     color: poster.avatar_color || "#6366f1",
     avatarUrl: poster.avatar_url ? getAvatarUrl(poster.avatar_url) : null,
     levelLabel: level.label,
+    posterAvgRating,
+    posterReviewCount,
     postedAt: new Date(g.created_at).getTime(),
     notes: g.notes || "No additional notes.",
   };

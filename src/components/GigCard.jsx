@@ -1,5 +1,6 @@
 import { MapPin, Clock } from "lucide-react";
 import LevelBadge from "./LevelBadge";
+import Stars from "./Stars";
 import { elapsed } from "../utils/helpers";
 
 export default function GigCard({ gig, onClick, tick }) {
@@ -50,7 +51,7 @@ export default function GigCard({ gig, onClick, tick }) {
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           gap: 8,
           paddingTop: 9,
           borderTop: "1px solid var(--bd)",
@@ -60,22 +61,37 @@ export default function GigCard({ gig, onClick, tick }) {
           <img
             src={gig.avatarUrl}
             alt=""
-            style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+            style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 1 }}
           />
         ) : (
-          <div className="pav" style={{ background: gig.color }}>
+          <div className="pav" style={{ background: gig.color, marginTop: 1 }}>
             {gig.initials}
           </div>
         )}
-        <span style={{ fontSize: 12, color: "var(--fg3)", flex: 1 }}>
-          {gig.poster}
-        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 12, color: "var(--fg3)" }}>
+            {gig.poster}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <Stars rating={gig.posterAvgRating} size={9} />
+            {gig.posterReviewCount > 0 ? (
+              <span style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
+                {gig.posterAvgRating.toFixed(1)}
+              </span>
+            ) : (
+              <span style={{ fontSize: 10, color: "var(--fg4)", fontFamily: "var(--mono)" }}>
+                No reviews
+              </span>
+            )}
+          </div>
+        </div>
         <LevelBadge label={gig.levelLabel} small />
         <span
           style={{
             fontSize: 10,
             color: "var(--fg4)",
             fontFamily: "var(--mono)",
+            marginTop: 2,
           }}
           key={tick}
         >

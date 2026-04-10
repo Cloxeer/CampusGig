@@ -1,4 +1,4 @@
-import { Zap } from "lucide-react";
+export const LOGO_MARK_SRC = "/photos/favicon.ico";
 
 export default function Logo({ size = 15 }) {
   return (
@@ -15,10 +15,13 @@ export default function Logo({ size = 15 }) {
   );
 }
 
-export function LogoMark() {
+export function LogoMark({ size, style, className = "tmark" }) {
   return (
-    <div className="tmark">
-      <Zap size={14} color="#fff" strokeWidth={2.5} />
+    <div
+      className={className}
+      style={size != null ? { width: size, height: size, ...style } : style}
+    >
+      <img src={LOGO_MARK_SRC} alt="" className="tmark-img" draggable={false} />
     </div>
   );
 }

@@ -167,8 +167,8 @@ CREATE TABLE reviews (
     gig_id UUID NOT NULL REFERENCES gigs(id) ON DELETE CASCADE,
     reviewer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reviewee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    rating INTEGER NOT NULL
-        CONSTRAINT valid_rating CHECK (rating >= 1 AND rating <= 5),
+    rating NUMERIC(2,1) NOT NULL
+        CONSTRAINT valid_rating CHECK (rating >= 0.5 AND rating <= 5 AND (rating * 2) = ROUND(rating * 2)),
     text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(gig_id, reviewer_id),

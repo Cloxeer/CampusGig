@@ -1,8 +1,9 @@
 import { MapPin, Clock, FileText, Lock, CheckCircle, Check } from "lucide-react";
 import LevelBadge from "../LevelBadge";
+import Stars from "../Stars";
 import { elapsed } from "../../utils/helpers";
 
-export default function GigDetailModal({ gig, tick, requested, onRequest, onClose }) {
+export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile }) {
   return (
     <div
       style={{
@@ -83,7 +84,10 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
+                  cursor: "pointer",
+                  transition: "border-color .12s",
                 }}
+                onClick={() => onViewProfile?.(gig.posterId)}
               >
                 {gig.avatarUrl ? (
                   <img
@@ -117,11 +121,24 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
                   </div>
                 )}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{gig.poster}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{gig.poster}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                     <LevelBadge label={gig.levelLabel} />
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Stars rating={gig.posterAvgRating} size={11} />
+                    {gig.posterReviewCount > 0 ? (
+                      <span style={{ fontSize: 11, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
+                        {gig.posterAvgRating.toFixed(1)} ({gig.posterReviewCount})
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)" }}>
+                        No reviews
+                      </span>
+                    )}
+                  </div>
                 </div>
+                <span style={{ fontSize: 14, color: "var(--fg4)" }}>›</span>
               </div>
             </div>
 

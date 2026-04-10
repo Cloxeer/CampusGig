@@ -178,6 +178,10 @@ export default function Home({ setScreen }) {
           requested={requested}
           onRequest={() => setRequested(true)}
           onClose={() => setSelectedGig(null)}
+          onViewProfile={(userId) => {
+            setSelectedGig(null);
+            setScreen("userProfile", userId);
+          }}
         />
       )}
     </div>

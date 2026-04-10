@@ -1,5 +1,5 @@
-import { Zap, Lock } from "lucide-react";
-import Logo from "../components/Logo";
+import { Lock } from "lucide-react";
+import Logo, { LogoMark } from "../components/Logo";
 
 export default function Splash({ setScreen }) {
   return (
@@ -9,19 +9,7 @@ export default function Splash({ setScreen }) {
         <div className="sfade" />
         <div className="scontent">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 44 }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                background: "var(--ink)",
-                borderRadius: "var(--r)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Zap size={16} color="#fff" strokeWidth={2.5} />
-            </div>
+            <LogoMark size={32} style={{ borderRadius: "var(--r)" }} />
             <Logo size={17} />
           </div>
 

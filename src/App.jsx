@@ -9,6 +9,7 @@ import PostGig from "./pages/PostGig";
 import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
+import UserProfile from "./pages/UserProfile";
 import RepDetailModal from "./components/modals/RepDetailModal";
 import BottomNav from "./components/BottomNav";
 import { supabase } from "./lib/supabase";
@@ -19,6 +20,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState("signup");
   const [magicEmail, setMagicEmail] = useState("");
   const [showRepDetail, setShowRepDetail] = useState(false);
+  const [viewUserId, setViewUserId] = useState(null);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -78,6 +80,9 @@ export default function App() {
       setShowRepDetail(true);
       return;
     }
+    if (newScreen === "userProfile" && payload) {
+      setViewUserId(payload);
+    }
     setScreen(newScreen);
   };
 
@@ -102,6 +107,7 @@ export default function App() {
       {screen === "alerts" && <Alerts setScreen={handleSetScreen} />}
       {screen === "profile" && <Profile setScreen={handleSetScreen} />}
       {screen === "editProfile" && <EditProfile setScreen={handleSetScreen} />}
+      {screen === "userProfile" && <UserProfile setScreen={handleSetScreen} userId={viewUserId} />}
 
       {["home", "explore", "alerts", "profile", "post"].includes(screen) && (
         <BottomNav screen={screen} setScreen={handleSetScreen} />

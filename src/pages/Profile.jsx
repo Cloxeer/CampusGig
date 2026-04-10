@@ -3,7 +3,7 @@ import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader } fro
 import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl } from "../lib/profile";
 import { logout } from "../lib/auth";
 import { getLevel } from "../utils/helpers";
-import Logo from "../components/Logo";
+import Logo, { LogoMark } from "../components/Logo";
 import LevelBadge from "../components/LevelBadge";
 import Stars from "../components/Stars";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
@@ -119,7 +119,10 @@ export default function Profile({ setScreen }) {
           <button className="btn bg-btn bico" onClick={() => setScreen("home")}>
             <span style={{ fontSize: 15 }}>←</span>
           </button>
-          <Logo />
+          <div className="tlogo">
+            <LogoMark />
+            <Logo />
+          </div>
           <button
             className="btn bsm"
             onClick={handleLogout}
@@ -196,12 +199,14 @@ export default function Profile({ setScreen }) {
                 style={{ textAlign: "right", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
                 onClick={() => setShowReviews(true)}
               >
-                <Stars n={5} size={13} filled={reviews.length > 0} />
+                <Stars rating={parseFloat(avgRating)} size={13} />
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--mono)", letterSpacing: "-.03em", marginTop: 2 }}>
                   {avgRating}
                 </div>
                 <div style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
-                  {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                  {reviews.length > 0
+                    ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""}`
+                    : "No reviews"}
                 </div>
                 <div style={{ fontSize: 10, color: "var(--fg4)", fontFamily: "var(--mono)" }}>tap to view</div>
               </div>
@@ -340,7 +345,14 @@ export default function Profile({ setScreen }) {
                 </div>
               )}
               {leaderboard.map((p) => (
-                <div key={p.rank} className={`lb-row ${p.isYou ? "lb-you" : ""}`}>
+                <div
+                  key={p.rank}
+                  className={`lb-row ${p.isYou ? "lb-you" : ""}`}
+                  style={{ cursor: p.isYou ? "default" : "pointer" }}
+                  onClick={() => {
+                    if (!p.isYou && p.userId) setScreen("userProfile", p.userId);
+                  }}
+                >
                   <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
                   {p.avatarUrl ? (
                     <img
