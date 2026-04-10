@@ -56,9 +56,17 @@ export default function GigCard({ gig, onClick, tick }) {
           borderTop: "1px solid var(--bd)",
         }}
       >
-        <div className="pav" style={{ background: gig.color }}>
-          {gig.initials}
-        </div>
+        {gig.avatarUrl ? (
+          <img
+            src={gig.avatarUrl}
+            alt=""
+            style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+          />
+        ) : (
+          <div className="pav" style={{ background: gig.color }}>
+            {gig.initials}
+          </div>
+        )}
         <span style={{ fontSize: 12, color: "var(--fg3)", flex: 1 }}>
           {gig.poster}
         </span>

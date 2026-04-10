@@ -1,15 +1,10 @@
 import { supabase } from "./supabase";
+import { getLevel } from "../utils/helpers";
 
 // ──────────────────────────────────────────────────
 // Get profile
 // ──────────────────────────────────────────────────
 
-/**
- * Fetches the current user's profile row.
- * Relies on the RLS policy "Users can view all users" (SELECT).
- *
- * @returns {{ profile: object|null, error }}
- */
 export async function getMyProfile() {
   const {
     data: { user },
@@ -26,12 +21,6 @@ export async function getMyProfile() {
   return { profile: data, error };
 }
 
-/**
- * Fetches any user's profile by ID.
- *
- * @param {string} userId
- * @returns {{ profile: object|null, error }}
- */
 export async function getProfileById(userId) {
   const { data, error } = await supabase
     .from("users")
@@ -46,13 +35,6 @@ export async function getProfileById(userId) {
 // Create profile (used during onboarding)
 // ──────────────────────────────────────────────────
 
-/**
- * Inserts a new profile row for the authenticated user.
- * Called once after sign-up (during onboarding).
- *
- * @param {{ phone: string, firstName: string, lastName: string, email: string, venmo?: string, cashapp?: string, paypal?: string, snapchat?: string, avatarColor?: string }}
- * @returns {{ profile: object|null, error }}
- */
 export async function createProfile({
   phone,
   firstName,
@@ -96,14 +78,6 @@ export async function createProfile({
 // Update profile
 // ──────────────────────────────────────────────────
 
-/**
- * Updates the current user's profile.
- * Only send the fields you want to change.
- *
- * @param {object} updates  – keys can be: first_name, last_name, phone,
- *                            venmo, cashapp, paypal, snapchat, avatar_color
- * @returns {{ profile: object|null, error }}
- */
 export async function updateMyProfile(updates) {
   const {
     data: { user },
@@ -125,10 +99,6 @@ export async function updateMyProfile(updates) {
 // Profile stats (real data)
 // ──────────────────────────────────────────────────
 
-/**
- * Returns reviews written about the current user.
- * Joins reviewer info from the users table.
- */
 export async function getMyReviews() {
   const {
     data: { user },
@@ -145,9 +115,6 @@ export async function getMyReviews() {
   return { reviews: data || [], error };
 }
 
-/**
- * Returns the count of completed gigs for the current user (as taker).
- */
 export async function getMyGigStats() {
   const {
     data: { user },
@@ -174,10 +141,6 @@ export async function getMyGigStats() {
   };
 }
 
-/**
- * Returns the campus rank for a user based on rep_score.
- * Rank = number of users with a higher rep_score + 1.
- */
 export async function getCampusRank(repScore) {
   const { count, error } = await supabase
     .from("users")
@@ -187,9 +150,6 @@ export async function getCampusRank(repScore) {
   return { rank: (count || 0) + 1, error };
 }
 
-/**
- * Returns the total number of users on the platform.
- */
 export async function getTotalUsers() {
   const { count, error } = await supabase
     .from("users")
@@ -198,9 +158,6 @@ export async function getTotalUsers() {
   return { total: count || 0, error };
 }
 
-/**
- * Returns the top users by rep_score for the leaderboard.
- */
 export async function getLeaderboard(limit = 10) {
   const {
     data: { user },
@@ -208,7 +165,7 @@ export async function getLeaderboard(limit = 10) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, first_name, last_name, avatar_color, rep_score")
+    .select("id, first_name, last_name, avatar_color, avatar_url, rep_score")
     .order("rep_score", { ascending: false })
     .limit(limit);
 
@@ -217,6 +174,7 @@ export async function getLeaderboard(limit = 10) {
     name: `${u.first_name} ${u.last_name?.charAt(0)}.`,
     initials: `${u.first_name?.charAt(0) || ""}${u.last_name?.charAt(0) || ""}`.toUpperCase(),
     color: u.avatar_color || "#6366f1",
+    avatarUrl: u.avatar_url ? getAvatarUrl(u.avatar_url) : null,
     rep: u.rep_score || 0,
     isYou: user?.id === u.id,
   }));
@@ -224,10 +182,6 @@ export async function getLeaderboard(limit = 10) {
   return { leaderboard, error };
 }
 
-/**
- * Returns recent activity for the current user:
- * completed gigs + reviews received, sorted by time.
- */
 export async function getMyActivity() {
   const {
     data: { user },
@@ -266,14 +220,120 @@ export async function getMyActivity() {
 }
 
 // ──────────────────────────────────────────────────
+// Gigs (open feed + posting)
+// ──────────────────────────────────────────────────
+
+export async function getOpenGigs() {
+  const { data, error } = await supabase
+    .from("gigs")
+    .select(`
+      id, title, price, location, estimated_time, notes, status, created_at,
+      category:category_id(label, icon_name),
+      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score)
+    `)
+    .eq("status", "open")
+    .order("created_at", { ascending: false });
+
+  return { gigs: data || [], error };
+}
+
+export function normalizeGig(g) {
+  const poster = g.poster || {};
+  const firstName = poster.first_name || "";
+  const lastName = poster.last_name || "";
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const posterName = lastName ? `${firstName} ${lastName.charAt(0)}.` : firstName;
+  const repScore = poster.rep_score || 0;
+  const level = getLevel(repScore);
+
+  return {
+    id: g.id,
+    title: g.title,
+    price: `$${Number(g.price).toFixed(2)}`,
+    cat: g.category?.label || "Other",
+    loc: g.location || "TBD",
+    eta: g.estimated_time || "—",
+    poster: posterName,
+    posterId: poster.id,
+    initials,
+    color: poster.avatar_color || "#6366f1",
+    avatarUrl: poster.avatar_url ? getAvatarUrl(poster.avatar_url) : null,
+    levelLabel: level.label,
+    postedAt: new Date(g.created_at).getTime(),
+    notes: g.notes || "No additional notes.",
+  };
+}
+
+export async function postNewGig({ title, categoryLabel, price, location }) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { gig: null, error: { message: "Not authenticated" } };
+
+  const { data: cat } = await supabase
+    .from("categories")
+    .select("id")
+    .eq("label", categoryLabel)
+    .single();
+
+  if (!cat) return { gig: null, error: { message: "Invalid category" } };
+
+  const { data, error } = await supabase
+    .from("gigs")
+    .insert({
+      poster_id: user.id,
+      category_id: cat.id,
+      title,
+      price: price || 0,
+      location,
+    })
+    .select()
+    .single();
+
+  return { gig: data, error };
+}
+
+// ──────────────────────────────────────────────────
+// Notifications
+// ──────────────────────────────────────────────────
+
+export async function getMyNotifications() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { notifications: [], error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  return { notifications: data || [], error };
+}
+
+export async function markAllNotificationsRead() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("user_id", user.id)
+    .eq("read", false);
+
+  return { error };
+}
+
+// ──────────────────────────────────────────────────
 // Avatar (profile photo)
 // ──────────────────────────────────────────────────
 
-/**
- * Uploads a profile photo to the 'avatars' bucket.
- * File is stored as `{userId}/avatar.{ext}` so each user only has one.
- * Returns the storage path (not the public URL).
- */
 export async function uploadAvatar(file) {
   const {
     data: { user },
@@ -298,9 +358,6 @@ export async function uploadAvatar(file) {
   return { path, error: updateError };
 }
 
-/**
- * Returns the public URL for an avatar storage path.
- */
 export function getAvatarUrl(avatarPath) {
   if (!avatarPath) return null;
   const { data } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
@@ -311,14 +368,6 @@ export function getAvatarUrl(avatarPath) {
 // Delete profile (and account)
 // ──────────────────────────────────────────────────
 
-/**
- * Deletes the current user's profile row.
- * NOTE: This only removes the row from the `users` table.
- * To fully delete the auth account you need a server-side admin call
- * or Supabase Edge Function (see manual steps).
- *
- * @returns {{ error }}
- */
 export async function deleteMyProfile() {
   const {
     data: { user },

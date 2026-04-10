@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { MapPin, Lock, Award, Utensils, Printer, Package, FileText, Bike, MessageCircle } from "lucide-react";
+import { MapPin, Lock, Award, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
+import { postNewGig } from "../lib/profile";
 import TopBar from "../components/TopBar";
 
 const ICON_MAP = {
@@ -22,6 +23,36 @@ const CATS = [
 
 export default function PostGig({ setScreen }) {
   const [cat, setCat] = useState("Food");
+  const [title, setTitle] = useState("");
+  const [price, setPrice] = useState("0");
+  const [location, setLocation] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handlePost() {
+    if (!title.trim()) {
+      setError("Please describe the task.");
+      return;
+    }
+
+    setPosting(true);
+    setError(null);
+
+    const { error: postError } = await postNewGig({
+      title: title.trim(),
+      categoryLabel: cat,
+      price: parseFloat(price) || 0,
+      location: location.trim() || null,
+    });
+
+    if (postError) {
+      setError(postError.message || "Failed to post gig.");
+      setPosting(false);
+      return;
+    }
+
+    setScreen("home");
+  }
 
   return (
     <div className="page fadein">
@@ -42,7 +73,12 @@ export default function PostGig({ setScreen }) {
 
         <div className="field">
           <label className="lbl">Task description</label>
-          <textarea className="ta" placeholder="Describe exactly what you need. Be specific — better descriptions get done faster." />
+          <textarea
+            className="ta"
+            placeholder="Describe exactly what you need. Be specific — better descriptions get done faster."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </div>
 
         <div className="field">
@@ -91,7 +127,8 @@ export default function PostGig({ setScreen }) {
               }}
               type="number"
               min="0"
-              defaultValue="0"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
             />
           </div>
           <span className="hint">+1 Rep just for posting. Your taker earns +10 Rep when they complete it.</span>
@@ -103,7 +140,12 @@ export default function PostGig({ setScreen }) {
             <div className="iad">
               <MapPin size={13} />
             </div>
-            <input className="ii" placeholder="e.g. Science Hall Room 225" />
+            <input
+              className="ii"
+              placeholder="e.g. Science Hall Room 118A"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
           </div>
         </div>
 
@@ -125,12 +167,21 @@ export default function PostGig({ setScreen }) {
           </span>
         </div>
 
-        <button className="btn bp bfull blg" onClick={() => setScreen("home")}>
-          Post gig
+        {error && (
+          <div style={{ fontSize: 12, color: "var(--err)", fontFamily: "var(--mono)", textAlign: "center" }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          className="btn bp bfull blg"
+          onClick={handlePost}
+          disabled={posting}
+          style={{ opacity: posting ? 0.7 : 1 }}
+        >
+          {posting ? <Loader size={16} className="spin" /> : "Post gig"}
         </button>
       </div>
-
-
     </div>
   );
 }

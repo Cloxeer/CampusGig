@@ -1,20 +1,37 @@
-import { useState } from "react";
-import { Search, X } from "lucide-react";
-import { ALL_GIGS } from "../data/mockData";
+import { useState, useEffect } from "react";
+import { Search, X, Loader } from "lucide-react";
+import { getOpenGigs, normalizeGig } from "../lib/profile";
 import { useTimer } from "../utils/helpers";
 import TopBar from "../components/TopBar";
 import GigCard from "../components/GigCard";
+import GigDetailModal from "../components/modals/GigDetailModal";
 
 export default function Explore({ setScreen }) {
   const [searchQ, setSearchQ] = useState("");
+  const [allGigs, setAllGigs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedGig, setSelectedGig] = useState(null);
+  const [requested, setRequested] = useState(false);
   const tick = useTimer();
 
-  const searchResults = ALL_GIGS.filter((g) =>
+  useEffect(() => {
+    loadGigs();
+  }, []);
+
+  async function loadGigs() {
+    setLoading(true);
+    const { gigs } = await getOpenGigs();
+    setAllGigs((gigs || []).map(normalizeGig));
+    setLoading(false);
+  }
+
+  const searchResults = allGigs.filter((g) =>
     searchQ.trim() === ""
       ? false
       : g.title.toLowerCase().includes(searchQ.toLowerCase()) ||
         g.cat.toLowerCase().includes(searchQ.toLowerCase()) ||
-        g.loc.toLowerCase().includes(searchQ.toLowerCase())
+        g.loc.toLowerCase().includes(searchQ.toLowerCase()) ||
+        g.poster.toLowerCase().includes(searchQ.toLowerCase())
   );
 
   return (
@@ -62,7 +79,11 @@ export default function Explore({ setScreen }) {
       </div>
 
       <div className="scroll" style={{ paddingBottom: 80 }}>
-        {searchQ.trim() === "" ? (
+        {loading ? (
+          <div style={{ padding: "48px 0", display: "flex", justifyContent: "center" }}>
+            <Loader size={20} className="spin" color="var(--fg3)" />
+          </div>
+        ) : searchQ.trim() === "" ? (
           <div style={{ padding: "48px 16px", textAlign: "center" }}>
             <Search size={28} color="var(--fg4)" style={{ marginBottom: 10 }} />
             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg3)", marginBottom: 4 }}>Search for anything</div>
@@ -82,14 +103,30 @@ export default function Explore({ setScreen }) {
             </div>
             <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 7 }}>
               {searchResults.map((g) => (
-                <GigCard key={g.id} gig={g} tick={tick} onClick={() => setScreen("home")} />
+                <GigCard
+                  key={g.id}
+                  gig={g}
+                  tick={tick}
+                  onClick={() => {
+                    setSelectedGig(g);
+                    setRequested(false);
+                  }}
+                />
               ))}
             </div>
           </div>
         )}
       </div>
 
-
+      {selectedGig && (
+        <GigDetailModal
+          gig={selectedGig}
+          tick={tick}
+          requested={requested}
+          onRequest={() => setRequested(true)}
+          onClose={() => setSelectedGig(null)}
+        />
+      )}
     </div>
   );
 }

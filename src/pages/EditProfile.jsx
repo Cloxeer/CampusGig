@@ -1,6 +1,34 @@
 import { useState, useEffect, useRef } from "react";
-import { Lock, AtSign, Phone, Loader, ChevronLeft, Camera } from "lucide-react";
+import { Lock, AtSign, Phone, Loader, Camera } from "lucide-react";
 import { getMyProfile, updateMyProfile, uploadAvatar, getAvatarUrl } from "../lib/profile";
+
+/** Strip to US NANP digits: optional leading 1, then up to 10 national digits. */
+function nanpDigitsFromInput(raw) {
+  const d = String(raw).replace(/\D/g, "");
+  if (d.length === 0) return "";
+  if (d[0] === "1") return d.slice(0, 11);
+  return d.slice(0, 10);
+}
+
+/** Format NANP digit string (from nanpDigitsFromInput) as +1 (AAA) BBB-CCCC */
+function formatNanpDisplay(digits) {
+  if (!digits) return "";
+  const rest = digits[0] === "1" ? digits.slice(1) : digits;
+  if (rest.length === 0) return "+1";
+  let s = "+1 (" + rest.slice(0, 3);
+  if (rest.length <= 3) return s;
+  s += ") " + rest.slice(3, 6);
+  if (rest.length <= 6) return s;
+  return s + "-" + rest.slice(6, 10);
+}
+
+function phoneFromStored(stored) {
+  const d = String(stored ?? "").replace(/\D/g, "");
+  if (d.length === 11 && d[0] === "1") return formatNanpDisplay(d);
+  if (d.length === 10) return formatNanpDisplay("1" + d);
+  if (d[0] === "1") return formatNanpDisplay(d.slice(0, 11));
+  return formatNanpDisplay(d.slice(0, 10));
+}
 
 export default function EditProfile({ setScreen }) {
   const fileInputRef = useRef(null);
@@ -32,7 +60,7 @@ export default function EditProfile({ setScreen }) {
         cashapp: p.cashapp || "",
         paypal: p.paypal || "",
         snapchat: p.snapchat || "",
-        phone: p.phone || "",
+        phone: phoneFromStored(p.phone),
       });
       setInitials(
         `${p.first_name?.charAt(0) || ""}${p.last_name?.charAt(0) || ""}`.toUpperCase()
@@ -67,8 +95,14 @@ export default function EditProfile({ setScreen }) {
   const handleSave = async () => {
     setError("");
 
-    if (!profile.phone.trim()) {
+    const phoneDigits = nanpDigitsFromInput(profile.phone);
+    if (!phoneDigits) {
       setError("Phone number is required.");
+      return;
+    }
+    const nationalLen = phoneDigits[0] === "1" ? phoneDigits.length - 1 : phoneDigits.length;
+    if (nationalLen !== 10) {
+      setError("Enter a valid 10-digit US phone number.");
       return;
     }
 
@@ -118,13 +152,15 @@ export default function EditProfile({ setScreen }) {
 
   return (
     <div className="page fadein">
-      <div style={{ padding: "52px 20px 18px", borderBottom: "1px solid var(--bd)" }}>
+      <div style={{ padding: "16px 20px 18px", borderBottom: "1px solid var(--bd)" }}>
         <button
-          className="btn bg-btn bsm"
+          type="button"
+          className="btn bg-btn bico"
           onClick={() => setScreen("profile")}
-          style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 4 }}
+          aria-label="Back to profile"
+          style={{ marginBottom: 10 }}
         >
-          <ChevronLeft size={14} /> Back
+          <span style={{ fontSize: 15 }}>←</span>
         </button>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.035em", marginBottom: 4 }}>
           Edit profile
@@ -228,8 +264,15 @@ export default function EditProfile({ setScreen }) {
               className="ii"
               placeholder="+1 (000) 000-0000"
               type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
               value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  phone: formatNanpDisplay(nanpDigitsFromInput(e.target.value)),
+                })
+              }
             />
           </div>
         </div>

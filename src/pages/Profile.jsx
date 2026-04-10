@@ -267,7 +267,6 @@ export default function Profile({ setScreen }) {
             {[
               ["activity", "Activity"],
               ["leaderboard", "Board"],
-              ["contact", "Contact"],
             ].map(([k, l]) => (
               <button key={k} className={`ptab ${pTab === k ? "on" : ""}`} onClick={() => setPTab(k)}>
                 {l}
@@ -343,9 +342,17 @@ export default function Profile({ setScreen }) {
               {leaderboard.map((p) => (
                 <div key={p.rank} className={`lb-row ${p.isYou ? "lb-you" : ""}`}>
                   <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
-                  <div className="lb-av" style={{ background: p.color }}>
-                    {p.initials}
-                  </div>
+                  {p.avatarUrl ? (
+                    <img
+                      src={p.avatarUrl}
+                      alt=""
+                      style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div className="lb-av" style={{ background: p.color }}>
+                      {p.initials}
+                    </div>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
                       {p.name}
@@ -374,36 +381,6 @@ export default function Profile({ setScreen }) {
             </div>
           )}
 
-          {pTab === "contact" && (
-            <div style={{ padding: "10px 16px 0" }}>
-              <div style={{ fontSize: 12, color: "var(--fg3)", marginBottom: 10, lineHeight: 1.5 }}>
-                Contact info is <strong style={{ color: "var(--fg)" }}>private</strong> until both parties accept a gig.
-                <span
-                  style={{ color: "var(--accent)", cursor: "pointer", marginLeft: 6 }}
-                  onClick={() => setScreen("editProfile")}
-                >
-                  Edit →
-                </span>
-              </div>
-              {[
-                { label: "Phone", value: profile.phone },
-                { label: "Venmo", value: profile.venmo },
-                { label: "Cash App", value: profile.cashapp },
-                { label: "PayPal", value: profile.paypal },
-                { label: "Snapchat", value: profile.snapchat },
-              ].map((f) => (
-                <div key={f.label} className="editable-field" onClick={() => setScreen("editProfile")}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="ef-label">{f.label}</div>
-                    <div className={f.value ? "ef-val" : "ef-empty"}>
-                      {f.value || "Not set"}
-                    </div>
-                  </div>
-                  <Pencil size={13} color="var(--fg4)" />
-                </div>
-              ))}
-            </div>
-          )}
           <div style={{ height: 16 }} />
         </div>
       </div>

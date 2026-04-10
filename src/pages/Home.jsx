@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Search, Zap, Award, Navigation } from "lucide-react";
-import { ALL_GIGS, MY_REP } from "../data/mockData";
+import { useState, useEffect } from "react";
+import { Search, Award, Loader } from "lucide-react";
+import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig } from "../lib/profile";
 import { getLevel, useTimer } from "../utils/helpers";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
@@ -12,11 +12,39 @@ export default function Home({ setScreen }) {
   const [tab, setTab] = useState("Recent");
   const [selectedGig, setSelectedGig] = useState(null);
   const [requested, setRequested] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [gigs, setGigs] = useState([]);
+  const [avatarUrl, setAvatarUrl] = useState(null);
   const tick = useTimer();
 
-  const lvl = getLevel(MY_REP);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const filteredGigs = ALL_GIGS.filter((g) => {
+  async function loadData() {
+    setLoading(true);
+    const [profileRes, gigsRes] = await Promise.all([
+      getMyProfile(),
+      getOpenGigs(),
+    ]);
+
+    if (profileRes.profile) {
+      setProfile(profileRes.profile);
+      if (profileRes.profile.avatar_url) {
+        setAvatarUrl(getAvatarUrl(profileRes.profile.avatar_url));
+      }
+    }
+
+    setGigs((gigsRes.gigs || []).map(normalizeGig));
+    setLoading(false);
+  }
+
+  const repScore = profile?.rep_score || 0;
+  const lvl = getLevel(repScore);
+  const initials = `${profile?.first_name?.charAt(0) || ""}${profile?.last_name?.charAt(0) || ""}`.toUpperCase();
+
+  const filteredGigs = gigs.filter((g) => {
     if (tab === "Recent" || tab === "All") return true;
     if (tab === "Food") return g.cat === "Food";
     if (tab === "Errands") return g.cat === "Errand";
@@ -24,9 +52,16 @@ export default function Home({ setScreen }) {
     return true;
   });
 
+  if (loading) {
+    return (
+      <div className="page fadein" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <Loader size={20} className="spin" color="var(--fg3)" />
+      </div>
+    );
+  }
+
   return (
     <div className="page fadein">
-      {/* Top bar */}
       <div className="topbar">
         <div className="tlogo">
           <LogoMark />
@@ -36,21 +71,40 @@ export default function Home({ setScreen }) {
           <button className="btn bg-btn bico" onClick={() => setScreen("explore")}>
             <Search size={15} />
           </button>
-          <div className="av" style={{ background: "#6366f1" }} onClick={() => setScreen("profile")}>
-            MT
-            <div className="av-dot" />
-          </div>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              onClick={() => setScreen("profile")}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                objectFit: "cover",
+                cursor: "pointer",
+                border: "1px solid var(--bd)",
+              }}
+            />
+          ) : (
+            <div
+              className="av"
+              style={{ background: profile?.avatar_color || "#6366f1" }}
+              onClick={() => setScreen("profile")}
+            >
+              {initials}
+              <div className="av-dot" />
+            </div>
+          )}
         </div>
       </div>
 
       <div className="scroll" style={{ paddingBottom: 80 }}>
-        {/* Rep card */}
         <div style={{ margin: "14px 16px 0" }}>
           <div className="rep-card" style={{ cursor: "pointer" }} onClick={() => setScreen("repDetail")}>
             <div className="rc-ey">Rep Score · tap for details</div>
             <div className="rc-row">
               <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                <span className="rc-score">{MY_REP}</span>
+                <span className="rc-score">{repScore}</span>
                 <span className="rc-pts">pts</span>
               </div>
               <div className="rc-badge">
@@ -79,9 +133,6 @@ export default function Home({ setScreen }) {
           </div>
         </div>
 
-        {/* Gig list starts below */}
-
-        {/* Tabs */}
         <div style={{ padding: "0 16px" }}>
           <div className="tabs" style={{ margin: "14px -16px 0", padding: "0 16px" }}>
             {TABS.map((t) => (
@@ -98,26 +149,28 @@ export default function Home({ setScreen }) {
           </span>
         </div>
 
-        {/* Gig list */}
         <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 7 }}>
-          {filteredGigs.map((g) => (
-            <GigCard
-              key={g.id}
-              gig={g}
-              tick={tick}
-              onClick={() => {
-                setSelectedGig(g);
-                setRequested(false);
-              }}
-            />
-          ))}
+          {filteredGigs.length === 0 ? (
+            <div style={{ padding: "32px 0", textAlign: "center", color: "var(--fg4)", fontSize: 13, fontFamily: "var(--mono)" }}>
+              No gigs yet — be the first to post one!
+            </div>
+          ) : (
+            filteredGigs.map((g) => (
+              <GigCard
+                key={g.id}
+                gig={g}
+                tick={tick}
+                onClick={() => {
+                  setSelectedGig(g);
+                  setRequested(false);
+                }}
+              />
+            ))
+          )}
         </div>
         <div style={{ height: 16 }} />
       </div>
 
-
-
-      {/* Modals */}
       {selectedGig && (
         <GigDetailModal
           gig={selectedGig}
@@ -127,7 +180,6 @@ export default function Home({ setScreen }) {
           onClose={() => setSelectedGig(null)}
         />
       )}
-
     </div>
   );
 }
