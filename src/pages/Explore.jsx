@@ -26,6 +26,23 @@ export default function Explore({ currentUserId }) {
     setRequested(false);
   }, [gigParam]);
 
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      getOpenGigs().then(({ gigs: raw }) => {
+        setAllGigs((raw || []).map(normalizeGig));
+      });
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && gigParam && !allGigs.some((g) => g.id === gigParam)) {
+      closeGig();
+    }
+  }, [loading, gigParam, allGigs, closeGig]);
+
   async function loadGigs() {
     setLoading(true);
     const { gigs } = await getOpenGigs();
@@ -139,6 +156,8 @@ export default function Explore({ currentUserId }) {
             const result = await requestGig(selectedGig.id);
             if (!result.error) {
               setRequested(true);
+              const { gigs: raw } = await getOpenGigs();
+              setAllGigs((raw || []).map(normalizeGig));
               return { error: null };
             }
             return result;

@@ -271,7 +271,7 @@ CREATE TRIGGER set_reviews_updated_at
 
 -- ============================================================
 -- 8. REP SCORE TRIGGER
---    +1 for posting a gig, +10 for completing a gig (taker),
+--    +1 for posting a gig, +10 each to poster and taker when a gig is completed,
 --    +5 for receiving a 5-star review
 -- ============================================================
 
@@ -289,12 +289,15 @@ CREATE TRIGGER trg_rep_gig_post
     FOR EACH ROW
     EXECUTE FUNCTION award_rep_on_gig_post();
 
--- Award +10 rep to taker when gig status changes to 'completed'
+-- Award +10 rep to poster and taker when gig status changes to 'completed'
 CREATE OR REPLACE FUNCTION award_rep_on_gig_complete()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.status = 'completed' AND OLD.status != 'completed' AND NEW.taker_id IS NOT NULL THEN
-        UPDATE users SET rep_score = rep_score + 10 WHERE id = NEW.taker_id;
+    IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+        UPDATE users SET rep_score = rep_score + 10 WHERE id = NEW.poster_id;
+        IF NEW.taker_id IS NOT NULL THEN
+            UPDATE users SET rep_score = rep_score + 10 WHERE id = NEW.taker_id;
+        END IF;
     END IF;
     RETURN NEW;
 END;
@@ -307,14 +310,18 @@ CREATE TRIGGER trg_rep_gig_complete
 
 -- Award +5 rep for a 5-star review
 CREATE OR REPLACE FUNCTION award_rep_on_5star_review()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
     IF NEW.rating = 5 THEN
         UPDATE users SET rep_score = rep_score + 5 WHERE id = NEW.reviewee_id;
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE TRIGGER trg_rep_5star_review
     AFTER INSERT ON reviews
@@ -342,14 +349,14 @@ CREATE POLICY "Users can upload own avatar"
     ON storage.objects FOR INSERT TO authenticated
     WITH CHECK (
         bucket_id = 'avatars'
-        AND (storage.foldername(name))[1] = auth.uid()::text
+        AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
     );
 
 CREATE POLICY "Users can update own avatar"
     ON storage.objects FOR UPDATE TO authenticated
     USING (
         bucket_id = 'avatars'
-        AND (storage.foldername(name))[1] = auth.uid()::text
+        AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
     );
 
 -- Anyone can view avatars (public bucket)
@@ -362,7 +369,7 @@ CREATE POLICY "Users can delete own avatar"
     ON storage.objects FOR DELETE TO authenticated
     USING (
         bucket_id = 'avatars'
-        AND (storage.foldername(name))[1] = auth.uid()::text
+        AND (storage.foldername(name))[1] = (SELECT auth.uid())::text
     );
 
 -- ============================================================

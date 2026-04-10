@@ -76,6 +76,23 @@ export default function Home({ currentUserId }) {
     setRequested(false);
   }, [gigParam]);
 
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      getOpenGigs().then(({ gigs: raw }) => {
+        setGigs((raw || []).map(normalizeGig));
+      });
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && gigParam && !gigs.some((g) => g.id === gigParam)) {
+      closeGig();
+    }
+  }, [loading, gigParam, gigs, closeGig]);
+
   async function loadData() {
     setLoading(true);
     const [profileRes, gigsRes] = await Promise.all([
@@ -235,6 +252,8 @@ export default function Home({ currentUserId }) {
             const result = await requestGig(selectedGig.id);
             if (!result.error) {
               setRequested(true);
+              const { gigs: raw } = await getOpenGigs();
+              setGigs((raw || []).map(normalizeGig));
               return { error: null };
             }
             return result;
