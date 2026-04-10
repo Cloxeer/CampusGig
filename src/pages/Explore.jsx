@@ -164,6 +164,10 @@ export default function Explore({ currentUserId }) {
           }}
           onClose={closeGig}
           onViewProfile={(userId) => navigate(`/users/${userId}`)}
+          onGigDeleted={async () => {
+            const { gigs: raw } = await getOpenGigs();
+            setAllGigs((raw || []).map(normalizeGig));
+          }}
         />
       )}
     </div>

@@ -578,6 +578,7 @@ export default function Profile({ currentUserId }) {
           onClose={closeGig}
           onViewProfile={(userId) => navigate(`/users/${userId}`)}
           currentUserId={currentUserId}
+          onGigDeleted={() => loadProfileData()}
         />
       )}
       {gigLoading && (

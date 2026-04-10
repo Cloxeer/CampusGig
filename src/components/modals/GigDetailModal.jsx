@@ -3,17 +3,24 @@ import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer, Loader } from
 import LevelBadge from "../LevelBadge";
 import Stars from "../Stars";
 import { elapsed, countdown } from "../../utils/helpers";
-import { getMyRequestForGig } from "../../lib/profile";
+import { getMyRequestForGig, deleteMyGig } from "../../lib/profile";
 
-export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile, currentUserId }) {
+export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile, currentUserId, onGigDeleted }) {
   const cd = countdown(gig.deadline);
   const taskDesc = gig.description || gig.notes || "No additional details.";
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState(null);
   const [existingRequest, setExistingRequest] = useState(null);
   const [checkingRequest, setCheckingRequest] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const isOwnGig = currentUserId && gig.posterId === currentUserId;
+  const canPosterDelete = isOwnGig && (gig.status === "open" || gig.status === "requested");
+
+  useEffect(() => {
+    setDeleteError(null);
+  }, [gig.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +74,21 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
     setRequesting(false);
   }
 
+  async function handleDelete() {
+    if (!canPosterDelete) return;
+    if (!window.confirm("Delete this gig? This can’t be undone.")) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await deleteMyGig(gig.id);
+    setDeleting(false);
+    if (error) {
+      setDeleteError(error.message || "Couldn’t delete gig.");
+      return;
+    }
+    onGigDeleted?.();
+    onClose();
+  }
+
   return (
     <div
       style={{
@@ -84,7 +106,27 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
             <span style={{ fontSize: 15 }}>←</span>
           </button>
           <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>Gig Details</span>
-          <div style={{ width: 34 }} />
+          {canPosterDelete ? (
+            <button
+              type="button"
+              className="btn bg-btn bsm"
+              onClick={handleDelete}
+              disabled={deleting}
+              style={{
+                color: "var(--err)",
+                borderColor: "var(--err)",
+                background: "transparent",
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "5px 10px",
+                opacity: deleting ? 0.6 : 1,
+              }}
+            >
+              {deleting ? "…" : "Delete"}
+            </button>
+          ) : (
+            <div style={{ width: 34 }} />
+          )}
         </div>
 
         <div className="scroll" style={{ paddingBottom: 80 }}>
@@ -303,6 +345,11 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
                     </>
                   )}
                 </span>
+              </div>
+            )}
+            {deleteError && (
+              <div style={{ fontSize: 12, color: "var(--err)", fontFamily: "var(--mono)", textAlign: "center" }}>
+                {deleteError}
               </div>
             )}
             <button className="btn bo bfull" onClick={onClose}>

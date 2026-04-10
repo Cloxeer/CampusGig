@@ -876,6 +876,30 @@ export async function deleteNotification(notificationId) {
   return { error };
 }
 
+/** Poster-only; allowed while status is open or requested (not active/completed). */
+export async function deleteMyGig(gigId) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { data: gig, error: fetchErr } = await supabase
+    .from("gigs")
+    .select("id, poster_id, status")
+    .eq("id", gigId)
+    .maybeSingle();
+
+  if (fetchErr) return { error: fetchErr };
+  if (!gig) return { error: { message: "Gig not found" } };
+  if (gig.poster_id !== user.id) {
+    return { error: { message: "Only the poster can delete this gig." } };
+  }
+  if (gig.status !== "open" && gig.status !== "requested") {
+    return { error: { message: "You can only delete a gig before it’s accepted." } };
+  }
+
+  const { error } = await supabase.from("gigs").delete().eq("id", gigId);
+  return { error };
+}
+
 export async function getGigStatusesForNotifications(gigIds) {
   if (!gigIds.length) return {};
   const { data } = await supabase

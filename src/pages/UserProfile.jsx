@@ -508,6 +508,7 @@ export default function UserProfile({ currentUserId }) {
           onClose={closeGig}
           onViewProfile={(uid) => navigate(`/users/${uid}`)}
           currentUserId={currentUserId}
+          onGigDeleted={() => loadData()}
         />
       )}
       {gigLoading && (

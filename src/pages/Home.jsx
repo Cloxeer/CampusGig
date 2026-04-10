@@ -260,6 +260,10 @@ export default function Home({ currentUserId }) {
           }}
           onClose={closeGig}
           onViewProfile={(userId) => navigate(`/users/${userId}`)}
+          onGigDeleted={async () => {
+            const { gigs: raw } = await getOpenGigs();
+            setGigs((raw || []).map(normalizeGig));
+          }}
         />
       )}
 
