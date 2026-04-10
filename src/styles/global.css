@@ -647,3 +647,22 @@ body {
   to { transform: rotate(360deg); }
 }
 .spin { animation: spin .8s linear infinite; }
+
+/* ── SKELETONS ─────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skel {
+  background: linear-gradient(90deg, var(--bg3) 25%, #e8e8eb 37%, var(--bg3) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--r);
+}
+.skel-circle { border-radius: 50%; }
+.skel-rep {
+  background: linear-gradient(90deg, #27272a 25%, #3f3f46 37%, #27272a 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--r);
+}

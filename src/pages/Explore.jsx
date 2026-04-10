@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, X, Loader } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { getOpenGigs, normalizeGig } from "../lib/profile";
 import { useTimer } from "../utils/helpers";
 import TopBar from "../components/TopBar";
@@ -80,8 +80,10 @@ export default function Explore({ setScreen }) {
 
       <div className="scroll" style={{ paddingBottom: 80 }}>
         {loading ? (
-          <div style={{ padding: "48px 0", display: "flex", justifyContent: "center" }}>
-            <Loader size={20} className="spin" color="var(--fg3)" />
+          <div style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 7 }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="skel" style={{ width: "100%", height: 88, borderRadius: "var(--rlg)" }} />
+            ))}
           </div>
         ) : searchQ.trim() === "" ? (
           <div style={{ padding: "48px 16px", textAlign: "center" }}>

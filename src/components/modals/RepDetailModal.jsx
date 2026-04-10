@@ -34,16 +34,16 @@ export default function RepDetailModal({ onClose, repScore = 0 }) {
                 <span className="rc-score">{repScore}</span>
                 <span className="rc-pts">pts</span>
               </div>
-              <div className="rc-badge">
+              <div className="rc-badge" style={{ background: lvl.bg, color: lvl.color, borderColor: lvl.border }}>
                 <Award size={10} /> {lvl.label}
               </div>
             </div>
             <div className="rc-track">
-              <div className="rc-fill" style={{ width: `${lvl.pct}%` }} />
+              <div className="rc-fill" style={{ width: `${lvl.pct}%`, background: lvl.color }} />
             </div>
             <div className="rc-labels">
               {["New", "Reliable", "Trusted", "Legend"].map((l) => (
-                <span key={l} className={`rc-lbl ${lvl.label === l ? "cur" : ""}`}>
+                <span key={l} className="rc-lbl" style={lvl.label === l ? { color: lvl.color, fontWeight: 600 } : undefined}>
                   {l}
                 </span>
               ))}
@@ -51,26 +51,34 @@ export default function RepDetailModal({ onClose, repScore = 0 }) {
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Level breakdown</div>
-          {REP_LEVELS.map((l, i) => (
-            <div
-              key={l.label}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 0",
-                borderBottom: i < REP_LEVELS.length - 1 ? "1px solid var(--bd)" : "none",
-              }}
-            >
-              <LevelBadge label={l.label} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
-                  {l.max === Infinity ? `${l.min}+ pts` : `${l.min}–${l.max} pts`}
+          {REP_LEVELS.map((l, i) => {
+            const isCurrent = repScore >= l.min && repScore <= l.max;
+            return (
+              <div
+                key={l.label}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 0",
+                  borderBottom: i < REP_LEVELS.length - 1 ? "1px solid var(--bd)" : "none",
+                  background: isCurrent ? `${l.bg}` : "transparent",
+                  borderRadius: isCurrent ? "var(--r)" : 0,
+                  margin: isCurrent ? "0 -4px" : 0,
+                  paddingLeft: isCurrent ? 4 : 0,
+                  paddingRight: isCurrent ? 4 : 0,
+                }}
+              >
+                <LevelBadge label={l.label} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: isCurrent ? l.color : "var(--fg3)", fontWeight: isCurrent ? 600 : 400, fontFamily: "var(--mono)" }}>
+                    {l.max === Infinity ? `${l.min}+ pts` : `${l.min}–${l.max} pts`}
+                  </div>
                 </div>
+                {repScore >= l.min && <Check size={14} color={l.color} />}
               </div>
-              {repScore >= l.min && <Check size={14} color="var(--green-d)" />}
-            </div>
-          ))}
+            );
+          })}
 
           <div style={{ fontSize: 13, fontWeight: 600, margin: "16px 0 10px" }}>How to earn Rep</div>
           {[

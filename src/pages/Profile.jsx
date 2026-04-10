@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader } from "lucide-react";
-import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl } from "../lib/profile";
+import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader, Timer } from "lucide-react";
+
+import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl, getGigById, parseDeadline } from "../lib/profile";
 import { logout } from "../lib/auth";
-import { getLevel } from "../utils/helpers";
+import { getLevel, useTimer } from "../utils/helpers";
 import Logo, { LogoMark } from "../components/Logo";
 import LevelBadge from "../components/LevelBadge";
 import Stars from "../components/Stars";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
+import GigDetailModal from "../components/modals/GigDetailModal";
 
 export default function Profile({ setScreen }) {
   const [pTab, setPTab] = useState("activity");
@@ -15,6 +17,9 @@ export default function Profile({ setScreen }) {
   const [showRepDetail, setShowRepDetail] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [selectedGig, setSelectedGig] = useState(null);
+  const [gigLoading, setGigLoading] = useState(false);
+  const tick = useTimer();
 
   const [profile, setProfile] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -45,7 +50,7 @@ export default function Profile({ setScreen }) {
         getMyGigStats(),
         getCampusRank(p.rep_score || 0),
         getTotalUsers(),
-        getLeaderboard(10),
+        getLeaderboard(100),
         getMyActivity(),
       ]);
       setReviews(reviewsRes.reviews);
@@ -63,10 +68,59 @@ export default function Profile({ setScreen }) {
     await logout();
   }
 
+  async function handleOpenGig(gigId) {
+    if (!gigId || gigLoading) return;
+    setGigLoading(true);
+    const { gig } = await getGigById(gigId);
+    if (gig) setSelectedGig(gig);
+    setGigLoading(false);
+  }
+
   if (loading) {
     return (
-      <div className="page fadein" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <Loader size={20} className="spin" color="var(--fg3)" />
+      <div className="page fadein">
+        <div className="topbar">
+          <div className="skel" style={{ width: 34, height: 34, borderRadius: "var(--r)" }} />
+          <div className="tlogo">
+            <div className="skel" style={{ width: 26, height: 26, borderRadius: 6 }} />
+            <div className="skel" style={{ width: 90, height: 16 }} />
+          </div>
+          <div className="skel" style={{ width: 72, height: 30, borderRadius: 6 }} />
+        </div>
+        <div className="scroll" style={{ paddingBottom: 80 }}>
+          <div style={{ padding: "20px 16px 0" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
+              <div className="skel skel-circle" style={{ width: 56, height: 56, flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div className="skel" style={{ width: 120, height: 18, marginBottom: 6 }} />
+                <div className="skel" style={{ width: 160, height: 11, marginBottom: 8 }} />
+                <div className="skel" style={{ width: 70, height: 20, borderRadius: 5 }} />
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="skel" style={{ width: 65, height: 13, marginBottom: 4 }} />
+                <div className="skel" style={{ width: 30, height: 15, marginLeft: "auto" }} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 14 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="skel" style={{ height: 60, borderRadius: "var(--r)" }} />
+              ))}
+            </div>
+            <div className="rep-card" style={{ padding: 16 }}>
+              <div className="skel-rep" style={{ width: 140, height: 10, marginBottom: 10 }} />
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                <div className="skel-rep" style={{ width: 70, height: 28 }} />
+                <div className="skel-rep" style={{ width: 60, height: 22, borderRadius: 5 }} />
+              </div>
+              <div className="skel-rep" style={{ width: "100%", height: 2, marginBottom: 8 }} />
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                {[40, 50, 46, 44].map((w, i) => (
+                  <div key={i} className="skel-rep" style={{ width: w, height: 9 }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -93,6 +147,7 @@ export default function Profile({ setScreen }) {
       d: "+10 pts",
       pos: true,
       time: new Date(g.updated_at).getTime(),
+      gigId: g.id,
     })),
     ...activity.receivedReviews.map((r) => ({
       icon: <Star size={15} />,
@@ -101,15 +156,24 @@ export default function Profile({ setScreen }) {
       d: r.rating === 5 ? "+5 pts" : r.rating === 4 ? "+2 pts" : "",
       pos: r.rating >= 4,
       time: new Date(r.created_at).getTime(),
+      gigId: null,
     })),
-    ...activity.postedGigs.map((g) => ({
-      icon: <Package size={15} />,
-      t: `${g.category?.label || "Gig"} posted`,
-      s: `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""} · ${g.status}`,
-      d: g.status === "open" ? "open" : g.status,
-      pos: false,
-      time: new Date(g.created_at).getTime(),
-    })),
+    ...activity.postedGigs.map((g) => {
+      const dl = parseDeadline(g);
+      const timeEnded = dl && dl < Date.now();
+      let statusLabel = g.status === "open" ? "open" : g.status;
+      if (timeEnded && g.status === "open") statusLabel = "Time ended";
+      return {
+        icon: timeEnded ? <Timer size={15} /> : <Package size={15} />,
+        t: `${g.category?.label || "Gig"} posted`,
+        s: `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""} · ${statusLabel}`,
+        d: statusLabel,
+        pos: false,
+        expired: timeEnded,
+        time: new Date(g.created_at).getTime(),
+        gigId: g.id,
+      };
+    }),
   ].sort((a, b) => b.time - a.time);
 
   return (
@@ -238,7 +302,7 @@ export default function Profile({ setScreen }) {
                   <span className="rc-pts">pts</span>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div className="rc-badge" style={{ marginBottom: 4 }}>
+                  <div className="rc-badge" style={{ marginBottom: 4, background: lvl.bg, color: lvl.color, borderColor: lvl.border }}>
                     <Award size={10} /> {lvl.label}
                   </div>
                   <div style={{ fontSize: 10, color: "#52525b", fontFamily: "var(--mono)" }}>
@@ -247,11 +311,11 @@ export default function Profile({ setScreen }) {
                 </div>
               </div>
               <div className="rc-track">
-                <div className="rc-fill" style={{ width: `${lvl.pct}%` }} />
+                <div className="rc-fill" style={{ width: `${lvl.pct}%`, background: lvl.color }} />
               </div>
               <div className="rc-labels">
                 {["New", "Reliable", "Trusted", "Legend"].map((l) => (
-                  <span key={l} className={`rc-lbl ${lvl.label === l ? "cur" : ""}`}>
+                  <span key={l} className="rc-lbl" style={lvl.label === l ? { color: lvl.color, fontWeight: 600 } : undefined}>
                     {l}
                   </span>
                 ))}
@@ -259,7 +323,7 @@ export default function Profile({ setScreen }) {
               <div className="rc-footer">
                 {lvl.next ? (
                   <>
-                    +{lvl.toNext} pts to <span className="accent">{lvl.next}</span> · +10 per gig completed · +1 per gig posted
+                    +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +10 per gig completed · +1 per gig posted
                   </>
                 ) : (
                   "Max level reached"
@@ -295,20 +359,22 @@ export default function Profile({ setScreen }) {
                     gap: 10,
                     padding: "11px 0",
                     borderBottom: i < activityItems.length - 1 ? "1px solid var(--bd)" : "none",
+                    cursor: a.gigId ? "pointer" : "default",
                   }}
+                  onClick={() => a.gigId && handleOpenGig(a.gigId)}
                 >
                   <div
                     style={{
                       width: 34,
                       height: 34,
                       borderRadius: "var(--r)",
-                      background: "var(--bg3)",
-                      border: "1px solid var(--bd)",
+                      background: a.expired ? "var(--err-bg)" : "var(--bg3)",
+                      border: `1px solid ${a.expired ? "#fecaca" : "var(--bd)"}`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
-                      color: "var(--fg3)",
+                      color: a.expired ? "var(--err)" : "var(--fg3)",
                     }}
                   >
                     {a.icon}
@@ -322,7 +388,7 @@ export default function Profile({ setScreen }) {
                       fontSize: 12,
                       fontWeight: 600,
                       fontFamily: "var(--mono)",
-                      color: a.pos ? "var(--green-d)" : "var(--fg3)",
+                      color: a.expired ? "var(--err)" : a.pos ? "var(--green-d)" : "var(--fg3)",
                       flexShrink: 0,
                     }}
                   >
@@ -333,65 +399,133 @@ export default function Profile({ setScreen }) {
             </div>
           )}
 
-          {pTab === "leaderboard" && (
-            <div>
-              <div style={{ padding: "10px 16px 6px", display: "flex", alignItems: "center", gap: 4 }}>
-                <Trophy size={12} color="var(--fg3)" />
-                <span style={{ fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Campus · all time</span>
-              </div>
-              {leaderboard.length === 0 && (
-                <div style={{ padding: "32px 0", textAlign: "center", color: "var(--fg4)", fontSize: 13, fontFamily: "var(--mono)" }}>
-                  No leaderboard data yet.
+          {pTab === "leaderboard" && (() => {
+            const userInBoard = leaderboard.some((p) => p.isYou);
+            return (
+              <div>
+                <div style={{ padding: "10px 16px 6px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <Trophy size={12} color="var(--fg3)" />
+                    <span style={{ fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Campus · top 100</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)" }}>
+                    {totalUsers} student{totalUsers !== 1 ? "s" : ""}
+                  </span>
                 </div>
-              )}
-              {leaderboard.map((p) => (
-                <div
-                  key={p.rank}
-                  className={`lb-row ${p.isYou ? "lb-you" : ""}`}
-                  style={{ cursor: p.isYou ? "default" : "pointer" }}
-                  onClick={() => {
-                    if (!p.isYou && p.userId) setScreen("userProfile", p.userId);
-                  }}
-                >
-                  <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
-                  {p.avatarUrl ? (
-                    <img
-                      src={p.avatarUrl}
-                      alt=""
-                      style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                    />
-                  ) : (
-                    <div className="lb-av" style={{ background: p.color }}>
-                      {p.initials}
+                {leaderboard.length === 0 && (
+                  <div style={{ padding: "32px 0", textAlign: "center", color: "var(--fg4)", fontSize: 13, fontFamily: "var(--mono)" }}>
+                    No leaderboard data yet.
+                  </div>
+                )}
+                {leaderboard.map((p) => (
+                  <div
+                    key={p.rank}
+                    className={`lb-row ${p.isYou ? "lb-you" : ""}`}
+                    style={{ cursor: p.isYou ? "default" : "pointer" }}
+                    onClick={() => {
+                      if (!p.isYou && p.userId) setScreen("userProfile", p.userId);
+                    }}
+                  >
+                    <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
+                    {p.avatarUrl ? (
+                      <img
+                        src={p.avatarUrl}
+                        alt=""
+                        style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div className="lb-av" style={{ background: p.color }}>
+                        {p.initials}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
+                        {p.name}
+                        {p.isYou && (
+                          <span style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)", marginLeft: 5 }}>you</span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--fg3)",
+                          fontFamily: "var(--mono)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <LevelBadge label={getLevel(p.rep).label} small />
+                      </div>
                     </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
-                      {p.name}
-                      {p.isYou && (
-                        <span style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)", marginLeft: 5 }}>you</span>
-                      )}
-                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg2)", fontFamily: "var(--mono)", flexShrink: 0 }}>
+                      {p.rep}
+                    </span>
+                  </div>
+                ))}
+
+                {!userInBoard && rank && (
+                  <>
                     <div
                       style={{
-                        fontSize: 11,
-                        color: "var(--fg3)",
-                        fontFamily: "var(--mono)",
                         display: "flex",
                         alignItems: "center",
+                        justifyContent: "center",
+                        padding: "6px 16px",
                         gap: 6,
                       }}
                     >
-                      <LevelBadge label={getLevel(p.rep).label} small />
+                      <span style={{ fontSize: 18, color: "var(--fg4)", letterSpacing: 2 }}>···</span>
                     </div>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg2)", fontFamily: "var(--mono)", flexShrink: 0 }}>
-                    {p.rep}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+                    <div
+                      className="lb-row lb-you"
+                      style={{
+                        position: "sticky",
+                        bottom: 0,
+                        borderTop: "2px solid var(--green-bd)",
+                        borderBottom: "none",
+                        background: "var(--green-bg)",
+                      }}
+                    >
+                      <span className="lb-rank">{rank}</span>
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt=""
+                          style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                        />
+                      ) : (
+                        <div className="lb-av" style={{ background: profile.avatar_color || "#6366f1" }}>
+                          {initials}
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
+                          {fullName}
+                          <span style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)", marginLeft: 5 }}>you</span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--fg3)",
+                            fontFamily: "var(--mono)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <LevelBadge label={lvl.label} small />
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg2)", fontFamily: "var(--mono)", flexShrink: 0 }}>
+                        {repScore}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           <div style={{ height: 16 }} />
         </div>
@@ -411,6 +545,36 @@ export default function Profile({ setScreen }) {
           onClose={() => setShowRepDetail(false)}
           repScore={repScore}
         />
+      )}
+      {selectedGig && (
+        <GigDetailModal
+          gig={selectedGig}
+          tick={tick}
+          requested={false}
+          onRequest={() => {}}
+          onClose={() => setSelectedGig(null)}
+          onViewProfile={(userId) => {
+            setSelectedGig(null);
+            setScreen("userProfile", userId);
+          }}
+        />
+      )}
+      {gigLoading && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 30,
+            maxWidth: 393,
+            margin: "0 auto",
+            background: "rgba(255,255,255,.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Loader size={20} className="spin" color="var(--fg3)" />
+        </div>
       )}
     </>
   );

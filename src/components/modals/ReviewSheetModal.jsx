@@ -13,10 +13,11 @@ export default function ReviewSheetModal({
   gigId,
   canReview = false,
   alreadyReviewed = false,
+  existingReview = null,
   onReviewSubmitted,
 }) {
-  const [newRating, setNewRating] = useState(0);
-  const [reviewText, setReviewText] = useState("");
+  const [newRating, setNewRating] = useState(existingReview?.rating || 0);
+  const [reviewText, setReviewText] = useState(existingReview?.text || "");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
@@ -33,7 +34,7 @@ export default function ReviewSheetModal({
   };
 
   async function handleSubmit() {
-    if (newRating === 0 || !gigId || !revieweeId) return;
+    if (newRating === 0 || !revieweeId) return;
     setSubmitting(true);
     setSubmitError(null);
 
@@ -56,7 +57,7 @@ export default function ReviewSheetModal({
     onReviewSubmitted?.();
   }
 
-  const showReviewForm = !isOwnProfile && canReview && !alreadyReviewed;
+  const showReviewForm = !isOwnProfile && canReview;
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -91,42 +92,37 @@ export default function ReviewSheetModal({
 
         {showReviewForm && (
           <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--bd)", background: "var(--bg2)", flexShrink: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Leave a review</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 2, marginBottom: 10 }}>
-              {[1, 2, 3, 4, 5].map((i) => {
-                const isFull = newRating >= i;
-                const isHalf = !isFull && newRating >= i - 0.5;
-
-                return (
-                  <div
-                    key={i}
-                    style={{ cursor: "pointer", padding: 2, position: "relative", display: "inline-flex" }}
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const x = e.clientX - rect.left;
-                      setNewRating(x < rect.width / 2 ? i - 0.5 : i);
-                    }}
-                  >
-                    {isFull && (
-                      <Star size={24} fill="#fbbf24" color="#fbbf24" strokeWidth={1.5} />
-                    )}
-                    {isHalf && (
-                      <span style={{ position: "relative", display: "inline-flex", width: 24, height: 24 }}>
-                        <Star size={24} fill="none" color="#d4d4d8" strokeWidth={1.5} />
-                        <span style={{ position: "absolute", top: 0, left: 0, width: "50%", height: "100%", overflow: "hidden" }}>
-                          <Star size={24} fill="#fbbf24" color="#fbbf24" strokeWidth={1.5} style={{ minWidth: 24 }} />
-                        </span>
-                      </span>
-                    )}
-                    {!isFull && !isHalf && (
-                      <Star size={24} fill="none" color="#d4d4d8" strokeWidth={1.5} />
-                    )}
-                  </div>
-                );
-              })}
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+            {alreadyReviewed ? "Update your review" : "Leave a review"}
+          </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 10 }}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  style={{
+                    cursor: "pointer",
+                    padding: 4,
+                    display: "inline-flex",
+                    background: "none",
+                    border: "none",
+                    WebkitTapHighlightColor: "transparent",
+                    transition: "transform .1s",
+                    transform: newRating === i ? "scale(1.15)" : "scale(1)",
+                  }}
+                  onClick={() => setNewRating(i)}
+                >
+                  <Star
+                    size={28}
+                    fill={newRating >= i ? "#fbbf24" : "none"}
+                    color={newRating >= i ? "#fbbf24" : "#d4d4d8"}
+                    strokeWidth={1.5}
+                  />
+                </button>
+              ))}
               {newRating > 0 && (
                 <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--mono)", color: "#d97706", marginLeft: 6 }}>
-                  {newRating.toFixed(1)}
+                  {newRating}★
                 </span>
               )}
             </div>
@@ -149,12 +145,12 @@ export default function ReviewSheetModal({
               onClick={handleSubmit}
             >
               {submitting ? <Loader size={13} className="spin" /> : <Send size={13} />}
-              {submitting ? "Submitting…" : "Submit"}
+              {submitting ? "Submitting…" : alreadyReviewed ? "Update" : "Submit"}
             </button>
           </div>
         )}
 
-        {!isOwnProfile && alreadyReviewed && (
+        {!isOwnProfile && alreadyReviewed && !canReview && (
           <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--bd)", background: "var(--green-bg)", flexShrink: 0 }}>
             <div style={{ fontSize: 12, color: "var(--green-text)", fontFamily: "var(--mono)" }}>
               You've already reviewed this user.

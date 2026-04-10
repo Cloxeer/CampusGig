@@ -2,6 +2,18 @@
 -- CampusGig — Complete Supabase Schema
 -- Run this in your Supabase SQL Editor (Dashboard → SQL Editor)
 -- ============================================================
+--
+-- GIGS — canonical fields (source of truth in the database)
+--   title          Short headline for the listing
+--   description    Full task details (what the app labels “Task description”)
+--   expires_at     When the listing disappears from the open feed (timestamptz, NULL = no expiry)
+--   estimated_time Optional free-text hint only (e.g. “~20 min”), NOT the listing deadline
+--
+-- REVIEWS — stars
+--   rating         1–5 (numeric); app may send whole numbers. Half-star display is UI-only.
+--   RLS must allow UPDATE on own rows so upsert/edit review works (see policy below).
+--
+-- ============================================================
 
 -- 0. Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -85,10 +97,12 @@ CREATE TABLE gigs (
     location VARCHAR(255),
     estimated_time VARCHAR(100),
     notes TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) DEFAULT 'open'
         CONSTRAINT valid_status CHECK (status IN ('open', 'requested', 'active', 'completed', 'cancelled')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT expires_after_created CHECK (expires_at IS NULL OR expires_at > created_at)
 );
 
 CREATE INDEX idx_gigs_poster ON gigs(poster_id);
@@ -96,6 +110,8 @@ CREATE INDEX idx_gigs_taker ON gigs(taker_id);
 CREATE INDEX idx_gigs_status ON gigs(status);
 CREATE INDEX idx_gigs_category ON gigs(category_id);
 CREATE INDEX idx_gigs_created ON gigs(created_at DESC);
+CREATE INDEX idx_gigs_open_expires ON gigs (expires_at)
+    WHERE status = 'open';
 
 ALTER TABLE gigs ENABLE ROW LEVEL SECURITY;
 
@@ -164,30 +180,37 @@ CREATE POLICY "Poster can update request status"
 
 CREATE TABLE reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    gig_id UUID NOT NULL REFERENCES gigs(id) ON DELETE CASCADE,
+    gig_id UUID REFERENCES gigs(id) ON DELETE SET NULL,
     reviewer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reviewee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     rating NUMERIC(2,1) NOT NULL
-        CONSTRAINT valid_rating CHECK (rating >= 0.5 AND rating <= 5 AND (rating * 2) = ROUND(rating * 2)),
+        CONSTRAINT valid_rating CHECK (
+            rating >= 1 AND rating <= 5
+            AND (rating * 2) = ROUND(rating * 2)
+        ),
     text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(gig_id, reviewer_id),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(reviewer_id, reviewee_id),
     CONSTRAINT no_self_review CHECK (reviewer_id != reviewee_id)
 );
 
 CREATE INDEX idx_reviews_reviewee ON reviews(reviewee_id);
 CREATE INDEX idx_reviews_gig ON reviews(gig_id);
+CREATE INDEX idx_reviews_reviewer ON reviews(reviewer_id);
 
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 
--- Anyone authed can read reviews
 CREATE POLICY "Anyone can read reviews"
     ON reviews FOR SELECT TO authenticated USING (true);
 
--- Only gig participants can write reviews
-CREATE POLICY "Participants can write reviews"
+CREATE POLICY "Users can insert own reviews"
     ON reviews FOR INSERT TO authenticated
+    WITH CHECK (auth.uid() = reviewer_id);
+
+CREATE POLICY "Reviewers can update own reviews"
+    ON reviews FOR UPDATE TO authenticated
+    USING (auth.uid() = reviewer_id)
     WITH CHECK (auth.uid() = reviewer_id);
 
 -- ============================================================
@@ -238,6 +261,11 @@ CREATE TRIGGER set_users_updated_at
 
 CREATE TRIGGER set_gigs_updated_at
     BEFORE UPDATE ON gigs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER set_reviews_updated_at
+    BEFORE UPDATE ON reviews
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at();
 
@@ -336,3 +364,59 @@ CREATE POLICY "Users can delete own avatar"
         bucket_id = 'avatars'
         AND (storage.foldername(name))[1] = auth.uid()::text
     );
+
+-- ============================================================
+-- 10. MIGRATION SNIPPETS (existing databases — run in SQL Editor)
+-- ============================================================
+-- You do NOT run this whole block on a brand-new project that used sections 1–9 above.
+-- Use these only when upgrading from an older CampusGig schema.
+--
+-- DISCARD (frontend / old patterns):
+--   • Storing listing deadlines as ISO strings inside estimated_time VARCHAR.
+--   • Relying only on the client to hide expired gigs (keep a client filter as backup).
+--   • Broken reviews RLS: INSERT without matching UPDATE policy breaks submitReview() upsert.
+--
+-- ADD listing expiry column
+--   ALTER TABLE gigs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+--
+-- Backfill expires_at from legacy ISO values stuffed into estimated_time, then clear the varchar
+--   UPDATE gigs
+--   SET expires_at = estimated_time::timestamptz
+--   WHERE expires_at IS NULL
+--     AND estimated_time ~ '^\d{4}-\d{2}-\d{2}';
+--   UPDATE gigs
+--   SET estimated_time = NULL
+--   WHERE expires_at IS NOT NULL
+--     AND estimated_time ~ '^\d{4}-\d{2}-\d{2}';
+--
+-- Optional: enforce ordering (skip if any row violates; fix data first)
+--   ALTER TABLE gigs DROP CONSTRAINT IF EXISTS expires_after_created;
+--   ALTER TABLE gigs ADD CONSTRAINT expires_after_created
+--     CHECK (expires_at IS NULL OR expires_at > created_at) NOT VALID;
+--   ALTER TABLE gigs VALIDATE CONSTRAINT expires_after_created;
+--
+-- Index for open-feed queries
+--   CREATE INDEX IF NOT EXISTS idx_gigs_open_expires ON gigs (expires_at) WHERE status = 'open';
+--
+-- REVIEWS — stars + upsert
+--   ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+--   -- If rating CHECK still allows 0.5, align with app (whole/half stars 1–5):
+--   ALTER TABLE reviews DROP CONSTRAINT IF EXISTS valid_rating;
+--   ALTER TABLE reviews ADD CONSTRAINT valid_rating CHECK (
+--     rating >= 1 AND rating <= 5 AND (rating * 2) = ROUND(rating * 2)
+--   );
+--   DROP POLICY IF EXISTS "Participants can write reviews" ON reviews;
+--   CREATE POLICY "Users can insert own reviews"
+--     ON reviews FOR INSERT TO authenticated WITH CHECK (auth.uid() = reviewer_id);
+--   DROP POLICY IF EXISTS "Reviewers can update own reviews" ON reviews;
+--   CREATE POLICY "Reviewers can update own reviews"
+--     ON reviews FOR UPDATE TO authenticated
+--     USING (auth.uid() = reviewer_id) WITH CHECK (auth.uid() = reviewer_id);
+--   DROP TRIGGER IF EXISTS set_reviews_updated_at ON reviews;
+--   CREATE TRIGGER set_reviews_updated_at
+--     BEFORE UPDATE ON reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+--
+-- If gig_id FK still ON DELETE CASCADE and you need SET NULL (optional):
+--   ALTER TABLE reviews DROP CONSTRAINT IF EXISTS reviews_gig_id_fkey;
+--   ALTER TABLE reviews ADD CONSTRAINT reviews_gig_id_fkey
+--     FOREIGN KEY (gig_id) REFERENCES gigs(id) ON DELETE SET NULL;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Award, Loader } from "lucide-react";
+import { Search, Award } from "lucide-react";
 import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig } from "../lib/profile";
 import { getLevel, useTimer } from "../utils/helpers";
 import Logo, { LogoMark } from "../components/Logo";
@@ -7,6 +7,50 @@ import GigCard from "../components/GigCard";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
 const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
+
+function HomeSkeleton() {
+  return (
+    <div className="page fadein">
+      <div className="topbar">
+        <div className="tlogo">
+          <div className="skel" style={{ width: 26, height: 26, borderRadius: 6 }} />
+          <div className="skel" style={{ width: 90, height: 16 }} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div className="skel" style={{ width: 34, height: 34, borderRadius: "var(--r)" }} />
+          <div className="skel skel-circle" style={{ width: 30, height: 30 }} />
+        </div>
+      </div>
+      <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div style={{ margin: "14px 16px 0" }}>
+          <div className="rep-card" style={{ padding: 16 }}>
+            <div className="skel-rep" style={{ width: 140, height: 10, marginBottom: 10 }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+              <div className="skel-rep" style={{ width: 70, height: 28 }} />
+              <div className="skel-rep" style={{ width: 60, height: 22, borderRadius: 5 }} />
+            </div>
+            <div className="skel-rep" style={{ width: "100%", height: 2, marginBottom: 8 }} />
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              {[40, 50, 46, 44].map((w, i) => (
+                <div key={i} className="skel-rep" style={{ width: w, height: 9 }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "14px 16px 0", display: "flex", gap: 8 }}>
+          {TABS.map((t) => (
+            <div key={t} className="skel" style={{ width: 52, height: 28, borderRadius: 6 }} />
+          ))}
+        </div>
+        <div style={{ padding: "18px 16px 0", display: "flex", flexDirection: "column", gap: 7 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skel" style={{ width: "100%", height: 88, borderRadius: "var(--rlg)" }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home({ setScreen }) {
   const [tab, setTab] = useState("Recent");
@@ -44,7 +88,12 @@ export default function Home({ setScreen }) {
   const lvl = getLevel(repScore);
   const initials = `${profile?.first_name?.charAt(0) || ""}${profile?.last_name?.charAt(0) || ""}`.toUpperCase();
 
-  const filteredGigs = gigs.filter((g) => {
+  const activeGigs = gigs.filter((g) => {
+    if (!g.deadline) return true;
+    return g.deadline > Date.now();
+  });
+
+  const filteredGigs = activeGigs.filter((g) => {
     if (tab === "Recent" || tab === "All") return true;
     if (tab === "Food") return g.cat === "Food";
     if (tab === "Errands") return g.cat === "Errand";
@@ -52,13 +101,7 @@ export default function Home({ setScreen }) {
     return true;
   });
 
-  if (loading) {
-    return (
-      <div className="page fadein" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <Loader size={20} className="spin" color="var(--fg3)" />
-      </div>
-    );
-  }
+  if (loading) return <HomeSkeleton />;
 
   return (
     <div className="page fadein">
@@ -107,16 +150,16 @@ export default function Home({ setScreen }) {
                 <span className="rc-score">{repScore}</span>
                 <span className="rc-pts">pts</span>
               </div>
-              <div className="rc-badge">
+              <div className="rc-badge" style={{ background: lvl.bg, color: lvl.color, borderColor: lvl.border }}>
                 <Award size={10} /> {lvl.label}
               </div>
             </div>
             <div className="rc-track">
-              <div className="rc-fill" style={{ width: `${lvl.pct}%` }} />
+              <div className="rc-fill" style={{ width: `${lvl.pct}%`, background: lvl.color }} />
             </div>
             <div className="rc-labels">
               {["New", "Reliable", "Trusted", "Legend"].map((l) => (
-                <span key={l} className={`rc-lbl ${lvl.label === l ? "cur" : ""}`}>
+                <span key={l} className="rc-lbl" style={lvl.label === l ? { color: lvl.color, fontWeight: 600 } : undefined}>
                   {l}
                 </span>
               ))}
@@ -124,7 +167,7 @@ export default function Home({ setScreen }) {
             <div className="rc-footer">
               {lvl.next ? (
                 <>
-                  +{lvl.toNext} pts to <span className="accent">{lvl.next}</span> · +10 per gig completed · +1 per gig posted
+                  +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +10 per gig completed · +1 per gig posted
                 </>
               ) : (
                 "Max level reached"

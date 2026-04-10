@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Lock, Award, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
+import { MapPin, Lock, Award, Clock, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
 import { postNewGig } from "../lib/profile";
 import TopBar from "../components/TopBar";
 
@@ -21,28 +21,48 @@ const CATS = [
   { icon: "MessageCircle", label: "Other" },
 ];
 
+const TIME_OPTIONS = [
+  { label: "No limit", minutes: 0 },
+  { label: "30 min", minutes: 30 },
+  { label: "1 hour", minutes: 60 },
+  { label: "2 hours", minutes: 120 },
+  { label: "4 hours", minutes: 240 },
+  { label: "8 hours", minutes: 480 },
+  { label: "24 hours", minutes: 1440 },
+];
+
 export default function PostGig({ setScreen }) {
   const [cat, setCat] = useState("Food");
-  const [title, setTitle] = useState("");
+  const [gigTitle, setGigTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [price, setPrice] = useState("0");
   const [location, setLocation] = useState("");
+  const [timeLimitIdx, setTimeLimitIdx] = useState(0);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
 
   async function handlePost() {
-    if (!title.trim()) {
-      setError("Please describe the task.");
+    if (!gigTitle.trim()) {
+      setError("Please add a title.");
       return;
     }
 
     setPosting(true);
     setError(null);
 
+    const selectedTime = TIME_OPTIONS[timeLimitIdx];
+    let estimatedTime = null;
+    if (selectedTime.minutes > 0) {
+      estimatedTime = new Date(Date.now() + selectedTime.minutes * 60 * 1000).toISOString();
+    }
+
     const { error: postError } = await postNewGig({
-      title: title.trim(),
+      title: gigTitle.trim(),
+      description: description.trim() || null,
       categoryLabel: cat,
       price: parseFloat(price) || 0,
       location: location.trim() || null,
+      estimatedTime,
     });
 
     if (postError) {
@@ -72,12 +92,22 @@ export default function PostGig({ setScreen }) {
         </div>
 
         <div className="field">
+          <label className="lbl">Title</label>
+          <input
+            className="inp"
+            placeholder="e.g. Pick up food from Corbet"
+            value={gigTitle}
+            onChange={(e) => setGigTitle(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
           <label className="lbl">Task description</label>
           <textarea
             className="ta"
             placeholder="Describe exactly what you need. Be specific — better descriptions get done faster."
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </div>
 
@@ -132,6 +162,35 @@ export default function PostGig({ setScreen }) {
             />
           </div>
           <span className="hint">+1 Rep just for posting. Your taker earns +10 Rep when they complete it.</span>
+        </div>
+
+        <div className="field">
+          <label className="lbl">
+            <Clock size={12} style={{ display: "inline", verticalAlign: "-1px", marginRight: 4 }} />
+            Time limit <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>— optional</span>
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {TIME_OPTIONS.map((opt, i) => (
+              <button
+                key={opt.label}
+                type="button"
+                className={`badge ${timeLimitIdx === i ? "" : "bn"}`}
+                style={
+                  timeLimitIdx === i
+                    ? { background: "var(--ink)", color: "var(--ink-fg)", border: "1px solid var(--ink)", cursor: "pointer", padding: "5px 10px" }
+                    : { cursor: "pointer", padding: "5px 10px" }
+                }
+                onClick={() => setTimeLimitIdx(i)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {TIME_OPTIONS[timeLimitIdx].minutes > 0 && (
+            <span className="hint">
+              Gig will be removed from the feed after {TIME_OPTIONS[timeLimitIdx].label}.
+            </span>
+          )}
         </div>
 
         <div className="field">

@@ -1,9 +1,11 @@
-import { MapPin, Clock } from "lucide-react";
+import { MapPin, Clock, Timer } from "lucide-react";
 import LevelBadge from "./LevelBadge";
 import Stars from "./Stars";
-import { elapsed } from "../utils/helpers";
+import { elapsed, countdown } from "../utils/helpers";
 
 export default function GigCard({ gig, onClick, tick }) {
+  const cd = countdown(gig.deadline);
+
   return (
     <div className="gig" onClick={onClick}>
       <div
@@ -42,9 +44,15 @@ export default function GigCard({ gig, onClick, tick }) {
         <span className="gmi">
           <MapPin size={10} /> {gig.loc}
         </span>
-        <span className="gmi">
-          <Clock size={10} /> {gig.eta}
-        </span>
+        {cd && !cd.expired ? (
+          <span className="gmi" key={tick} style={{ color: "var(--amber)", fontWeight: 600 }}>
+            <Timer size={10} /> {cd.text}
+          </span>
+        ) : gig.eta && gig.eta !== "—" ? (
+          <span className="gmi">
+            <Clock size={10} /> {gig.eta}
+          </span>
+        ) : null}
         <span className="badge bn">{gig.cat}</span>
       </div>
 

@@ -9,7 +9,13 @@ export function getLevel(rep) {
   const l = REP_LEVELS[idx];
   const next = REP_LEVELS[idx + 1];
   const pct = next ? Math.round(((rep - l.min) / (l.max - l.min)) * 100) : 100;
-  return { ...l, pct: Math.min(pct, 100), next: next?.label, toNext: next ? next.min - rep : 0 };
+  return {
+    ...l,
+    pct: Math.min(pct, 100),
+    next: next?.label,
+    nextColor: next?.color,
+    toNext: next ? next.min - rep : 0,
+  };
 }
 
 /**
@@ -35,4 +41,21 @@ export function elapsed(ts) {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+/**
+ * Returns remaining time until a deadline as { text, expired }.
+ * If deadline is null/undefined, returns null (no deadline set).
+ */
+export function countdown(deadlineMs) {
+  if (!deadlineMs) return null;
+  const diff = deadlineMs - Date.now();
+  if (diff <= 0) return { text: "Time ended", expired: true };
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  if (h > 0) return { text: `${h}:${pad(m)}:${pad(s)}`, expired: false };
+  return { text: `${m}:${pad(s)}`, expired: false };
 }

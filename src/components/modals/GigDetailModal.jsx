@@ -1,9 +1,27 @@
-import { MapPin, Clock, FileText, Lock, CheckCircle, Check } from "lucide-react";
+import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer } from "lucide-react";
 import LevelBadge from "../LevelBadge";
 import Stars from "../Stars";
-import { elapsed } from "../../utils/helpers";
+import { elapsed, countdown } from "../../utils/helpers";
 
 export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile }) {
+  const cd = countdown(gig.deadline);
+  const taskDesc = gig.description || gig.notes || "No additional details.";
+
+  const detailRows = [
+    { icon: <MapPin size={14} />, label: "Location", val: gig.loc },
+  ];
+  if (gig.deadline) {
+    detailRows.push({
+      icon: <Timer size={14} />,
+      label: "Time remaining",
+      val: cd ? cd.text : "—",
+      expired: cd?.expired,
+    });
+  } else if (gig.eta && gig.eta !== "—") {
+    detailRows.push({ icon: <Clock size={14} />, label: "Est. time", val: gig.eta });
+  }
+  detailRows.push({ icon: <FileText size={14} />, label: "Task description", val: taskDesc });
+
   return (
     <div
       style={{
@@ -33,18 +51,35 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
               <span style={{ fontSize: 22, fontWeight: 700, color: "var(--fg)", fontFamily: "var(--mono)", letterSpacing: "-.04em" }}>
                 {gig.price}
               </span>
-              <span style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)" }} key={tick}>
-                {elapsed(gig.postedAt)}
-              </span>
+              <div style={{ textAlign: "right" }}>
+                {cd && !cd.expired && (
+                  <div
+                    key={tick}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      fontFamily: "var(--mono)",
+                      color: "var(--amber)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    ⏱ {cd.text}
+                  </div>
+                )}
+                {cd && cd.expired && (
+                  <div style={{ fontSize: 12, fontWeight: 600, fontFamily: "var(--mono)", color: "var(--err)", marginBottom: 2 }}>
+                    Time ended
+                  </div>
+                )}
+                <span style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)" }} key={`e-${tick}`}>
+                  {elapsed(gig.postedAt)}
+                </span>
+              </div>
             </div>
           </div>
 
           <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-            {[
-              { icon: <MapPin size={14} />, label: "Location", val: gig.loc },
-              { icon: <Clock size={14} />, label: "Est. time", val: gig.eta },
-              { icon: <FileText size={14} />, label: "Notes", val: gig.notes },
-            ].map((r) => (
+            {detailRows.map((r) => (
               <div key={r.label} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div
                   style={{
@@ -66,7 +101,15 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
                   <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 1 }}>
                     {r.label}
                   </div>
-                  <div style={{ fontSize: 14, color: "var(--fg)" }}>{r.val}</div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: r.expired ? "var(--err)" : "var(--fg)",
+                      fontWeight: r.expired ? 600 : 400,
+                    }}
+                  >
+                    {r.val}
+                  </div>
                 </div>
               </div>
             ))}
