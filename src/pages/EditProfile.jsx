@@ -1,9 +1,8 @@
-import { useState, useRef } from "react";
-import { Lock, AtSign, Phone, Loader, Camera } from "lucide-react";
-import { createProfile, uploadAvatar } from "../lib/profile";
-import { supabase } from "../lib/supabase";
+import { useState, useEffect, useRef } from "react";
+import { Lock, AtSign, Phone, Loader, ChevronLeft, Camera } from "lucide-react";
+import { getMyProfile, updateMyProfile, uploadAvatar, getAvatarUrl } from "../lib/profile";
 
-export default function Onboarding({ setScreen }) {
+export default function EditProfile({ setScreen }) {
   const fileInputRef = useRef(null);
   const [profile, setProfile] = useState({
     venmo: "",
@@ -12,10 +11,40 @@ export default function Onboarding({ setScreen }) {
     snapchat: "",
     phone: "",
   });
-  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [initials, setInitials] = useState("");
+  const [avatarColor, setAvatarColor] = useState("#6366f1");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  async function loadProfile() {
+    const { profile: p } = await getMyProfile();
+    if (p) {
+      setProfile({
+        venmo: p.venmo || "",
+        cashapp: p.cashapp || "",
+        paypal: p.paypal || "",
+        snapchat: p.snapchat || "",
+        phone: p.phone || "",
+      });
+      setInitials(
+        `${p.first_name?.charAt(0) || ""}${p.last_name?.charAt(0) || ""}`.toUpperCase()
+      );
+      setAvatarColor(p.avatar_color || "#6366f1");
+      if (p.avatar_url) {
+        const url = getAvatarUrl(p.avatar_url);
+        if (url) setAvatarUrl(url);
+      }
+    }
+    setLoading(false);
+  }
 
   function handlePhotoSelect(e) {
     const file = e.target.files?.[0];
@@ -35,7 +64,7 @@ export default function Onboarding({ setScreen }) {
     setError("");
   }
 
-  const handleFinish = async () => {
+  const handleSave = async () => {
     setError("");
 
     if (!profile.phone.trim()) {
@@ -43,70 +72,65 @@ export default function Onboarding({ setScreen }) {
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setError("Not authenticated. Please sign up again.");
-        setLoading(false);
-        return;
+      if (avatarFile) {
+        const { error: avatarError } = await uploadAvatar(avatarFile);
+        if (avatarError) {
+          setError(`Photo upload failed: ${avatarError.message}`);
+          setSaving(false);
+          return;
+        }
       }
 
-      const { error: createError } = await createProfile({
+      const { error: updateError } = await updateMyProfile({
         phone: profile.phone.trim(),
-        firstName: user.user_metadata?.first_name || "",
-        lastName: user.user_metadata?.last_name || "",
-        email: user.email,
         venmo: profile.venmo.trim() || null,
         cashapp: profile.cashapp.trim() || null,
         paypal: profile.paypal.trim() || null,
         snapchat: profile.snapchat.trim() || null,
       });
 
-      if (createError) {
-        setError(createError.message);
-        setLoading(false);
+      if (updateError) {
+        setError(updateError.message);
+        setSaving(false);
         return;
       }
 
-      if (avatarFile) {
-        const { error: avatarError } = await uploadAvatar(avatarFile);
-        if (avatarError) {
-          console.warn("Avatar upload failed:", avatarError.message);
-        }
-      }
-
-      setScreen("home");
+      setScreen("profile");
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleSkip = async () => {
-    setError("");
+  if (loading) {
+    return (
+      <div className="page fadein" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <Loader size={20} className="spin" color="var(--fg3)" />
+      </div>
+    );
+  }
 
-    if (!profile.phone.trim()) {
-      setError("Phone number is required — it's the only field you can't skip.");
-      return;
-    }
-
-    await handleFinish();
-  };
+  const displayUrl = avatarPreview || avatarUrl;
 
   return (
     <div className="page fadein">
       <div style={{ padding: "52px 20px 18px", borderBottom: "1px solid var(--bd)" }}>
+        <button
+          className="btn bg-btn bsm"
+          onClick={() => setScreen("profile")}
+          style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 4 }}
+        >
+          <ChevronLeft size={14} /> Back
+        </button>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.035em", marginBottom: 4 }}>
-          Set up your profile
+          Edit profile
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
-          Phone is required. Everything else is optional — update anytime.
+          Phone is required. Everything else is optional.
         </div>
       </div>
 
@@ -117,9 +141,9 @@ export default function Onboarding({ setScreen }) {
             style={{ position: "relative", cursor: "pointer" }}
             onClick={() => fileInputRef.current?.click()}
           >
-            {avatarPreview ? (
+            {displayUrl ? (
               <img
-                src={avatarPreview}
+                src={displayUrl}
                 alt="Profile"
                 style={{
                   width: 80,
@@ -135,15 +159,18 @@ export default function Onboarding({ setScreen }) {
                   width: 80,
                   height: 80,
                   borderRadius: "50%",
-                  background: "var(--bg3)",
-                  border: "2px dashed var(--bd2)",
+                  background: avatarColor,
+                  color: "white",
+                  fontSize: 26,
+                  fontWeight: 700,
+                  fontFamily: "var(--mono)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "var(--fg4)",
+                  border: "2px solid var(--bd)",
                 }}
               >
-                <Camera size={24} />
+                {initials}
               </div>
             )}
             <div
@@ -169,7 +196,7 @@ export default function Onboarding({ setScreen }) {
             className="btn bg-btn bsm"
             onClick={() => fileInputRef.current?.click()}
           >
-            {avatarPreview ? "Change photo" : "Add photo"}
+            {displayUrl ? "Change photo" : "Add photo"}
           </button>
           <input
             ref={fileInputRef}
@@ -287,14 +314,14 @@ export default function Onboarding({ setScreen }) {
 
         <button
           className="btn bp bfull blg"
-          style={{ marginTop: 4, opacity: loading ? 0.7 : 1 }}
-          onClick={handleFinish}
-          disabled={loading}
+          style={{ marginTop: 4, opacity: saving ? 0.7 : 1 }}
+          onClick={handleSave}
+          disabled={saving}
         >
-          {loading ? <Loader size={16} className="spin" /> : "Finish setup"}
+          {saving ? <Loader size={16} className="spin" /> : "Save changes"}
         </button>
-        <button className="btn bg-btn bfull" onClick={handleSkip} disabled={loading}>
-          Skip optional fields
+        <button className="btn bg-btn bfull" onClick={() => setScreen("profile")} disabled={saving}>
+          Cancel
         </button>
         <div style={{ height: 8 }} />
       </div>

@@ -1,10 +1,10 @@
 import { X, Award, Check } from "lucide-react";
-import { MY_REP, REP_LEVELS } from "../../data/mockData";
+import { REP_LEVELS } from "../../data/mockData";
 import { getLevel } from "../../utils/helpers";
 import LevelBadge from "../LevelBadge";
 
-export default function RepDetailModal({ onClose }) {
-  const lvl = getLevel(MY_REP);
+export default function RepDetailModal({ onClose, repScore = 0 }) {
+  const lvl = getLevel(repScore);
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -27,12 +27,11 @@ export default function RepDetailModal({ onClose }) {
         </div>
 
         <div style={{ padding: 20 }}>
-          {/* Score card */}
           <div className="rep-card" style={{ marginBottom: 20 }}>
             <div className="rc-ey">Current score</div>
             <div className="rc-row">
               <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                <span className="rc-score">{MY_REP}</span>
+                <span className="rc-score">{repScore}</span>
                 <span className="rc-pts">pts</span>
               </div>
               <div className="rc-badge">
@@ -51,7 +50,6 @@ export default function RepDetailModal({ onClose }) {
             </div>
           </div>
 
-          {/* Level breakdown */}
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Level breakdown</div>
           {REP_LEVELS.map((l, i) => (
             <div
@@ -70,11 +68,10 @@ export default function RepDetailModal({ onClose }) {
                   {l.max === Infinity ? `${l.min}+ pts` : `${l.min}–${l.max} pts`}
                 </div>
               </div>
-              {MY_REP >= l.min && <Check size={14} color="var(--green-d)" />}
+              {repScore >= l.min && <Check size={14} color="var(--green-d)" />}
             </div>
           ))}
 
-          {/* How to earn */}
           <div style={{ fontSize: 13, fontWeight: 600, margin: "16px 0 10px" }}>How to earn Rep</div>
           {[
             { t: "Complete a gig", d: "+10 pts" },

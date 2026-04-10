@@ -8,6 +8,7 @@ import Explore from "./pages/Explore";
 import PostGig from "./pages/PostGig";
 import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
 import RepDetailModal from "./components/modals/RepDetailModal";
 import BottomNav from "./components/BottomNav";
 import { supabase } from "./lib/supabase";
@@ -100,6 +101,7 @@ export default function App() {
       {screen === "post" && <PostGig setScreen={handleSetScreen} />}
       {screen === "alerts" && <Alerts setScreen={handleSetScreen} />}
       {screen === "profile" && <Profile setScreen={handleSetScreen} />}
+      {screen === "editProfile" && <EditProfile setScreen={handleSetScreen} />}
 
       {["home", "explore", "alerts", "profile", "post"].includes(screen) && (
         <BottomNav screen={screen} setScreen={handleSetScreen} />

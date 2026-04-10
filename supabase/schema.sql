@@ -22,6 +22,7 @@ CREATE TABLE users (
     cashapp VARCHAR(255) UNIQUE,
     paypal VARCHAR(255) UNIQUE,
     avatar_color VARCHAR(20) DEFAULT '#6366f1',
+    avatar_url TEXT,
     rep_score INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -170,7 +171,9 @@ CREATE TABLE reviews (
         CONSTRAINT valid_rating CHECK (rating >= 1 AND rating <= 5),
     text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(gig_id, reviewer_id)
+    UNIQUE(gig_id, reviewer_id),
+    UNIQUE(reviewer_id, reviewee_id),
+    CONSTRAINT no_self_review CHECK (reviewer_id != reviewee_id)
 );
 
 CREATE INDEX idx_reviews_reviewee ON reviews(reviewee_id);
@@ -289,3 +292,47 @@ CREATE TRIGGER trg_rep_5star_review
     AFTER INSERT ON reviews
     FOR EACH ROW
     EXECUTE FUNCTION award_rep_on_5star_review();
+
+-- ============================================================
+-- 9. AVATAR STORAGE BUCKET
+--    Stores profile photos. Each user gets one file at
+--    {user_id}/avatar.{ext}, upserted on change.
+-- ============================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'avatars',
+    'avatars',
+    true,
+    5242880,  -- 5 MB
+    ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Users can upload/overwrite their own avatar
+CREATE POLICY "Users can upload own avatar"
+    ON storage.objects FOR INSERT TO authenticated
+    WITH CHECK (
+        bucket_id = 'avatars'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+CREATE POLICY "Users can update own avatar"
+    ON storage.objects FOR UPDATE TO authenticated
+    USING (
+        bucket_id = 'avatars'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+
+-- Anyone can view avatars (public bucket)
+CREATE POLICY "Avatars are publicly viewable"
+    ON storage.objects FOR SELECT TO public
+    USING (bucket_id = 'avatars');
+
+-- Users can delete their own avatar
+CREATE POLICY "Users can delete own avatar"
+    ON storage.objects FOR DELETE TO authenticated
+    USING (
+        bucket_id = 'avatars'
+        AND (storage.foldername(name))[1] = auth.uid()::text
+    );
