@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { ArrowLeft, Mail, Shield, Eye, EyeOff, Loader } from "lucide-react";
-import { signUp, login, sendMagicLink, isEduEmail } from "../lib/auth";
+import { ArrowLeft, Mail, Shield, Loader } from "lucide-react";
+import { sendMagicLink, isEduEmail } from "../lib/auth";
 
 export default function Auth({ setScreen, initialMode = "signup" }) {
   const [authMode, setAuthMode] = useState(initialMode);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,67 +14,31 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
     setError("");
     setLoading(true);
 
-    try {
-      if (authMode === "signup") {
-        if (!firstName.trim() || !lastName.trim()) {
-          setError("First and last name are required.");
-          setLoading(false);
-          return;
-        }
-        if (!isEduEmail(email)) {
-          setError("Only .edu email addresses are allowed. Please use your university email.");
-          setLoading(false);
-          return;
-        }
-        const { error: signUpError } = await signUp({
-          email,
-          password,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-        });
-        if (signUpError) {
-          setError(signUpError.message);
-          setLoading(false);
-          return;
-        }
-        // After sign-up, redirect to onboarding to collect phone + optional info
-        setScreen("onboarding");
-      } else {
-        // Login
-        if (!isEduEmail(email)) {
-          setError("Only .edu email addresses are allowed.");
-          setLoading(false);
-          return;
-        }
-        const { error: loginError } = await login({ email, password });
-        if (loginError) {
-          setError(loginError.message);
-          setLoading(false);
-          return;
-        }
-        // Auth state listener in App.jsx will move to "home"
-        setScreen("home");
+    if (authMode === "signup") {
+      if (!firstName.trim() || !lastName.trim()) {
+        setError("First and last name are required.");
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setLoading(false);
     }
-  };
 
-  const handleMagicLink = async () => {
-    setError("");
     if (!isEduEmail(email)) {
-      setError("Only .edu email addresses are allowed.");
+      setError("Only .edu email addresses are allowed. Please use your university email.");
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    const { error: mlError } = await sendMagicLink(email);
+
+    const options = authMode === "signup" ? { firstName, lastName } : {};
+    
+    const { error: mlError } = await sendMagicLink(email, options);
+    
     setLoading(false);
+    
     if (mlError) {
       setError(mlError.message);
       return;
     }
+    
     setScreen("magic");
   };
 
@@ -95,8 +57,8 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
           {authMode === "signup"
-            ? "Sign up with your .edu email and a password."
-            : "Sign in with your .edu email."}
+            ? "Sign up with your .edu email. We'll send a magic link."
+            : "Sign in with your .edu email. We'll send a magic link."}
         </div>
       </div>
 
@@ -151,34 +113,6 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
           </div>
         </div>
 
-        <div className="field">
-          <label className="lbl">Password</label>
-          <div className="ig">
-            <input
-              className="ii"
-              placeholder={authMode === "signup" ? "Min 6 characters" : "Your password"}
-              type={showPw ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--fg3)",
-                display: "flex",
-                padding: "0 10px",
-              }}
-              onClick={() => setShowPw(!showPw)}
-              type="button"
-            >
-              {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          </div>
-        </div>
-
         {error && (
           <div
             style={{
@@ -203,25 +137,10 @@ export default function Auth({ setScreen, initialMode = "signup" }) {
         >
           {loading ? (
             <Loader size={16} className="spin" />
-          ) : authMode === "signup" ? (
-            "Create account →"
           ) : (
-            "Sign in"
+            "Send Magic Link"
           )}
         </button>
-
-        {authMode === "login" && (
-          <>
-            <div className="or-row">or</div>
-            <button
-              className="btn bo bfull"
-              onClick={handleMagicLink}
-              disabled={loading}
-            >
-              Send magic link instead
-            </button>
-          </>
-        )}
 
         <div className="or-row">or</div>
 

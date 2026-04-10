@@ -10,77 +10,6 @@ export function isEduEmail(email) {
 }
 
 // ──────────────────────────────────────────────────
-// Sign-up  (email + password)
-// ──────────────────────────────────────────────────
-
-/**
- * Creates a new account. Only .edu emails are accepted.
- * After sign-up the user must verify their email (Supabase will send
- * a confirmation link automatically).
- *
- * @param {{ email: string, password: string, firstName: string, lastName: string }}
- * @returns {{ data, error }}
- */
-export async function signUp({ email, password, firstName, lastName }) {
-  const trimmedEmail = email?.trim().toLowerCase();
-
-  if (!isEduEmail(trimmedEmail)) {
-    return {
-      data: null,
-      error: { message: "Only .edu email addresses are allowed. Please use your university email." },
-    };
-  }
-
-  if (!password || password.length < 6) {
-    return {
-      data: null,
-      error: { message: "Password must be at least 6 characters." },
-    };
-  }
-
-  const { data, error } = await supabase.auth.signUp({
-    email: trimmedEmail,
-    password,
-    options: {
-      data: {
-        first_name: firstName?.trim(),
-        last_name: lastName?.trim(),
-      },
-    },
-  });
-
-  return { data, error };
-}
-
-// ──────────────────────────────────────────────────
-// Login  (email + password)
-// ──────────────────────────────────────────────────
-
-/**
- * Signs in with email and password.
- *
- * @param {{ email: string, password: string }}
- * @returns {{ data, error }}
- */
-export async function login({ email, password }) {
-  const trimmedEmail = email?.trim().toLowerCase();
-
-  if (!isEduEmail(trimmedEmail)) {
-    return {
-      data: null,
-      error: { message: "Only .edu email addresses are allowed." },
-    };
-  }
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: trimmedEmail,
-    password,
-  });
-
-  return { data, error };
-}
-
-// ──────────────────────────────────────────────────
 // Magic Link (passwordless)
 // ──────────────────────────────────────────────────
 
@@ -88,9 +17,10 @@ export async function login({ email, password }) {
  * Sends a magic link to the supplied .edu email.
  *
  * @param {string} email
+ * @param {object} [options]
  * @returns {{ data, error }}
  */
-export async function sendMagicLink(email) {
+export async function sendMagicLink(email, options = {}) {
   const trimmedEmail = email?.trim().toLowerCase();
 
   if (!isEduEmail(trimmedEmail)) {
@@ -100,8 +30,17 @@ export async function sendMagicLink(email) {
     };
   }
 
+  const otpOptions = {};
+  if (options.firstName || options.lastName) {
+    otpOptions.data = {
+      first_name: options.firstName?.trim(),
+      last_name: options.lastName?.trim(),
+    };
+  }
+
   const { data, error } = await supabase.auth.signInWithOtp({
     email: trimmedEmail,
+    options: Object.keys(otpOptions).length > 0 ? otpOptions : undefined,
   });
 
   return { data, error };
