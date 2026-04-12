@@ -143,7 +143,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
     if (!req) return;
     setActionLoading(true);
     setActionError(null);
-    const { error } = await acceptGigRequest(req.id, gig.id, req.requester_id);
+    const { error } = await acceptGigRequest(req.id);
     if (error) {
       setActionError(error.message || "Failed to accept");
       setActionLoading(false);
@@ -158,7 +158,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
     const req = requests.find((r) => r.status === "pending") || requests[0];
     if (!req) return;
     setActionLoading(true);
-    const { error } = await rejectGigRequest(req.id, gig.id, req.requester_id);
+    const { error } = await rejectGigRequest(req.id);
     if (!error) {
       onStatusChange?.();
       onClose();

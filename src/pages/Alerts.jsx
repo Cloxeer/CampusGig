@@ -212,7 +212,7 @@ export default function Alerts({ onNotificationsRead }) {
     if (!meta.request_id || !meta.gig_id || !meta.requester_id) return;
 
     setAcceptingId(n.id);
-    const { error } = await acceptGigRequest(meta.request_id, meta.gig_id, meta.requester_id);
+    const { error } = await acceptGigRequest(meta.request_id);
     if (!error) {
       await loadNotifications();
       onNotificationsRead?.();

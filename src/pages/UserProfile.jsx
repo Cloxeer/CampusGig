@@ -67,10 +67,9 @@ export default function UserProfile({ currentUserId }) {
         if (url) setAvatarUrl(url);
       }
 
-      const [reviewsRes, gigsRes, existingRes, actRes, statsRes, rankRes, totalRes] = await Promise.all([
+      const [reviewsRes, gigsRes, actRes, statsRes, rankRes, totalRes] = await Promise.all([
         getReviewsForUser(userId),
         getCompletedGigsBetweenUsers(userId),
-        getExistingReview(userId),
         getUserActivity(userId),
         getUserGigStats(userId),
         getCampusRank(p.rep_score || 0),
@@ -88,6 +87,9 @@ export default function UserProfile({ currentUserId }) {
       if (hasCompletedGigs) {
         setReviewGigId(gigsRes.gigs[0].id);
       }
+
+      const firstGigId = gigsRes.gigs[0]?.id ?? null;
+      const existingRes = firstGigId ? await getExistingReview(userId, firstGigId) : { review: null };
 
       if (existingRes.review) {
         setAlreadyReviewed(true);
