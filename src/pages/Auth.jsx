@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ArrowLeft, Mail, Shield, Loader } from "lucide-react";
 import { sendMagicLink, isEduEmail } from "../lib/auth";
 
@@ -28,6 +28,7 @@ export default function Auth() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +39,11 @@ export default function Auth() {
     if (authMode === "signup") {
       if (!firstName.trim() || !lastName.trim()) {
         setError("First and last name are required.");
+        setLoading(false);
+        return;
+      }
+      if (!agreedToTerms) {
+        setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
         setLoading(false);
         return;
       }
@@ -140,6 +146,50 @@ export default function Auth() {
             </span>
           </div>
         </div>
+
+        {authMode === "signup" && (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              style={{
+                width: 16,
+                height: 16,
+                marginTop: 1,
+                accentColor: "var(--ink)",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55 }}>
+              I agree to the{" "}
+              <Link
+                to="/terms"
+                style={{ color: "var(--fg)", fontWeight: 600, textDecoration: "underline" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                to="/privacy"
+                style={{ color: "var(--fg)", fontWeight: 600, textDecoration: "underline" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
+        )}
 
         {error && (
           <div

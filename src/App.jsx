@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
 import MagicLink from "./pages/MagicLink";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import Onboarding from "./pages/Onboarding";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore";
@@ -116,6 +118,8 @@ export default function App() {
           <Route path="/welcome" element={<Splash />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/magic" element={<MagicLink />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<Navigate to="/welcome" replace />} />
         </Routes>
       </div>
@@ -130,6 +134,8 @@ export default function App() {
             path="/onboarding"
             element={<Onboarding onComplete={() => setHasProfile(true)} />}
           />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<Navigate to="/onboarding" replace />} />
         </Routes>
       </div>
@@ -148,6 +154,8 @@ export default function App() {
         </Route>
         <Route path="/profile/edit" element={<EditProfile />} />
         <Route path="/users/:userId" element={<UserProfile currentUserId={currentUserId} />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
