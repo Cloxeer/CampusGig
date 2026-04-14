@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer, Loader } from "lucide-react";
 import LevelBadge from "../LevelBadge";
 import Stars from "../Stars";
+import UserAvatar from "../UserAvatar";
 import { elapsed, countdown } from "../../utils/helpers";
 import { getMyRequestForGig, deleteMyGig } from "../../lib/profile";
 
@@ -219,37 +220,15 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
                 }}
                 onClick={() => onViewProfile?.(gig.posterId)}
               >
-                {gig.avatarUrl ? (
-                  <img
-                    src={gig.avatarUrl}
-                    alt=""
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                      flexShrink: 0,
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      background: gig.color,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: "white",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {gig.initials}
-                  </div>
-                )}
+                <UserAvatar
+                  user={{
+                    resolvedAvatarUrl: gig.avatarUrl,
+                    avatar_color: gig.color,
+                    first_name: gig.initials?.[0],
+                    last_name: gig.initials?.[1],
+                  }}
+                  size={40}
+                />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{gig.poster}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>

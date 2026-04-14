@@ -7,6 +7,7 @@ import { useModalParam } from "../hooks/useModalParam";
 import TopBar from "../components/TopBar";
 import LevelBadge from "../components/LevelBadge";
 import Stars from "../components/Stars";
+import UserAvatar from "../components/UserAvatar";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import GigDetailModal from "../components/modals/GigDetailModal";
 
@@ -179,40 +180,11 @@ export default function UserProfile({ currentUserId }) {
         <div className="scroll" style={{ paddingBottom: 80 }}>
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={fullName}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                    border: "2px solid var(--bd)",
-                    flexShrink: 0,
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: profile.avatar_color || "#6366f1",
-                    color: "white",
-                    fontSize: 20,
-                    fontWeight: 700,
-                    fontFamily: "var(--mono)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid var(--bd)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {initials}
-                </div>
-              )}
+              <UserAvatar
+                user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile.avatar_color, first_name: profile.first_name, last_name: profile.last_name }}
+                size="xl"
+                style={{ border: "2px solid var(--bd)" }}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.03em", marginBottom: 2 }}>{fullName}</div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 4 }}>

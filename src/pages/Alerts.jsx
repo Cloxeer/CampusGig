@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { Bell, Star, AlertTriangle, Trash2, Lock, CheckCircle, Loader } from "lucide-react";
 import {
   getMyNotifications, markAllNotificationsRead, markNotificationRead,
   deleteNotification, getGigStatusesForNotifications, acceptGigRequest,
+  getProfilesByIds,
 } from "../lib/profile";
 import { elapsed } from "../utils/helpers";
 import TopBar from "../components/TopBar";
+import UserAvatar from "../components/UserAvatar";
 import AlertDetailModal from "../components/modals/AlertDetailModal";
 
 const GIG_NOTIF_TYPES = new Set([
@@ -27,6 +28,39 @@ function isDeletable(n, gigStatusMap) {
   if (gs.status === "completed" || gs.status === "cancelled") return true;
   if (gs.status === "open" && n.type !== "gig_request_sent") return true;
   return false;
+}
+
+function groupNotifications(notifications) {
+  const groups = [];
+  const gigRequestBuckets = {};
+
+  for (const n of notifications) {
+    if (n.type === "gig_requested" && n.metadata?.gig_id) {
+      const key = n.metadata.gig_id;
+      if (!gigRequestBuckets[key]) {
+        gigRequestBuckets[key] = [];
+      }
+      gigRequestBuckets[key].push(n);
+    } else {
+      groups.push({ kind: "single", items: [n] });
+    }
+  }
+
+  for (const [, bucket] of Object.entries(gigRequestBuckets)) {
+    if (bucket.length === 1) {
+      groups.push({ kind: "single", items: bucket });
+    } else {
+      groups.push({ kind: "gig_requests", items: bucket });
+    }
+  }
+
+  groups.sort((a, b) => {
+    const aTime = new Date(a.items[0].created_at).getTime();
+    const bTime = new Date(b.items[0].created_at).getTime();
+    return bTime - aTime;
+  });
+
+  return groups;
 }
 
 function SwipeRow({ children, canDelete, onDelete }) {
@@ -118,46 +152,94 @@ function SwipeRow({ children, canDelete, onDelete }) {
   );
 }
 
-function NotifAvatar({ notification }) {
+function getOtherUserId(meta) {
+  if (meta.reviewer_id) return meta.reviewer_id;
+
+  if (meta.role === "poster") return meta.requester_id;
+  if (meta.role === "requester") return meta.poster_id;
+
+  return meta.requester_id || meta.other_user_id || meta.poster_id;
+}
+
+function collectUserIds(notifications) {
+  const ids = new Set();
+  for (const n of notifications) {
+    const m = n.metadata;
+    if (!m) continue;
+    if (m.requester_id) ids.add(m.requester_id);
+    if (m.poster_id) ids.add(m.poster_id);
+    if (m.reviewer_id) ids.add(m.reviewer_id);
+    if (m.other_user_id) ids.add(m.other_user_id);
+  }
+  return [...ids];
+}
+
+function resolveNotifAvatar(notification, profileMap) {
   const meta = notification.metadata || {};
+  const otherId = getOtherUserId(meta);
+  const liveProfile = otherId ? profileMap[otherId] : null;
+
+  if (liveProfile) return liveProfile;
+
   if (meta.other_avatar_url) {
-    return (
-      <img
-        src={meta.other_avatar_url}
-        alt=""
-        style={{
-          width: 36, height: 36, borderRadius: "50%", objectFit: "cover",
-          border: "1px solid var(--bd)", flexShrink: 0,
-        }}
-      />
-    );
+    return {
+      resolvedAvatarUrl: meta.other_avatar_url,
+      avatar_color: meta.other_avatar_color || "#6366f1",
+      first_name: "",
+      last_name: "",
+    };
   }
-  if (meta.other_initials) {
-    return (
-      <div style={{
-        width: 36, height: 36, borderRadius: "50%",
-        background: meta.other_avatar_color || "#6366f1",
-        color: "white", fontSize: 13, fontWeight: 700,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0, border: "1px solid var(--bd)",
-      }}>
-        {meta.other_initials}
-      </div>
-    );
+
+  return null;
+}
+
+function StackedAvatars({ items, profileMap }) {
+  const seen = new Set();
+  const users = [];
+  for (const n of items) {
+    const uid = getOtherUserId(n.metadata || {});
+    if (uid && !seen.has(uid)) {
+      seen.add(uid);
+      users.push(profileMap[uid] || null);
+    }
   }
-  const fb = FALLBACK_STYLE[notification.type] || FALLBACK_STYLE.default;
+  const show = users.slice(0, 3);
+  const overflow = users.length - show.length;
+
   return (
-    <div className="aico" style={{ background: fb.bg, color: fb.color }}>
-      {fb.icon}
+    <div style={{ display: "flex", flexShrink: 0 }}>
+      {show.map((u, i) => (
+        <div key={i} style={{ marginLeft: i > 0 ? -10 : 0, zIndex: show.length - i }}>
+          {u ? (
+            <UserAvatar user={u} size={30} style={{ border: "2px solid var(--bg)" }} />
+          ) : (
+            <div style={{
+              width: 30, height: 30, borderRadius: "50%", background: "var(--bg3)",
+              border: "2px solid var(--bg)", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 10, color: "var(--fg4)", fontWeight: 700,
+            }}>?</div>
+          )}
+        </div>
+      ))}
+      {overflow > 0 && (
+        <div style={{
+          marginLeft: -10, zIndex: 0, width: 30, height: 30, borderRadius: "50%",
+          background: "var(--bg3)", border: "2px solid var(--bg)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontWeight: 700, color: "var(--fg3)", fontFamily: "var(--mono)",
+        }}>
+          +{overflow}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Alerts({ onNotificationsRead }) {
-  const navigate = useNavigate();
+export default function Alerts({ currentUserId, onNotificationsRead }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [gigStatusMap, setGigStatusMap] = useState({});
+  const [profileMap, setProfileMap] = useState({});
   const [selectedNotif, setSelectedNotif] = useState(null);
   const [acceptingId, setAcceptingId] = useState(null);
 
@@ -174,10 +256,15 @@ export default function Alerts({ onNotificationsRead }) {
     const gigIds = [...new Set(
       data.filter((n) => n.metadata?.gig_id).map((n) => n.metadata.gig_id)
     )];
-    if (gigIds.length > 0) {
-      const map = await getGigStatusesForNotifications(gigIds);
-      setGigStatusMap(map);
-    }
+    const userIds = collectUserIds(data);
+
+    const [statusMap, profiles] = await Promise.all([
+      gigIds.length > 0 ? getGigStatusesForNotifications(gigIds) : {},
+      userIds.length > 0 ? getProfilesByIds(userIds) : {},
+    ]);
+
+    setGigStatusMap(statusMap);
+    setProfileMap(profiles);
     setLoading(false);
   }
 
@@ -193,6 +280,13 @@ export default function Alerts({ onNotificationsRead }) {
     onNotificationsRead?.();
   }
 
+  async function handleDeleteGroup(items) {
+    await Promise.all(items.map((n) => deleteNotification(n.id)));
+    const ids = new Set(items.map((n) => n.id));
+    setNotifications((prev) => prev.filter((n) => !ids.has(n.id)));
+    onNotificationsRead?.();
+  }
+
   async function handleNotifClick(n) {
     if (!n.read) {
       markNotificationRead(n.id);
@@ -203,6 +297,21 @@ export default function Alerts({ onNotificationsRead }) {
     }
     if (GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id) {
       setSelectedNotif(n);
+    }
+  }
+
+  async function handleGroupClick(items) {
+    const unreadIds = items.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length > 0) {
+      await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
+      setNotifications((prev) =>
+        prev.map((n) => unreadIds.includes(n.id) ? { ...n, read: true } : n)
+      );
+      onNotificationsRead?.();
+    }
+    const latest = items[0];
+    if (latest.metadata?.gig_id) {
+      setSelectedNotif(latest);
     }
   }
 
@@ -226,6 +335,7 @@ export default function Alerts({ onNotificationsRead }) {
   }
 
   const hasUnread = notifications.some((n) => !n.read);
+  const groups = groupNotifications(notifications);
 
   return (
     <div className="page fadein">
@@ -255,14 +365,86 @@ export default function Alerts({ onNotificationsRead }) {
               </div>
             ))}
           </div>
-        ) : notifications.length === 0 ? (
+        ) : groups.length === 0 ? (
           <div style={{ padding: "48px 16px", textAlign: "center" }}>
             <Bell size={28} color="var(--fg4)" style={{ marginBottom: 10 }} />
             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--fg3)", marginBottom: 4 }}>No alerts yet</div>
             <div style={{ fontSize: 12, color: "var(--fg4)" }}>You'll see notifications here when something happens.</div>
           </div>
         ) : (
-          notifications.map((n) => {
+          groups.map((group) => {
+            if (group.kind === "gig_requests") {
+              const items = group.items;
+              const latest = items[0];
+              const gigTitle = latest.metadata?.gig_title || latest.body || "your gig";
+              const anyUnread = items.some((n) => !n.read);
+              const allDeletable = items.every((n) => isDeletable(n, gigStatusMap));
+              const gigStatus = latest.metadata?.gig_id ? gigStatusMap[latest.metadata.gig_id] : null;
+              const alreadyAccepted = gigStatus && (gigStatus.status === "active" || gigStatus.status === "completed");
+
+              return (
+                <SwipeRow
+                  key={`grp-${latest.metadata.gig_id}`}
+                  canDelete={allDeletable}
+                  onDelete={() => handleDeleteGroup(items)}
+                >
+                  <div
+                    className={`alert-row ${anyUnread ? "unread" : ""}`}
+                    onClick={() => handleGroupClick(items)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <StackedAvatars items={items} profileMap={profileMap} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 500, color: "var(--fg)",
+                        lineHeight: 1.4, marginBottom: 2,
+                      }}>
+                        {items.length} people requested your gig
+                      </div>
+                      <div style={{
+                        fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {gigTitle}
+                      </div>
+                      <div style={{
+                        fontSize: 10, color: "var(--ink)", fontFamily: "var(--mono)",
+                        fontWeight: 600, marginTop: 4,
+                      }}>
+                        Tap for details ›
+                      </div>
+                    </div>
+                    <div style={{
+                      display: "flex", flexDirection: "column", alignItems: "flex-end",
+                      gap: 6, flexShrink: 0,
+                    }}>
+                      <span style={{ fontSize: 10, color: "var(--fg4)", fontFamily: "var(--mono)" }}>
+                        {elapsed(new Date(latest.created_at).getTime())}
+                      </span>
+                      {!alreadyAccepted ? (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, fontFamily: "var(--mono)",
+                          color: "var(--amber)", background: "var(--amber-bg)",
+                          border: "1px solid var(--amber-bd)", borderRadius: 4,
+                          padding: "2px 6px",
+                        }}>
+                          {items.length} pending
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, fontFamily: "var(--mono)",
+                          color: "var(--green-d)",
+                        }}>
+                          ✓ Accepted
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </SwipeRow>
+              );
+            }
+
+            const n = group.items[0];
             const canDelete = isDeletable(n, gigStatusMap);
             const isClickable = GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id;
             const showInlineAccept = n.type === "gig_requested" && n.metadata?.request_id;
@@ -276,7 +458,12 @@ export default function Alerts({ onNotificationsRead }) {
                   onClick={() => handleNotifClick(n)}
                   style={{ cursor: isClickable ? "pointer" : "default" }}
                 >
-                  <NotifAvatar notification={n} />
+                  {(() => {
+                    const user = resolveNotifAvatar(n, profileMap);
+                    if (user) return <UserAvatar user={user} size="md" />;
+                    const fb = FALLBACK_STYLE[n.type] || FALLBACK_STYLE.default;
+                    return <div className="aico" style={{ background: fb.bg, color: fb.color }}>{fb.icon}</div>;
+                  })()}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 13, fontWeight: 500, color: "var(--fg)",
@@ -343,6 +530,7 @@ export default function Alerts({ onNotificationsRead }) {
       {selectedNotif && (
         <AlertDetailModal
           notification={selectedNotif}
+          currentUserId={currentUserId}
           onClose={() => { setSelectedNotif(null); loadNotifications(); }}
           onStatusChange={handleStatusChange}
         />

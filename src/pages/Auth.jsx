@@ -7,10 +7,6 @@ function modeFromParams(searchParams) {
   return searchParams.get("mode") === "signup" ? "signup" : "login";
 }
 
-/**
- * Magic link OTP does not return "email already exists" for existing users —
- * Supabase sends a sign-in link either way. This only maps errors that OTP actually returns.
- */
 function magicLinkErrorMessage(mlError, authMode) {
   const code = mlError?.code;
   const msg = (mlError?.message || "").toLowerCase();
@@ -19,7 +15,7 @@ function magicLinkErrorMessage(mlError, authMode) {
     authMode === "login" &&
     (msg.includes("signups not allowed") || code === "otp_disabled")
   ) {
-    return "No account for this email yet. Use Create account if you're new to CampusGig.";
+    return "No account for this email yet. Use Create account if you're new to GetCampusGig.";
   }
 
   return mlError?.message || "Something went wrong. Please try again.";
@@ -48,7 +44,7 @@ export default function Auth() {
     }
 
     if (!isEduEmail(email)) {
-      setError("Only .edu email addresses are allowed. Please use your university email.");
+      setError("Only @nmsu.edu email addresses are allowed. Please use your NMSU email.");
       setLoading(false);
       return;
     }
@@ -85,12 +81,16 @@ export default function Auth() {
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
           {authMode === "signup"
-            ? "Sign up with your .edu email. We'll send a magic link. Already joined? The link signs you in too."
-            : "Sign in with your .edu email. We'll send a magic link."}
+            ? "Sign up with your @nmsu.edu email. We'll send a magic link. Already joined? The link signs you in too."
+            : "Sign in with your @nmsu.edu email. We'll send a magic link."}
         </div>
       </div>
 
-      <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <form
+        className="scroll"
+        style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16 }}
+        onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+      >
         {authMode === "signup" && (
           <div style={{ display: "flex", gap: 10 }}>
             <div className="field" style={{ flex: 1 }}>
@@ -122,7 +122,7 @@ export default function Auth() {
             </div>
             <input
               className="ii"
-              placeholder="you@university.edu"
+              placeholder="you@nmsu.edu"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -133,10 +133,10 @@ export default function Auth() {
               <Shield size={13} />
             </div>
             <span className="ct">
-              <strong>.edu required.</strong>{" "}
+              <strong>@nmsu.edu required.</strong>{" "}
               {authMode === "signup"
-                ? "Only verified students can join CampusGig."
-                : "Enter the .edu email you signed up with."}
+                ? "Only verified NMSU students can join GetCampusGig."
+                : "Enter the @nmsu.edu email you signed up with."}
             </span>
           </div>
         </div>
@@ -158,8 +158,8 @@ export default function Auth() {
         )}
 
         <button
+          type="submit"
           className="btn bp bfull blg"
-          onClick={handleSubmit}
           disabled={loading}
           style={{ opacity: loading ? 0.7 : 1 }}
         >
@@ -173,6 +173,7 @@ export default function Auth() {
         <div className="or-row">or</div>
 
         <button
+          type="button"
           style={{
             background: "none",
             border: "none",
@@ -194,7 +195,7 @@ export default function Auth() {
         >
           {authMode === "signup" ? "Already have an account? Sign in" : "New here? Create account"}
         </button>
-      </div>
+      </form>
     </div>
   );
 }

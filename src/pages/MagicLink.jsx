@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Mail } from "lucide-react";
 
@@ -5,6 +6,14 @@ export default function MagicLink() {
   const navigate = useNavigate();
   const location = useLocation();
   const email = location.state?.email;
+
+  useEffect(() => {
+    if (!email) {
+      navigate("/auth", { replace: true });
+    }
+  }, [email, navigate]);
+
+  if (!email) return null;
 
   return (
     <div
@@ -34,7 +43,7 @@ export default function MagicLink() {
       <div style={{ fontSize: 14, color: "var(--fg3)", textAlign: "center", lineHeight: 1.6, marginBottom: 20 }}>
         We sent a magic link to
         <br />
-        <strong style={{ color: "var(--fg)" }}>{email || "your university email"}</strong>
+        <strong style={{ color: "var(--fg)" }}>{email}</strong>
         <br />
         Click it to sign in instantly — no password needed.
       </div>

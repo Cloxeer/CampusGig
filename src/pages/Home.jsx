@@ -6,6 +6,7 @@ import { getLevel, useTimer } from "../utils/helpers";
 import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
+import UserAvatar from "../components/UserAvatar";
 import GigDetailModal from "../components/modals/GigDetailModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
 
@@ -145,30 +146,13 @@ export default function Home({ currentUserId }) {
           <button className="btn bg-btn bico" onClick={() => navigate("/explore")}>
             <Search size={15} />
           </button>
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              onClick={() => navigate("/profile")}
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                objectFit: "cover",
-                cursor: "pointer",
-                border: "1px solid var(--bd)",
-              }}
+          <div onClick={() => navigate("/profile")} style={{ cursor: "pointer", position: "relative" }}>
+            <UserAvatar
+              user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile?.avatar_color, first_name: profile?.first_name, last_name: profile?.last_name }}
+              size="sm"
             />
-          ) : (
-            <div
-              className="av"
-              style={{ background: profile?.avatar_color || "#6366f1" }}
-              onClick={() => navigate("/profile")}
-            >
-              {initials}
-              <div className="av-dot" />
-            </div>
-          )}
+            <div className="av-dot" />
+          </div>
         </div>
       </div>
 
@@ -198,7 +182,7 @@ export default function Home({ currentUserId }) {
             <div className="rc-footer">
               {lvl.next ? (
                 <>
-                  +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +9 marking done · +10 as taker · +1 per post
+                  +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +8 marking done · +10 as taker · +2 per post
                 </>
               ) : (
                 "Max level reached"

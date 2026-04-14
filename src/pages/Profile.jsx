@@ -2,29 +2,27 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader, Timer } from "lucide-react";
 
-import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl, getGigById, parseDeadline } from "../lib/profile";
+import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl, parseDeadline } from "../lib/profile";
 import { logout } from "../lib/auth";
-import { getLevel, useTimer } from "../utils/helpers";
+import { getLevel } from "../utils/helpers";
 import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import LevelBadge from "../components/LevelBadge";
+import UserAvatar from "../components/UserAvatar";
 import Stars from "../components/Stars";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
-import GigDetailModal from "../components/modals/GigDetailModal";
+import AlertDetailModal from "../components/modals/AlertDetailModal";
 
 export default function Profile({ currentUserId }) {
   const navigate = useNavigate();
   const [repOpen, openRep, closeRep] = useModalParam("rep");
   const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
-  const [gigParam, openGig, closeGig] = useModalParam("gig");
 
   const [pTab, setPTab] = useState("activity");
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [selectedGig, setSelectedGig] = useState(null);
-  const [gigLoading, setGigLoading] = useState(false);
-  const tick = useTimer();
+  const [selectedGigId, setSelectedGigId] = useState(null);
 
   const [profile, setProfile] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -38,16 +36,6 @@ export default function Profile({ currentUserId }) {
   useEffect(() => {
     loadProfileData();
   }, []);
-
-  useEffect(() => {
-    if (!gigParam) {
-      setSelectedGig(null);
-      return;
-    }
-    if (!gigLoading && !selectedGig) {
-      fetchGig(gigParam);
-    }
-  }, [gigParam]);
 
   async function loadProfileData() {
     setLoading(true);
@@ -81,15 +69,6 @@ export default function Profile({ currentUserId }) {
   async function handleLogout() {
     setLoggingOut(true);
     await logout();
-  }
-
-  async function fetchGig(gigId) {
-    if (!gigId || gigLoading) return;
-    setGigLoading(true);
-    const { gig } = await getGigById(gigId);
-    if (gig) setSelectedGig(gig);
-    else closeGig();
-    setGigLoading(false);
   }
 
   if (loading) {
@@ -165,34 +144,52 @@ export default function Profile({ currentUserId }) {
       time: new Date(g.updated_at).getTime(),
       gigId: g.id,
     })),
-    ...activity.receivedReviews.map((r) => ({
-      icon: <Star size={15} />,
-      t: `${r.rating}-star review received`,
-      s: `From ${r.reviewer?.first_name || "User"} — "${r.text?.slice(0, 30)}${r.text?.length > 30 ? "…" : ""}"`,
-      d: r.rating === 5 ? "+5 pts" : r.rating === 4 ? "+2 pts" : "",
-      pos: r.rating >= 4,
-      time: new Date(r.created_at).getTime(),
-      gigId: null,
-    })),
+    ...activity.receivedReviews.map((r) => {
+      const rounded = Math.round(r.rating);
+      const isZero = rounded === 0;
+      return {
+        icon: <Star size={15} />,
+        t: `${r.rating}-star review received`,
+        s: `From ${r.reviewer?.first_name || "User"} — "${r.text?.slice(0, 30)}${r.text?.length > 30 ? "…" : ""}"`,
+        d: isZero ? "-10 pts" : `+${rounded} pts`,
+        pos: !isZero,
+        time: new Date(r.created_at).getTime(),
+        gigId: null,
+        reviewerId: r.reviewer_id || null,
+      };
+    }),
     ...activity.postedGigs.map((g) => {
       const dl = parseDeadline(g);
-      const timeEnded = dl && dl < Date.now();
-      let statusLabel = g.status === "open" ? "open" : g.status;
-      if (timeEnded && g.status === "open") statusLabel = "Time ended";
+      const isExpired = dl && dl < Date.now();
       const takerName = g.taker ? `${g.taker.first_name || ""} ${g.taker.last_name || ""}`.trim() : null;
-      let subtitle = `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""}`;
-      if (takerName && (g.status === "active" || g.status === "completed")) {
-        subtitle += ` · ${g.status === "active" ? "Taken by" : "Done by"} ${takerName}`;
+
+      let statusLabel, subtitle;
+      const titleSnip = `${g.title?.slice(0, 40)}${g.title?.length > 40 ? "…" : ""}`;
+
+      if (g.status === "completed" && takerName) {
+        statusLabel = "Done";
+        subtitle = `${titleSnip} · Done by ${takerName}`;
+      } else if (g.status === "active" && takerName) {
+        statusLabel = isExpired ? "Time ended" : "Active";
+        subtitle = `${titleSnip} · Taken by ${takerName}`;
+      } else if (g.status === "active" && isExpired) {
+        statusLabel = "Time ended";
+        subtitle = `${titleSnip} · Time ended`;
+      } else if (g.status === "open" && isExpired) {
+        statusLabel = "Expired";
+        subtitle = `${titleSnip} · Expired — no takers`;
       } else {
-        subtitle += ` · ${statusLabel}`;
+        statusLabel = g.status === "open" ? "Open" : g.status;
+        subtitle = `${titleSnip} · ${statusLabel}`;
       }
+
       return {
-        icon: timeEnded ? <Timer size={15} /> : <Package size={15} />,
+        icon: isExpired && g.status !== "completed" ? <Timer size={15} /> : <Package size={15} />,
         t: `${g.category?.label || "Gig"} posted`,
         s: subtitle,
         d: statusLabel,
-        pos: false,
-        expired: timeEnded,
+        pos: g.status === "completed",
+        expired: isExpired && g.status !== "completed",
         time: new Date(g.created_at).getTime(),
         gigId: g.id,
       };
@@ -232,40 +229,11 @@ export default function Profile({ currentUserId }) {
         <div className="scroll" style={{ paddingBottom: 80 }}>
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={fullName}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                    border: "2px solid var(--bd)",
-                    flexShrink: 0,
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: profile.avatar_color || "#6366f1",
-                    color: "white",
-                    fontSize: 20,
-                    fontWeight: 700,
-                    fontFamily: "var(--mono)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid var(--bd)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {initials}
-                </div>
-              )}
+              <UserAvatar
+                user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile.avatar_color, first_name: profile.first_name, last_name: profile.last_name }}
+                size="xl"
+                style={{ border: "2px solid var(--bd)" }}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.03em", marginBottom: 2 }}>{fullName}</div>
                 <div style={{ fontSize: 11, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 6 }}>
@@ -346,7 +314,7 @@ export default function Profile({ currentUserId }) {
               <div className="rc-footer">
                 {lvl.next ? (
                   <>
-                    +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +9 marking done · +10 as taker · +1 per post
+                    +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +8 marking done · +10 as taker · +2 per post
                   </>
                 ) : (
                   "Max level reached"
@@ -382,9 +350,12 @@ export default function Profile({ currentUserId }) {
                     gap: 10,
                     padding: "11px 0",
                     borderBottom: i < activityItems.length - 1 ? "1px solid var(--bd)" : "none",
-                    cursor: a.gigId ? "pointer" : "default",
+                    cursor: (a.gigId || a.reviewerId) ? "pointer" : "default",
                   }}
-                  onClick={() => a.gigId && openGig(a.gigId)}
+                  onClick={() => {
+                    if (a.gigId) setSelectedGigId(a.gigId);
+                    else if (a.reviewerId) navigate(`/users/${a.reviewerId}`);
+                  }}
                 >
                   <div
                     style={{
@@ -450,17 +421,10 @@ export default function Profile({ currentUserId }) {
                     }}
                   >
                     <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
-                    {p.avatarUrl ? (
-                      <img
-                        src={p.avatarUrl}
-                        alt=""
-                        style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                      />
-                    ) : (
-                      <div className="lb-av" style={{ background: p.color }}>
-                        {p.initials}
-                      </div>
-                    )}
+                    <UserAvatar
+                      user={{ resolvedAvatarUrl: p.avatarUrl, avatar_color: p.color, first_name: p.initials?.[0], last_name: p.initials?.[1] }}
+                      size={32}
+                    />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
                         {p.name}
@@ -511,17 +475,10 @@ export default function Profile({ currentUserId }) {
                       }}
                     >
                       <span className="lb-rank">{rank}</span>
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt=""
-                          style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                        />
-                      ) : (
-                        <div className="lb-av" style={{ background: profile.avatar_color || "#6366f1" }}>
-                          {initials}
-                        </div>
-                      )}
+                      <UserAvatar
+                        user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile.avatar_color, first_name: profile.first_name, last_name: profile.last_name }}
+                        size={32}
+                      />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
                           {fullName}
@@ -569,34 +526,13 @@ export default function Profile({ currentUserId }) {
           repScore={repScore}
         />
       )}
-      {selectedGig && (
-        <GigDetailModal
-          gig={selectedGig}
-          tick={tick}
-          requested={false}
-          onRequest={() => {}}
-          onClose={closeGig}
-          onViewProfile={(userId) => navigate(`/users/${userId}`)}
+      {selectedGigId && (
+        <AlertDetailModal
+          gigId={selectedGigId}
           currentUserId={currentUserId}
-          onGigDeleted={() => loadProfileData()}
+          onClose={() => { setSelectedGigId(null); loadProfileData(); }}
+          onStatusChange={loadProfileData}
         />
-      )}
-      {gigLoading && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 30,
-            maxWidth: 393,
-            margin: "0 auto",
-            background: "rgba(255,255,255,.8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Loader size={20} className="spin" color="var(--fg3)" />
-        </div>
       )}
     </>
   );

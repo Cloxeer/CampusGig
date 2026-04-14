@@ -45,6 +45,20 @@ export async function getProfileById(userId) {
   return { profile: mergeUserPrivateContact(data), error };
 }
 
+export async function getProfilesByIds(userIds) {
+  if (!userIds.length) return {};
+  const { data } = await supabase
+    .from("users")
+    .select("id, first_name, last_name, avatar_color, avatar_url")
+    .in("id", userIds);
+
+  const map = {};
+  for (const u of data || []) {
+    map[u.id] = u;
+  }
+  return map;
+}
+
 // ──────────────────────────────────────────────────
 // Create profile (used during onboarding)
 // ──────────────────────────────────────────────────
@@ -211,6 +225,20 @@ export async function getTotalUsers() {
   return { total: count || 0, error };
 }
 
+export async function getPublicStats() {
+  const [totalRes, completedRes, usersRes] = await Promise.all([
+    supabase.from("gigs").select("id", { count: "exact", head: true }),
+    supabase.from("gigs").select("id", { count: "exact", head: true }).eq("status", "completed"),
+    supabase.from("users").select("id", { count: "exact", head: true }),
+  ]);
+
+  return {
+    totalPostings: totalRes.count || 0,
+    completed: completedRes.count || 0,
+    accounts: usersRes.count || 0,
+  };
+}
+
 export async function getLeaderboard(limit = 10) {
   const {
     data: { user },
@@ -253,13 +281,13 @@ export async function getMyActivity() {
       .limit(10),
     supabase
       .from("reviews")
-      .select("id, rating, text, created_at, reviewer:reviewer_id(first_name, last_name)")
+      .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name)")
       .eq("reviewee_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("gigs")
-      .select("id, title, description, status, created_at, estimated_time, expires_at, category:category_id(label), taker:taker_id(first_name, last_name)")
+      .select("id, title, description, price, status, created_at, estimated_time, expires_at, category:category_id(label), taker:taker_id(first_name, last_name)")
       .eq("poster_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10),

@@ -4,14 +4,21 @@ import { supabase } from "./supabase";
 // Helpers
 // ──────────────────────────────────────────────────
 
-/** Returns true if the email ends with .edu (case-insensitive). */
+const ALLOWED_DOMAINS = ["nmsu.edu"];
+
+/** Returns true if the email belongs to an allowed school domain. */
 export function isEduEmail(email) {
-  return /\.edu$/i.test(email?.trim());
+  const trimmed = email?.trim().toLowerCase();
+  if (!trimmed) return false;
+  return ALLOWED_DOMAINS.some((d) => trimmed.endsWith(`@${d}`));
 }
 
 // ──────────────────────────────────────────────────
 // Magic Link (passwordless)
 // ──────────────────────────────────────────────────
+
+let lastMagicLinkAt = 0;
+const MAGIC_LINK_COOLDOWN_MS = 10_000;
 
 /**
  * Sends a magic link to the supplied .edu email.
@@ -27,11 +34,22 @@ export async function sendMagicLink(email, options = {}) {
   if (!isEduEmail(trimmedEmail)) {
     return {
       data: null,
-      error: { message: "Only .edu email addresses are allowed." },
+      error: { message: "Only @nmsu.edu email addresses are allowed." },
     };
   }
 
-  const otpOptions = {};
+  const now = Date.now();
+  if (now - lastMagicLinkAt < MAGIC_LINK_COOLDOWN_MS) {
+    const wait = Math.ceil((MAGIC_LINK_COOLDOWN_MS - (now - lastMagicLinkAt)) / 1000);
+    return {
+      data: null,
+      error: { message: `Please wait ${wait}s before requesting another link.` },
+    };
+  }
+
+  const otpOptions = {
+    emailRedirectTo: `${window.location.origin}/`,
+  };
   if (typeof options.shouldCreateUser === "boolean") {
     otpOptions.shouldCreateUser = options.shouldCreateUser;
   }
@@ -42,9 +60,11 @@ export async function sendMagicLink(email, options = {}) {
     };
   }
 
+  lastMagicLinkAt = Date.now();
+
   const { data, error } = await supabase.auth.signInWithOtp({
     email: trimmedEmail,
-    options: Object.keys(otpOptions).length > 0 ? otpOptions : undefined,
+    options: otpOptions,
   });
 
   return { data, error };

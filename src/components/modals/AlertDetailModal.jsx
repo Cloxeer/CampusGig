@@ -4,9 +4,10 @@ import {
   Loader, MapPin, Timer, FileText, CheckCircle, XCircle, Clock,
   Phone, AtSign, DollarSign, Smartphone, Lock,
 } from "lucide-react";
-import { getGigDetail, acceptGigRequest, rejectGigRequest, completeGig, getAvatarUrl } from "../../lib/profile";
+import { getGigDetail, acceptGigRequest, rejectGigRequest, completeGig } from "../../lib/profile";
 import { getLevel, countdown, useTimer } from "../../utils/helpers";
 import LevelBadge from "../LevelBadge";
+import UserAvatar from "../UserAvatar";
 
 const STATUS_CONFIG = {
   requested: { label: "Pending Approval", color: "var(--amber)", bg: "var(--amber-bg)", bd: "var(--amber-bd)", dot: "#f59e0b" },
@@ -38,8 +39,6 @@ function StatusBadge({ status, expired }) {
 function UserCard({ user, label, onClick }) {
   if (!user) return null;
   const name = `${user.first_name || ""} ${user.last_name || ""}`.trim();
-  const initials = `${user.first_name?.charAt(0) || ""}${user.last_name?.charAt(0) || ""}`.toUpperCase();
-  const avatarUrl = user.avatar_url ? getAvatarUrl(user.avatar_url) : null;
   const lvl = getLevel(user.rep_score || 0);
 
   return (
@@ -51,19 +50,9 @@ function UserCard({ user, label, onClick }) {
       }}
       onClick={onClick}
     >
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" style={{
-          width: 44, height: 44, borderRadius: "50%", objectFit: "cover",
-          border: "2px solid var(--bd)", margin: "0 auto 6px",
-        }} />
-      ) : (
-        <div style={{
-          width: 44, height: 44, borderRadius: "50%", background: user.avatar_color || "#6366f1",
-          color: "white", fontSize: 15, fontWeight: 700, display: "flex",
-          alignItems: "center", justifyContent: "center",
-          border: "2px solid var(--bd)", margin: "0 auto 6px",
-        }}>{initials}</div>
-      )}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
+        <UserAvatar user={user} size="lg" style={{ border: "2px solid var(--bd)" }} />
+      </div>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{name}</div>
       <div style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 4 }}>{label}</div>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 2 }}>
@@ -76,7 +65,6 @@ function UserCard({ user, label, onClick }) {
 
 function ContactSection({ user, label }) {
   if (!user) return null;
-  const name = `${user.first_name || ""} ${user.last_name?.charAt(0) || ""}.`.trim();
   const contacts = [
     user.snapchat && { icon: <Smartphone size={13} />, label: "Snapchat", val: user.snapchat },
     user.phone && { icon: <Phone size={13} />, label: "Phone", val: user.phone },
@@ -114,7 +102,7 @@ function ContactSection({ user, label }) {
   );
 }
 
-export default function AlertDetailModal({ notification, onClose, onStatusChange }) {
+export default function AlertDetailModal({ notification, gigId: gigIdProp, currentUserId, onClose, onStatusChange }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [gig, setGig] = useState(null);
@@ -124,19 +112,23 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
   const tick = useTimer();
 
   const meta = notification?.metadata || {};
-  const role = meta.role;
+  const resolvedGigId = gigIdProp || meta.gig_id;
 
   useEffect(() => {
-    if (meta.gig_id) loadDetail();
-  }, []);
+    if (resolvedGigId) loadDetail();
+  }, [resolvedGigId]);
 
   async function loadDetail() {
     setLoading(true);
-    const { gig: g, requests: r } = await getGigDetail(meta.gig_id);
+    const { gig: g, requests: r } = await getGigDetail(resolvedGigId);
     setGig(g);
     setRequests(r || []);
     setLoading(false);
   }
+
+  const role = meta.role || (gig && currentUserId
+    ? (gig.poster?.id === currentUserId ? "poster" : "requester")
+    : null);
 
   async function handleAccept() {
     const req = requests.find((r) => r.status === "pending") || requests[0];
@@ -234,6 +226,9 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
 
   const cd = gig.expires_at ? countdown(new Date(gig.expires_at).getTime()) : null;
 
+  let effectiveStatus = gig.status;
+  if (hasPendingRequest && gig.status === "open") effectiveStatus = "requested";
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 30, maxWidth: 393, margin: "0 auto", background: "var(--bg)" }}>
       <div className="page fadein">
@@ -251,7 +246,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
                 background: "var(--bg3)", border: "1px solid var(--bd)", borderRadius: 4,
                 padding: "2px 8px", color: "var(--fg3)",
               }}>{gig.category?.label || "Gig"}</span>
-              <StatusBadge status={hasPendingRequest && gig.status === "open" ? "requested" : gig.status} expired={expired} />
+              <StatusBadge status={effectiveStatus} expired={expired} />
             </div>
             <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-.02em", color: "var(--fg)", lineHeight: 1.4, marginBottom: 6 }}>
               {gig.title}
@@ -271,7 +266,7 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
                   {actionLoading ? "Accepting…" : "Accept"}
                 </button>
               )}
-              {isActive && (
+              {isActive && !expired && (
                 <span style={{
                   fontSize: 12, fontWeight: 600, fontFamily: "var(--mono)",
                   color: "var(--green-d)", display: "flex", alignItems: "center", gap: 4,
@@ -359,6 +354,15 @@ export default function AlertDetailModal({ notification, onClose, onStatusChange
                 />
               )}
             </div>
+            {!requesterUser && isPending && !hasPendingRequest && (
+              <div style={{
+                marginTop: 8, padding: "10px 12px", borderRadius: "var(--r)",
+                background: "var(--bg3)", border: "1px solid var(--bd)",
+                fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)", textAlign: "center",
+              }}>
+                No one has requested this gig yet.
+              </div>
+            )}
           </div>
 
           {showContactInfo && (

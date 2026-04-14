@@ -10,7 +10,7 @@ export default function Logo({ size = 15 }) {
         color: "var(--fg)",
       }}
     >
-      Campus<span style={{ color: "var(--green)" }}>Gig</span>
+      GetCampus<span style={{ color: "var(--green)" }}>Gig</span>.com
     </span>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { REP_LEVELS } from "../data/mockData";
+import { REP_LEVELS } from "../data/repLevels";
 
 /**
  * Returns the Rep level info for a given score.

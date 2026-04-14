@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Award, Check } from "lucide-react";
-import { REP_LEVELS } from "../../data/mockData";
+import { REP_LEVELS } from "../../data/repLevels";
 import { getLevel } from "../../utils/helpers";
 import { getMyProfile } from "../../lib/profile";
 import LevelBadge from "../LevelBadge";
@@ -119,12 +119,13 @@ export default function RepDetailModal({ onClose, repScore: repScoreProp }) {
 
               <div style={{ fontSize: 13, fontWeight: 600, margin: "16px 0 10px" }}>How to earn Rep</div>
               {[
-                { t: "Mark your gig done (poster)", d: "+9 pts" },
-                { t: "Complete a gig you took (taker)", d: "+10 pts" },
-                { t: "Receive a 5-star rating", d: "+5 pts" },
-                { t: "Receive a 4-star rating", d: "+2 pts" },
-                { t: "Post a gig (encourages activity)", d: "+1 pt" },
-              ].map((r, i) => (
+                { t: "Complete a gig you took (taker)", d: "+10 pts", positive: true },
+                { t: "Mark your gig done (poster)", d: "+8 pts", positive: true },
+                { t: "Receive a 5-star rating", d: "+5 pts", positive: true },
+                { t: "Post a gig (encourages activity)", d: "+2 pts", positive: true },
+                { t: "Receive a 1-star rating", d: "+1 pt", positive: true },
+                { t: "Receive a 0-star rating", d: "-10 pts", positive: false },
+              ].map((r, i, arr) => (
                 <div
                   key={i}
                   style={{
@@ -132,11 +133,11 @@ export default function RepDetailModal({ onClose, repScore: repScoreProp }) {
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "9px 0",
-                    borderBottom: i < 4 ? "1px solid var(--bd)" : "none",
+                    borderBottom: i < arr.length - 1 ? "1px solid var(--bd)" : "none",
                   }}
                 >
                   <span style={{ fontSize: 13, color: "var(--fg)" }}>{r.t}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--green-d)", fontFamily: "var(--mono)" }}>{r.d}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: r.positive ? "var(--green-d)" : "#dc2626", fontFamily: "var(--mono)" }}>{r.d}</span>
                 </div>
               ))}
             </>

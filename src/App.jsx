@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
@@ -30,33 +30,33 @@ export default function App() {
   const [hasProfile, setHasProfile] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const profileCheckRef = useRef(false);
+
   const refreshUnread = useCallback(async () => {
     const { count } = await getUnreadNotificationCount();
     setUnreadCount(count);
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      if (s) {
-        setCurrentUserId(s.user.id);
-        checkProfile(s);
-      } else {
-        setAuthLoading(false);
-      }
-    });
-
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      if (s) {
-        setCurrentUserId(s.user.id);
-        checkProfile(s);
-      } else {
+    } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN") {
+        setSession(s);
+        if (s) {
+          setCurrentUserId(s.user.id);
+          checkProfile();
+        } else {
+          setAuthLoading(false);
+        }
+      } else if (event === "SIGNED_OUT") {
+        setSession(null);
         setCurrentUserId(null);
         setUnreadCount(0);
         setHasProfile(false);
+        profileCheckRef.current = false;
+      } else if (event === "TOKEN_REFRESHED") {
+        setSession(s);
       }
     });
 
@@ -82,14 +82,23 @@ export default function App() {
     };
   }, [currentUserId, refreshUnread]);
 
-  async function checkProfile(s) {
-    if (!s) {
+  async function checkProfile() {
+    if (profileCheckRef.current) return;
+    profileCheckRef.current = true;
+
+    try {
+      const { profile, error } = await getMyProfile();
+      if (error && !profile) {
+        setHasProfile(false);
+      } else {
+        setHasProfile(!!profile);
+      }
+    } catch {
+      setHasProfile(false);
+    } finally {
       setAuthLoading(false);
-      return;
+      profileCheckRef.current = false;
     }
-    const { profile } = await getMyProfile();
-    setHasProfile(!!profile);
-    setAuthLoading(false);
   }
 
   if (authLoading) {
@@ -134,7 +143,7 @@ export default function App() {
           <Route path="/" element={<Home currentUserId={currentUserId} />} />
           <Route path="/explore" element={<Explore currentUserId={currentUserId} />} />
           <Route path="/post" element={<PostGig />} />
-          <Route path="/alerts" element={<Alerts onNotificationsRead={refreshUnread} />} />
+          <Route path="/alerts" element={<Alerts currentUserId={currentUserId} onNotificationsRead={refreshUnread} />} />
           <Route path="/profile" element={<Profile currentUserId={currentUserId} />} />
         </Route>
         <Route path="/profile/edit" element={<EditProfile />} />

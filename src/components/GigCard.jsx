@@ -1,6 +1,7 @@
 import { MapPin, Clock, Timer } from "lucide-react";
 import LevelBadge from "./LevelBadge";
 import Stars from "./Stars";
+import UserAvatar from "./UserAvatar";
 import { elapsed, countdown } from "../utils/helpers";
 
 export default function GigCard({ gig, onClick, tick }) {
@@ -65,17 +66,16 @@ export default function GigCard({ gig, onClick, tick }) {
           borderTop: "1px solid var(--bd)",
         }}
       >
-        {gig.avatarUrl ? (
-          <img
-            src={gig.avatarUrl}
-            alt=""
-            style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 1 }}
-          />
-        ) : (
-          <div className="pav" style={{ background: gig.color, marginTop: 1 }}>
-            {gig.initials}
-          </div>
-        )}
+        <UserAvatar
+          user={{
+            resolvedAvatarUrl: gig.avatarUrl,
+            avatar_color: gig.color,
+            first_name: gig.initials?.[0],
+            last_name: gig.initials?.[1],
+          }}
+          size="xs"
+          style={{ marginTop: 1 }}
+        />
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 12, color: "var(--fg3)" }}>
             {gig.poster}
