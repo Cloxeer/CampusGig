@@ -1,26 +1,13 @@
-# GetCampusGig
+<!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
-  <table align="center" bgcolor="#FFFFFF" cellpadding="0" cellspacing="0" style="border: 1px solid #FFFFFF; border-radius: 12px; background-color: #FFFFFF;">
-    <tr>
-      <td align="center" style="background-color: #FFFFFF; padding: 8px; border-radius: 12px;">
-        <a href="https://www.getcampusgig.com">
-          <img
-            src="https://www.getcampusgig.com/logo.png"
-            alt="GetCampusGig"
-            width="108"
-            height="108"
-            style="display: block; border: 0; outline: none;"
-          />
-        </a>
-      </td>
-    </tr>
-  </table>
+  <img src="docs/readmephotos/banner.png" alt="GetCampusGig Banner" width="100%" />
 </p>
 
-<p align="center">
-  <strong>Small gigs. Big campus energy.</strong><br />
-  Post a task. Pick one up. Earn rep — built for <strong>NMSU</strong> students.
-</p>
+# GetCampusGig
+
+**Small gigs. Big campus energy.**
+
+Post a task. Pick one up. Earn rep — built for **NMSU** students.
 
 ---
 
@@ -28,7 +15,7 @@ Hey — I’m an NMSU student who helped build this. We took **2nd place** at a 
 
 **GetCampusGig** is that idea, but clearer: you post a gig or pick one up, finish it, leave a review, and **Rep** actually means something here because sign-in is **@nmsu.edu** — classmates, not random internet.
 
-**What you can do**
+## What you can do
 
 - Browse and post gigs around campus.
 - Request → get accepted → get it done → review each other.
