@@ -1,5 +1,7 @@
 # GetCampusGig Orientation
 
+**Public elevator pitch + logo:** see the repo [README](../README.md) on GitHub (friendly NMSU-first intro).
+
 ## Answers
 
 - What is GetCampusGig and its fundamental stack?
