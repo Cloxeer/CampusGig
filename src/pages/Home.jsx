@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Search, Award } from "lucide-react";
-import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig, requestGig } from "../lib/profile";
+import { useQuery } from "@tanstack/react-query";
+import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig, requestGig, getGigById } from "../lib/profile";
+import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../lib/queryClient";
 import { getLevel, useTimer } from "../utils/helpers";
 import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
@@ -25,7 +27,7 @@ function HomeSkeleton() {
           <div className="skel skel-circle" style={{ width: 30, height: 30 }} />
         </div>
       </div>
-      <div className="scroll" style={{ paddingBottom: 80 }}>
+      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
         <div style={{ margin: "14px 16px 0" }}>
           <div className="rep-card" style={{ padding: 16 }}>
             <div className="skel-rep" style={{ width: 140, height: 10, marginBottom: 10 }} />
@@ -46,7 +48,7 @@ function HomeSkeleton() {
             <div key={t} className="skel" style={{ width: 52, height: 28, borderRadius: 6 }} />
           ))}
         </div>
-        <div style={{ padding: "18px 16px 0", display: "flex", flexDirection: "column", gap: 7 }}>
+        <div className="gig-grid" style={{ padding: "18px 16px 0" }}>
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="skel" style={{ width: "100%", height: 88, borderRadius: "var(--rlg)" }} />
           ))}
@@ -58,63 +60,62 @@ function HomeSkeleton() {
 
 export default function Home({ currentUserId }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [repOpen, openRep, closeRep] = useModalParam("rep");
   const [gigParam, openGig, closeGig] = useModalParam("gig");
 
   const [tab, setTab] = useState("Recent");
   const [requested, setRequested] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(null);
-  const [gigs, setGigs] = useState([]);
-  const [avatarUrl, setAvatarUrl] = useState(null);
   const tick = useTimer();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: profileData, isPending: profilePending } = useQuery({
+    queryKey: queryKeys.myProfile,
+    queryFn: getMyProfile,
+  });
+
+  const { data: gigsData, isPending: gigsPending } = useQuery({
+    queryKey: queryKeys.openGigs,
+    queryFn: getOpenGigs,
+    staleTime: 30_000,
+    refetchOnWindowFocus: "always",
+  });
+
+  const profile = profileData?.profile || null;
+  const avatarUrl = profile?.avatar_url ? getAvatarUrl(profile.avatar_url) : null;
+  const gigs = useMemo(() => (gigsData?.gigs || []).map(normalizeGig), [gigsData]);
+  /** Full-page skeleton only when we have never loaded the profile (no cache). Cached profile + loading gigs still shows the header/rep card. */
+  const showFullSkeleton = profilePending;
 
   useEffect(() => {
     setRequested(false);
   }, [gigParam]);
 
-  useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState !== "visible") return;
-      getOpenGigs().then(({ gigs: raw }) => {
-        setGigs((raw || []).map(normalizeGig));
-      });
-    }
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+  const listGig = useMemo(() => {
+    if (!gigParam) return undefined;
+    if (gigsPending) return undefined;
+    return gigs.find((g) => g.id === gigParam) ?? null;
+  }, [gigParam, gigsPending, gigs]);
+
+  const { data: modalGig, isPending: gigModalPending } = useQuery({
+    queryKey: queryKeys.gigById(gigParam),
+    queryFn: async () => {
+      const { gig } = await getGigById(gigParam);
+      return gig ?? null;
+    },
+    enabled: Boolean(gigParam),
+    staleTime: GIG_DETAIL_STALE_MS,
+    placeholderData: listGig != null ? listGig : undefined,
+  });
 
   useEffect(() => {
-    if (!loading && gigParam && !gigs.some((g) => g.id === gigParam)) {
-      closeGig();
-    }
-  }, [loading, gigParam, gigs, closeGig]);
-
-  async function loadData() {
-    setLoading(true);
-    const [profileRes, gigsRes] = await Promise.all([
-      getMyProfile(),
-      getOpenGigs(),
-    ]);
-
-    if (profileRes.profile) {
-      setProfile(profileRes.profile);
-      if (profileRes.profile.avatar_url) {
-        setAvatarUrl(getAvatarUrl(profileRes.profile.avatar_url));
-      }
-    }
-
-    setGigs((gigsRes.gigs || []).map(normalizeGig));
-    setLoading(false);
-  }
+    if (!gigParam) return;
+    if (gigsPending) return;
+    if (listGig !== null) return;
+    if (!gigModalPending && modalGig === null) closeGig();
+  }, [gigParam, gigsPending, listGig, gigModalPending, modalGig, closeGig]);
 
   const repScore = profile?.rep_score || 0;
   const lvl = getLevel(repScore);
-  const initials = `${profile?.first_name?.charAt(0) || ""}${profile?.last_name?.charAt(0) || ""}`.toUpperCase();
 
   const activeGigs = gigs.filter((g) => {
     if (!g.deadline) return true;
@@ -129,11 +130,7 @@ export default function Home({ currentUserId }) {
     return true;
   });
 
-  const selectedGig = gigParam && !loading
-    ? gigs.find((g) => g.id === gigParam) || null
-    : null;
-
-  if (loading) return <HomeSkeleton />;
+  if (showFullSkeleton) return <HomeSkeleton />;
 
   return (
     <div className="page fadein">
@@ -146,17 +143,16 @@ export default function Home({ currentUserId }) {
           <button className="btn bg-btn bico" onClick={() => navigate("/explore")}>
             <Search size={15} />
           </button>
-          <div onClick={() => navigate("/profile")} style={{ cursor: "pointer", position: "relative" }}>
+          <div onClick={() => navigate("/profile")} style={{ cursor: "pointer" }}>
             <UserAvatar
               user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile?.avatar_color, first_name: profile?.first_name, last_name: profile?.last_name }}
               size="sm"
             />
-            <div className="av-dot" />
           </div>
         </div>
       </div>
 
-      <div className="scroll" style={{ paddingBottom: 80 }}>
+      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
         <div style={{ margin: "14px 16px 0" }}>
           <div className="rep-card" style={{ cursor: "pointer" }} onClick={() => openRep()}>
             <div className="rc-ey">Rep Score · tap for details</div>
@@ -207,8 +203,14 @@ export default function Home({ currentUserId }) {
           </span>
         </div>
 
-        <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 7 }}>
-          {filteredGigs.length === 0 ? (
+        <div className="gig-grid" style={{ padding: "0 16px" }}>
+          {gigsPending ? (
+            <>
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="skel" style={{ width: "100%", height: 88, borderRadius: "var(--rlg)" }} />
+              ))}
+            </>
+          ) : filteredGigs.length === 0 ? (
             <div style={{ padding: "32px 0", textAlign: "center", color: "var(--fg4)", fontSize: 13, fontFamily: "var(--mono)" }}>
               No gigs yet — be the first to post one!
             </div>
@@ -226,27 +228,34 @@ export default function Home({ currentUserId }) {
         <div style={{ height: 16 }} />
       </div>
 
-      {selectedGig && (
+      {gigParam && (modalGig != null || gigModalPending) && (
         <GigDetailModal
-          gig={selectedGig}
+          gig={modalGig}
+          loading={gigModalPending && modalGig == null}
           tick={tick}
           requested={requested}
           currentUserId={currentUserId}
           onRequest={async () => {
-            const result = await requestGig(selectedGig.id);
+            const result = await requestGig(gigParam);
             if (!result.error) {
               setRequested(true);
-              const { gigs: raw } = await getOpenGigs();
-              setGigs((raw || []).map(normalizeGig));
+              queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
+              queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
               return { error: null };
             }
             return result;
           }}
           onClose={closeGig}
-          onViewProfile={(userId) => navigate(`/users/${userId}`)}
-          onGigDeleted={async () => {
-            const { gigs: raw } = await getOpenGigs();
-            setGigs((raw || []).map(normalizeGig));
+          onViewProfile={(userId) =>
+            navigate(`/users/${userId}`, {
+              state: {
+                returnTo: `${location.pathname}?gig=${encodeURIComponent(gigParam)}`,
+              },
+            })
+          }
+          onGigDeleted={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
+            queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
           }}
         />
       )}

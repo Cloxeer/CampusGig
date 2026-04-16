@@ -1,77 +1,124 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { Lock, AtSign, Phone, Loader, Camera } from "lucide-react";
+import { useState, useLayoutEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Loader, Camera } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { getMyProfile, updateMyProfile, uploadAvatar, getAvatarUrl } from "../lib/profile";
+import { queryClient, queryKeys } from "../lib/queryClient";
+import ContactFields, { normalizeContactFavoriteKeys } from "../components/ContactFields";
+import { nanpDigitsFromInput, phoneFromStored } from "../utils/phoneNanp";
 
-function nanpDigitsFromInput(raw) {
-  const d = String(raw).replace(/\D/g, "");
-  if (d.length === 0) return "";
-  if (d[0] === "1") return d.slice(0, 11);
-  return d.slice(0, 10);
+const EMPTY = {
+  phone: "",
+  venmo: "",
+  cashapp: "",
+  paypal: "",
+  snapchat: "",
+  instagram: "",
+  discord: "",
+  zelle: "",
+  apple_pay: "",
+  google_pay: "",
+  contact_favorite_keys: [],
+};
+
+function trimOrNull(s) {
+  const t = s != null ? String(s).trim() : "";
+  return t === "" ? null : t;
 }
 
-function formatNanpDisplay(digits) {
-  if (!digits) return "";
-  const rest = digits[0] === "1" ? digits.slice(1) : digits;
-  if (rest.length === 0) return "+1";
-  let s = "+1 (" + rest.slice(0, 3);
-  if (rest.length <= 3) return s;
-  s += ") " + rest.slice(3, 6);
-  if (rest.length <= 6) return s;
-  return s + "-" + rest.slice(6, 10);
+const EDIT_PROFILE_RETURN_PATHS = new Set(["/profile", "/settings"]);
+
+function resolveEditProfileReturnTo(state) {
+  const r = state?.returnTo;
+  if (typeof r === "string" && EDIT_PROFILE_RETURN_PATHS.has(r)) return r;
+  return "/profile";
 }
 
-function phoneFromStored(stored) {
-  const d = String(stored ?? "").replace(/\D/g, "");
-  if (d.length === 11 && d[0] === "1") return formatNanpDisplay(d);
-  if (d.length === 10) return formatNanpDisplay("1" + d);
-  if (d[0] === "1") return formatNanpDisplay(d.slice(0, 11));
-  return formatNanpDisplay(d.slice(0, 10));
+function profileRowToForm(p) {
+  return {
+    ...EMPTY,
+    venmo: p.venmo || "",
+    cashapp: p.cashapp || "",
+    paypal: p.paypal || "",
+    snapchat: p.snapchat || "",
+    instagram: p.instagram || "",
+    discord: p.discord || "",
+    zelle: p.zelle || "",
+    apple_pay: p.apple_pay || "",
+    google_pay: p.google_pay || "",
+    phone: phoneFromStored(p.phone),
+    contact_favorite_keys: normalizeContactFavoriteKeys(p.contact_favorite_keys),
+  };
 }
 
 export default function EditProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = resolveEditProfileReturnTo(location.state);
   const fileInputRef = useRef(null);
-  const [profile, setProfile] = useState({
-    venmo: "",
-    cashapp: "",
-    paypal: "",
-    snapchat: "",
-    phone: "",
+  const hydratedRef = useRef(!!queryClient.getQueryData(queryKeys.myProfile)?.profile);
+
+  const [profile, setProfile] = useState(() => {
+    const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
+    return p ? profileRowToForm(p) : EMPTY;
   });
-  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [emailDisplay, setEmailDisplay] = useState(() => {
+    const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
+    return p?.email || "";
+  });
+  const [avatarUrl, setAvatarUrl] = useState(() => {
+    const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
+    if (!p?.avatar_url) return null;
+    return getAvatarUrl(p.avatar_url) || null;
+  });
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarFile, setAvatarFile] = useState(null);
-  const [initials, setInitials] = useState("");
-  const [avatarColor, setAvatarColor] = useState("#6366f1");
+  const [initials, setInitials] = useState(() => {
+    const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
+    return `${p?.first_name?.charAt(0) || ""}${p?.last_name?.charAt(0) || ""}`.toUpperCase();
+  });
+  const [avatarColor, setAvatarColor] = useState(
+    () => queryClient.getQueryData(queryKeys.myProfile)?.profile?.avatar_color || "#6366f1"
+  );
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [formReady, setFormReady] = useState(() => !!queryClient.getQueryData(queryKeys.myProfile)?.profile);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  const { data: profileData, isPending: queryPending } = useQuery({
+    queryKey: queryKeys.myProfile,
+    queryFn: getMyProfile,
+  });
 
-  async function loadProfile() {
-    const { profile: p } = await getMyProfile();
-    if (p) {
-      setProfile({
-        venmo: p.venmo || "",
-        cashapp: p.cashapp || "",
-        paypal: p.paypal || "",
-        snapchat: p.snapchat || "",
-        phone: phoneFromStored(p.phone),
-      });
-      setInitials(
-        `${p.first_name?.charAt(0) || ""}${p.last_name?.charAt(0) || ""}`.toUpperCase()
-      );
-      setAvatarColor(p.avatar_color || "#6366f1");
-      if (p.avatar_url) {
-        const url = getAvatarUrl(p.avatar_url);
-        if (url) setAvatarUrl(url);
-      }
+  useLayoutEffect(() => {
+    const p = profileData?.profile;
+    if (!p || hydratedRef.current) return;
+    hydratedRef.current = true;
+    setProfile(profileRowToForm(p));
+    setEmailDisplay(p.email || "");
+    setInitials(`${p.first_name?.charAt(0) || ""}${p.last_name?.charAt(0) || ""}`.toUpperCase());
+    setAvatarColor(p.avatar_color || "#6366f1");
+    if (p.avatar_url) {
+      const url = getAvatarUrl(p.avatar_url);
+      setAvatarUrl(url || null);
+    } else {
+      setAvatarUrl(null);
     }
-    setLoading(false);
+    setFormReady(true);
+  }, [profileData]);
+
+  function onFieldChange(key, val) {
+    setProfile((p) => ({ ...p, [key]: val }));
+  }
+
+  function onFavoriteToggle(key) {
+    setProfile((p) => {
+      const arr = [...(p.contact_favorite_keys || [])];
+      const i = arr.indexOf(key);
+      if (i >= 0) {
+        return { ...p, contact_favorite_keys: arr.filter((k) => k !== key) };
+      }
+      return { ...p, contact_favorite_keys: [key, ...arr.filter((k) => k !== key)] };
+    });
   }
 
   function handlePhotoSelect(e) {
@@ -120,10 +167,16 @@ export default function EditProfile() {
 
       const { error: updateError } = await updateMyProfile({
         phone: profile.phone.trim(),
-        venmo: profile.venmo.trim() || null,
-        cashapp: profile.cashapp.trim() || null,
-        paypal: profile.paypal.trim() || null,
-        snapchat: profile.snapchat.trim() || null,
+        venmo: trimOrNull(profile.venmo),
+        cashapp: trimOrNull(profile.cashapp),
+        paypal: trimOrNull(profile.paypal),
+        snapchat: trimOrNull(profile.snapchat),
+        instagram: trimOrNull(profile.instagram),
+        discord: trimOrNull(profile.discord),
+        zelle: trimOrNull(profile.zelle),
+        apple_pay: trimOrNull(profile.apple_pay),
+        google_pay: trimOrNull(profile.google_pay),
+        contact_favorite_keys: normalizeContactFavoriteKeys(profile.contact_favorite_keys),
       });
 
       if (updateError) {
@@ -132,7 +185,8 @@ export default function EditProfile() {
         return;
       }
 
-      navigate("/profile");
+      queryClient.invalidateQueries({ queryKey: queryKeys.myProfile });
+      navigate(returnTo);
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -140,7 +194,7 @@ export default function EditProfile() {
     }
   };
 
-  if (loading) {
+  if (queryPending || !formReady) {
     return (
       <div className="page fadein" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <Loader size={20} className="spin" color="var(--fg3)" />
@@ -156,8 +210,8 @@ export default function EditProfile() {
         <button
           type="button"
           className="btn bg-btn bico"
-          onClick={() => navigate("/profile")}
-          aria-label="Back to profile"
+          onClick={() => navigate(returnTo)}
+          aria-label={returnTo === "/settings" ? "Back to settings" : "Back to profile"}
           style={{ marginBottom: 10 }}
         >
           <span style={{ fontSize: 15 }}>←</span>
@@ -166,16 +220,13 @@ export default function EditProfile() {
           Edit profile
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
-          Phone is required. Everything else is optional.
+          Phone is required. Popular payment methods first — everything else is optional.
         </div>
       </div>
 
       <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <div
-            style={{ position: "relative", cursor: "pointer" }}
-            onClick={() => fileInputRef.current?.click()}
-          >
+          <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileInputRef.current?.click()}>
             {displayUrl ? (
               <img
                 src={displayUrl}
@@ -227,116 +278,21 @@ export default function EditProfile() {
               <Camera size={13} />
             </div>
           </div>
-          <button
-            className="btn bg-btn bsm"
-            onClick={() => fileInputRef.current?.click()}
-          >
+          <button className="btn bg-btn bsm" onClick={() => fileInputRef.current?.click()}>
             {displayUrl ? "Change photo" : "Add photo"}
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={handlePhotoSelect}
-          />
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoSelect} />
         </div>
 
-        <div className="callout">
-          <div className="ci">
-            <Lock size={13} />
-          </div>
-          <span className="ct">
-            <strong>Payment info is private.</strong> Only shared with the other party once you both accept a gig.
-          </span>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Phone <span style={{ color: "#dc2626", fontSize: 11, fontWeight: 600 }}>required</span>
-          </label>
-          <div className="ig">
-            <div className="iad">
-              <Phone size={13} />
-            </div>
-            <input
-              className="ii"
-              placeholder="+1 (000) 000-0000"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel-national"
-              value={profile.phone}
-              onChange={(e) =>
-                setProfile({
-                  ...profile,
-                  phone: formatNanpDisplay(nanpDigitsFromInput(e.target.value)),
-                })
-              }
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Snapchat <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>@</div>
-            <input
-              className="ii"
-              placeholder="yoursnapchat"
-              value={profile.snapchat}
-              onChange={(e) => setProfile({ ...profile, snapchat: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Venmo <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>@</div>
-            <input
-              className="ii"
-              placeholder="yourvenmo"
-              value={profile.venmo}
-              onChange={(e) => setProfile({ ...profile, venmo: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Cash App <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>$</div>
-            <input
-              className="ii"
-              placeholder="yourcashtag"
-              value={profile.cashapp}
-              onChange={(e) => setProfile({ ...profile, cashapp: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            PayPal <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad">
-              <AtSign size={13} />
-            </div>
-            <input
-              className="ii"
-              placeholder="email or @handle"
-              value={profile.paypal}
-              onChange={(e) => setProfile({ ...profile, paypal: e.target.value })}
-            />
-          </div>
-        </div>
+        <ContactFields
+          profile={profile}
+          onFieldChange={onFieldChange}
+          emailDisplay={emailDisplay}
+          phoneMode="formatted"
+          phoneRequired
+          favoriteKeys={profile.contact_favorite_keys || []}
+          onFavoriteToggle={onFavoriteToggle}
+        />
 
         {error && (
           <div
@@ -362,7 +318,7 @@ export default function EditProfile() {
         >
           {saving ? <Loader size={16} className="spin" /> : "Save changes"}
         </button>
-        <button className="btn bg-btn bfull" onClick={() => navigate("/profile")} disabled={saving}>
+        <button className="btn bg-btn bfull" onClick={() => navigate(returnTo)} disabled={saving}>
           Cancel
         </button>
         <div style={{ height: 8 }} />

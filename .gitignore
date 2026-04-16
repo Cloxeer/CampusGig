@@ -1,7 +1,19 @@
 node_modules
 dist
+.vercel
+
+
+# Secrets — never commit
 .env
 .env.local
 .env.*.local
-.vercel
-.env*.local
+.env.development
+.env.production
+*.pem
+*.key
+
+# Keep the example file tracked
+!.env.example
+
+# If you copy MCP config into the repo, ignore the real one (use mcp.json.example)
+.cursor/mcp.json

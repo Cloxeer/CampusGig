@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Scale } from "lucide-react";
 
-const LAST_UPDATED = "April 13, 2026";
+const LAST_UPDATED = "April 14, 2026";
 
 function SummarizedPrivacy() {
   return (
@@ -26,11 +26,18 @@ function SummarizedPrivacy() {
       <Section title="What we collect">
         <P>Literally just what we need to make the app work:</P>
         <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
-          <LI>Your <strong>@nmsu.edu email</strong> — this is your login. It's how we verify you're actually an Aggie.</LI>
+          <LI>
+            Your <strong>@nmsu.edu email</strong> (Main Campus in Las Cruces only — exactly <strong>@nmsu.edu</strong>, not
+            extension domains like <strong>@dacc.nmsu.edu</strong> or <strong>@global.nmsu.edu</strong>) — this is your
+            login. It&apos;s how we verify you&apos;re an eligible Main Campus student.
+          </LI>
           <LI>Your <strong>name</strong> — first and last, so people know who they're working with.</LI>
           <LI>Your <strong>gig activity</strong> — what you post, what you accept, whether you completed it.</LI>
           <LI>Your <strong>reviews and reputation score</strong> — these are public on the platform anyway.</LI>
           <LI>Your <strong>profile info</strong> — bio, avatar color, major, etc. Whatever you choose to add.</LI>
+          <LI>
+            Optional <strong>transactional email</strong> to your @nmsu.edu — only if you enable email alerts in Settings (gig/review notices), never sold or used for ads.
+          </LI>
         </ul>
         <P>That's it. We don't track your location, we don't read your texts, we don't follow you around the internet.</P>
       </Section>
@@ -49,7 +56,9 @@ function SummarizedPrivacy() {
         <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
           <LI>We don't access or store your academic records. At all.</LI>
           <LI>We don't share your .edu email with third parties.</LI>
-          <LI>We only use your email for authentication and account-related communications.</LI>
+          <LI>
+            We use your email for sign-in and, if you keep email alerts on in Settings, for transactional messages about gigs and reviews — not marketing spam.
+          </LI>
         </ul>
         <P>We're not part of NMSU's systems and we don't have access to anything in your student portal. Your GPA is safe with us (mainly because we don't have it).</P>
       </Section>
@@ -59,7 +68,13 @@ function SummarizedPrivacy() {
       </Section>
 
       <Section title="Want your data deleted?">
-        <P>Say less. If you want us to delete your account and all associated data, just email us at <strong>support@getcampusgig.com</strong>. We'll wipe everything — your profile, gig history, reviews, all of it. Gone. We aim to process deletion requests within 30 days.</P>
+        <P>
+          You can start account deletion in <strong>Settings</strong>. During the grace period you can cancel:{" "}
+          <strong>this will sign you out</strong>; after you sign in again with your @nmsu.edu, a fresh sign-in clears the
+          scheduled deletion. You
+          can also email <strong>support@getcampusgig.com</strong> for help. After the grace period we remove your profile,
+          gig history, reviews, rep, and related data.
+        </P>
         <P>Heads up: once it's deleted, it's deleted. We can't get it back for you.</P>
       </Section>
 
@@ -89,7 +104,11 @@ function LegalPrivacy() {
       <LegalSection num="2" title="Information We Collect">
         <LP><strong>2.1 Information You Provide</strong></LP>
         <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
-          <LI><strong>Email Address:</strong> Your @nmsu.edu email address, used for account authentication via magic link.</LI>
+          <LI>
+            <strong>Email Address:</strong> Your Main Campus <strong>@nmsu.edu</strong> email address (domain exactly{" "}
+            <code>nmsu.edu</code> — not subdomains such as <code>dacc.nmsu.edu</code>, <code>alamogordo.nmsu.edu</code>,{" "}
+            <code>grants.nmsu.edu</code>, or <code>global.nmsu.edu</code>), used for account authentication via magic link.
+          </LI>
           <LI><strong>Name:</strong> First and last name, provided during account registration.</LI>
           <LI><strong>Profile Information:</strong> Optional details such as biography, major, graduation year, avatar preferences, and payment handle (e.g., Cash App, Venmo, or PayPal username).</LI>
         </ul>
@@ -115,6 +134,9 @@ function LegalPrivacy() {
           <LI>To display your public profile, reviews, and reputation to other Users.</LI>
           <LI>To populate the leaderboard with reputation rankings.</LI>
           <LI>To send in-app notifications regarding gig updates, reviews, and account activity.</LI>
+          <LI>
+            To send optional transactional email to your @nmsu.edu address when you enable email alerts in Settings (e.g., gig requests and reviews). You can turn this off anytime in Settings.
+          </LI>
           <LI>To monitor and improve Platform performance and reliability.</LI>
           <LI>To enforce our Terms of Service and protect Platform integrity.</LI>
         </ul>
@@ -138,7 +160,12 @@ function LegalPrivacy() {
       </LegalSection>
 
       <LegalSection num="6" title="FERPA Compliance">
-        <LP>We recognize that @nmsu.edu email addresses are associated with student enrollment status at New Mexico State University, and that student information may be subject to the Family Educational Rights and Privacy Act (FERPA).</LP>
+        <LP>
+          We recognize that @nmsu.edu email addresses used for Main Campus (Las Cruces) students are associated with
+          student status at New Mexico State University, and that student information may be subject to the Family
+          Educational Rights and Privacy Act (FERPA). We intentionally restrict authentication to the Main Campus @nmsu.edu
+          domain and do not accept separate NMSU extension-campus email domains.
+        </LP>
         <LP>GetCampusGig affirms the following:</LP>
         <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
           <LI>We do not access, collect, or store any educational records maintained by NMSU.</LI>

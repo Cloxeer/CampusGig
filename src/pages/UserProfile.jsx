@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Award, Loader, CheckCircle, Package, Timer, Star } from "lucide-react";
-import { getProfileById, getReviewsForUser, getAvatarUrl, getCompletedGigsBetweenUsers, getExistingReview, getUserActivity, getGigById, parseDeadline, getUserGigStats, getCampusRank, getTotalUsers } from "../lib/profile";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Award, CheckCircle, Package, Timer, Star, Settings } from "lucide-react";
+import {
+  getGigById, parseDeadline, getUserProfilePageData,
+} from "../lib/profile";
+import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../lib/queryClient";
 import { getLevel, useTimer } from "../utils/helpers";
 import { useModalParam } from "../hooks/useModalParam";
 import TopBar from "../components/TopBar";
@@ -9,114 +13,95 @@ import LevelBadge from "../components/LevelBadge";
 import Stars from "../components/Stars";
 import UserAvatar from "../components/UserAvatar";
 import ReviewSheetModal from "../components/modals/ReviewSheetModal";
+import DeleteReviewConfirmModal from "../components/modals/DeleteReviewConfirmModal";
 import GigDetailModal from "../components/modals/GigDetailModal";
+
+const USER_PROFILE_STALE_MS = 5 * 60 * 1000;
 
 export default function UserProfile({ currentUserId }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { userId } = useParams();
+  const selfRedirect = Boolean(currentUserId && userId && String(userId) === String(currentUserId));
   const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
   const [gigParam, openGig, closeGig] = useModalParam("gig");
 
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  const [canReview, setCanReview] = useState(false);
-  const [reviewGigId, setReviewGigId] = useState(null);
-  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
-  const [existingReview, setExistingReview] = useState(null);
+  const [reviewForm, setReviewForm] = useState(null);
+  /** Which review row has the settings dropdown open (same interaction model as report flag in ReviewSheetModal). */
+  const [settingsMenuReviewId, setSettingsMenuReviewId] = useState(null);
+  const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null);
+  const settingsMenuRef = useRef(null);
   const [upTab, setUpTab] = useState("reviews");
-  const [userActivity, setUserActivity] = useState({ postedGigs: [], completedGigs: [] });
-  const [gigStats, setGigStats] = useState({ completed: 0, posted: 0 });
-  const [rank, setRank] = useState(null);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [selectedGig, setSelectedGig] = useState(null);
-  const [gigLoading, setGigLoading] = useState(false);
   const tick = useTimer();
+
+  const { data: pageData, isPending: profilePending } = useQuery({
+    queryKey: queryKeys.userProfilePage(userId),
+    queryFn: () => getUserProfilePageData(userId),
+    enabled: Boolean(userId && !selfRedirect),
+    staleTime: USER_PROFILE_STALE_MS,
+  });
+
+  const { data: modalGig, isPending: gigModalPending } = useQuery({
+    queryKey: queryKeys.gigById(gigParam),
+    queryFn: async () => {
+      const { gig } = await getGigById(gigParam);
+      return gig ?? null;
+    },
+    enabled: Boolean(gigParam),
+    staleTime: GIG_DETAIL_STALE_MS,
+  });
 
   useEffect(() => {
     if (userId === currentUserId) {
-      navigate("/profile", { replace: true });
-      return;
+      navigate("/profile", { replace: true, state: location.state });
     }
-    loadData();
-  }, [userId]);
+  }, [userId, currentUserId, navigate, location.state]);
 
   useEffect(() => {
-    if (!gigParam) {
-      setSelectedGig(null);
-      return;
-    }
-    if (!gigLoading && !selectedGig) {
-      fetchGig(gigParam);
-    }
-  }, [gigParam]);
+    if (!gigParam) return;
+    if (!gigModalPending && modalGig === null) closeGig();
+  }, [gigParam, gigModalPending, modalGig, closeGig]);
 
-  async function loadData() {
-    setLoading(true);
-    setCanReview(false);
-    setAlreadyReviewed(false);
-    setReviewGigId(null);
-    setExistingReview(null);
-
-    const { profile: p } = await getProfileById(userId);
-    setProfile(p);
-
-    if (p) {
-      if (p.avatar_url) {
-        const url = getAvatarUrl(p.avatar_url);
-        if (url) setAvatarUrl(url);
-      }
-
-      const [reviewsRes, gigsRes, actRes, statsRes, rankRes, totalRes] = await Promise.all([
-        getReviewsForUser(userId),
-        getCompletedGigsBetweenUsers(userId),
-        getUserActivity(userId),
-        getUserGigStats(userId),
-        getCampusRank(p.rep_score || 0),
-        getTotalUsers(),
-      ]);
-
-      setReviews(reviewsRes.reviews);
-      setUserActivity(actRes);
-      setGigStats(statsRes);
-      setRank(rankRes.rank);
-      setTotalUsers(totalRes.total);
-
-      const hasCompletedGigs = gigsRes.gigs.length > 0;
-
-      if (hasCompletedGigs) {
-        setReviewGigId(gigsRes.gigs[0].id);
-      }
-
-      const firstGigId = gigsRes.gigs[0]?.id ?? null;
-      const existingRes = firstGigId ? await getExistingReview(userId, firstGigId) : { review: null };
-
-      if (existingRes.review) {
-        setAlreadyReviewed(true);
-        setExistingReview(existingRes.review);
-        setCanReview(true);
-      } else {
-        setCanReview(hasCompletedGigs);
+  useEffect(() => {
+    if (!settingsMenuReviewId) return;
+    function closeOnOutside(ev) {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(ev.target)) {
+        setSettingsMenuReviewId(null);
       }
     }
-    setLoading(false);
+    document.addEventListener("mousedown", closeOnOutside);
+    document.addEventListener("touchstart", closeOnOutside);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside);
+      document.removeEventListener("touchstart", closeOnOutside);
+    };
+  }, [settingsMenuReviewId]);
+
+  function refreshUserProfile() {
+    queryClient.invalidateQueries({ queryKey: queryKeys.userProfilePage(userId) });
   }
 
-  async function fetchGig(gigId) {
-    if (!gigId || gigLoading) return;
-    setGigLoading(true);
-    const { gig } = await getGigById(gigId);
-    if (gig) setSelectedGig(gig);
-    else closeGig();
-    setGigLoading(false);
+  if (selfRedirect) {
+    return null;
   }
 
-  if (loading) {
+  const profile = pageData?.profile ?? null;
+  const reviews = pageData?.reviews ?? [];
+  const avatarUrl = pageData?.avatarUrl ?? null;
+  const firstPendingGigId = pageData?.firstPendingGigId ?? null;
+  const hasPendingReview = pageData?.hasPendingReview ?? false;
+  const myReviewsToThem = pageData?.myReviewsToThem ?? [];
+  const userActivity = pageData?.userActivity ?? { postedGigs: [], completedGigs: [] };
+  const gigStats = pageData?.gigStats ?? { completed: 0, posted: 0 };
+  const rank = pageData?.rank ?? null;
+  const totalUsers = pageData?.totalUsers ?? 0;
+
+  /** Full skeleton only when this user has never been loaded (no React Query cache). */
+  if (profilePending) {
     return (
       <div className="page fadein">
         <TopBar title="" />
-        <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
               <div className="skel skel-circle" style={{ width: 56, height: 56, flexShrink: 0 }} />
@@ -177,7 +162,7 @@ export default function UserProfile({ currentUserId }) {
       <div className="page fadein">
         <TopBar title={fullName} />
 
-        <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
               <UserAvatar
@@ -204,9 +189,9 @@ export default function UserProfile({ currentUserId }) {
                     ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""}`
                     : "No reviews"}
                 </div>
-                {(canReview || alreadyReviewed) && (
+                {(hasPendingReview || myReviewsToThem.length > 0) && (
                   <div style={{ fontSize: 10, color: "var(--ink)", fontFamily: "var(--mono)", fontWeight: 600 }}>
-                    {alreadyReviewed ? "Tap to update" : "Tap to review"}
+                    {hasPendingReview ? "Tap to review" : "Tap for reviews"}
                   </div>
                 )}
               </div>
@@ -275,70 +260,132 @@ export default function UserProfile({ currentUserId }) {
               ) : (
                 reviews.map((r, idx) => {
                   const reviewer = r.reviewer || {};
-                  const rInitials = `${reviewer.first_name?.charAt(0) || "?"}${reviewer.last_name?.charAt(0) || ""}`.toUpperCase();
+                  const isMine = currentUserId && String(r.reviewer_id || "") === String(currentUserId);
                   return (
                     <div
                       key={r.id || idx}
+                      className="rev-row"
                       style={{
-                        display: "flex",
-                        gap: 10,
-                        padding: "11px 0",
-                        borderBottom: idx < reviews.length - 1 ? "1px solid var(--bd)" : "none",
+                        marginLeft: -16,
+                        marginRight: -16,
+                        width: "calc(100% + 32px)",
+                        paddingLeft: 16,
+                        paddingRight: 16,
+                        borderBottom: idx < reviews.length - 1 ? undefined : "none",
                       }}
                     >
-                      <div
-                        className="rev-av"
-                        style={{ background: reviewer.avatar_color || "#6366f1", width: 30, height: 30, fontSize: 11 }}
-                      >
-                        {rInitials}
-                      </div>
-                      <div style={{ flex: 1 }}>
+                      <UserAvatar user={reviewer} size={34} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600 }}>{reviewer.first_name || "User"}</span>
-                          <Stars rating={r.rating} size={10} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{reviewer.first_name || "User"}</span>
+                          <Stars rating={r.rating} size={11} />
                         </div>
-                        {r.text && <div style={{ fontSize: 12, color: "var(--fg2)", lineHeight: 1.4 }}>{r.text}</div>}
+                        {r.text ? (
+                          <div style={{ fontSize: 13, color: "var(--fg2)", lineHeight: 1.5 }}>{r.text}</div>
+                        ) : null}
                       </div>
+                      {isMine && (
+                        <div
+                          ref={settingsMenuReviewId === r.id ? settingsMenuRef : null}
+                          style={{ position: "relative", flexShrink: 0, alignSelf: "center" }}
+                        >
+                          <button
+                            type="button"
+                            className="rev-flag"
+                            aria-label="Edit or delete your review"
+                            aria-expanded={settingsMenuReviewId === r.id}
+                            aria-haspopup="menu"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSettingsMenuReviewId((id) => (id === r.id ? null : r.id));
+                            }}
+                          >
+                            <Settings size={13} strokeWidth={2} />
+                          </button>
+                          {settingsMenuReviewId === r.id && (
+                            <div
+                              role="menu"
+                              className="profile-menu-dropdown"
+                              style={{
+                                position: "absolute",
+                                top: "calc(100% + 6px)",
+                                right: 0,
+                                zIndex: 50,
+                                minWidth: 200,
+                                padding: 6,
+                                borderRadius: "var(--r)",
+                                border: "1px solid var(--bd)",
+                                background: "var(--bg)",
+                                boxShadow:
+                                  "0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.1), 0 2px 10px rgba(0, 0, 0, 0.05)",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="btn"
+                                onClick={() => {
+                                  setReviewForm({ type: "edit", reviewId: r.id });
+                                  openReviews();
+                                  setSettingsMenuReviewId(null);
+                                }}
+                                style={{
+                                  width: "100%",
+                                  justifyContent: "flex-start",
+                                  gap: 8,
+                                  padding: "8px 10px",
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  border: "none",
+                                  background: "transparent",
+                                }}
+                              >
+                                Change review
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="btn"
+                                onClick={() => {
+                                  setSettingsMenuReviewId(null);
+                                  setDeleteConfirmReviewId(r.id);
+                                }}
+                                style={{
+                                  width: "100%",
+                                  justifyContent: "flex-start",
+                                  gap: 8,
+                                  padding: "8px 10px",
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  border: "none",
+                                  background: "transparent",
+                                  color: "#dc2626",
+                                }}
+                              >
+                                Delete review
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
               )}
 
-              {alreadyReviewed ? (
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: "10px 12px",
-                    background: "var(--green-bg)",
-                    border: "1px solid var(--green-bd)",
-                    borderRadius: "var(--r)",
-                    fontSize: 12,
-                    color: "var(--green-text)",
-                    fontFamily: "var(--mono)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>You rated {existingReview?.rating || "—"}★</span>
-                  <button
-                    className="btn bsm"
-                    style={{ background: "transparent", color: "var(--green-text)", border: "1px solid var(--green-bd)" }}
-                    onClick={() => openReviews()}
-                  >
-                    Update
-                  </button>
-                </div>
-              ) : canReview ? (
+              {hasPendingReview ? (
                 <button
                   className="btn bp bfull"
                   style={{ marginTop: 16 }}
-                  onClick={() => openReviews()}
+                  onClick={() => {
+                    setReviewForm({ type: "new" });
+                    openReviews();
+                  }}
                 >
                   <Star size={14} />
                   Leave a review
                 </button>
-              ) : (
+              ) : myReviewsToThem.length === 0 ? (
                 <div
                   style={{
                     marginTop: 16,
@@ -354,7 +401,7 @@ export default function UserProfile({ currentUserId }) {
                 >
                   Complete a gig with {fullName} to leave a review.
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -457,50 +504,54 @@ export default function UserProfile({ currentUserId }) {
 
       {reviewsOpen && (
         <ReviewSheetModal
-          onClose={closeReviews}
+          onClose={() => {
+            closeReviews();
+            setReviewForm(null);
+          }}
           reviews={reviews}
           avgRating={avgRating}
           reviewCount={reviews.length}
           isOwnProfile={false}
+          currentUserId={currentUserId}
           revieweeId={userId}
-          gigId={reviewGigId}
-          canReview={canReview || alreadyReviewed}
-          alreadyReviewed={alreadyReviewed}
-          existingReview={existingReview}
+          pendingGigId={firstPendingGigId}
+          hasPendingReview={hasPendingReview}
+          myReviewsToThem={myReviewsToThem}
+          reviewForm={reviewForm}
+          setReviewForm={setReviewForm}
           onReviewSubmitted={() => {
             closeReviews();
-            loadData();
+            setReviewForm(null);
+            refreshUserProfile();
           }}
         />
       )}
-      {selectedGig && (
+      {deleteConfirmReviewId && (
+        <DeleteReviewConfirmModal
+          reviewId={deleteConfirmReviewId}
+          gigTitle={myReviewsToThem.find((x) => x.id === deleteConfirmReviewId)?.gig_title}
+          onClose={() => setDeleteConfirmReviewId(null)}
+          onDeleted={() => refreshUserProfile()}
+        />
+      )}
+      {gigParam && (modalGig != null || gigModalPending) && (
         <GigDetailModal
-          gig={selectedGig}
+          gig={modalGig}
+          loading={gigModalPending && modalGig == null}
           tick={tick}
           requested={false}
           onRequest={() => {}}
           onClose={closeGig}
-          onViewProfile={(uid) => navigate(`/users/${uid}`)}
-          currentUserId={currentUserId}
-          onGigDeleted={() => loadData()}
-        />
-      )}
-      {gigLoading && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 30,
-            maxWidth: 393,
-            margin: "0 auto",
-            background: "rgba(255,255,255,.8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+          onViewProfile={(uid) => {
+            const q = gigParam ? `?gig=${encodeURIComponent(gigParam)}` : "";
+            navigate(`/users/${uid}`, { state: { returnTo: `/users/${userId}${q}` } });
           }}
-        >
-          <Loader size={20} className="spin" color="var(--fg3)" />
-        </div>
+          currentUserId={currentUserId}
+          onGigDeleted={() => {
+            refreshUserProfile();
+            queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
+          }}
+        />
       )}
     </>
   );

@@ -28,7 +28,14 @@ function SummarizedTerms() {
       </Section>
 
       <Section title="Who can use it?">
-        <P>You need a valid <strong>@nmsu.edu</strong> email. If you're not an NMSU student (or you lose your .edu email), you can't use the platform. No exceptions — this is how we keep it campus-only.</P>
+        <P>
+          You need a valid <strong>@nmsu.edu</strong> email from <strong>NMSU Main Campus in Las Cruces</strong>. We do{" "}
+          <strong>not</strong> accept extension or branch-campus addresses — for example, not{" "}
+          <strong>@dacc.nmsu.edu</strong>, <strong>@alamogordo.nmsu.edu</strong>, <strong>@grants.nmsu.edu</strong>, or{" "}
+          <strong>@global.nmsu.edu</strong> (and not other <code>*.nmsu.edu</code> subdomains). If you can&apos;t log in
+          with a Main Campus <strong>@nmsu.edu</strong> address, you can&apos;t use the platform. No exceptions — this
+          is how we keep it Main Campus–only.
+        </P>
       </Section>
 
       <Section title="Payments are between y'all">
@@ -83,10 +90,12 @@ function LegalTerms() {
       </LegalSection>
 
       <LegalSection num="2" title="Eligibility">
-        <LP>The Platform is exclusively available to currently enrolled students at New Mexico State University ("NMSU") who possess a valid @nmsu.edu email address. By creating an account, you represent and warrant that:</LP>
+        <LP>
+          The Platform is exclusively available to currently enrolled students at NMSU&apos;s <strong>Main Campus in Las Cruces</strong> who possess a valid email address on the <strong>nmsu.edu</strong> domain only (i.e., <code>username@nmsu.edu</code>). Email addresses on NMSU system subdomains — including without limitation <strong>dacc.nmsu.edu</strong>, <strong>alamogordo.nmsu.edu</strong>, <strong>grants.nmsu.edu</strong>, and <strong>global.nmsu.edu</strong> — are not eligible. The Platform does not serve off-campus-only or extension-campus populations under separate NMSU email domains. By creating an account, you represent and warrant that:
+        </LP>
         <ul style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
-          <LI>You are a currently enrolled student at NMSU.</LI>
-          <LI>The @nmsu.edu email address you provide is your own and is currently active.</LI>
+          <LI>You are a currently enrolled student at NMSU&apos;s Main Campus in Las Cruces.</LI>
+          <LI>The @nmsu.edu email address you provide is your own, is currently active, and is not a branch- or extension-campus email domain.</LI>
           <LI>You are at least eighteen (18) years of age, or the age of majority in your jurisdiction.</LI>
           <LI>You have the legal capacity to enter into these Terms.</LI>
         </ul>

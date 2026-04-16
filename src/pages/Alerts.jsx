@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, Star, AlertTriangle, Trash2, Lock, CheckCircle, Loader } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   getMyNotifications, markAllNotificationsRead, markNotificationRead,
   deleteNotification, getGigStatusesForNotifications, acceptGigRequest,
   getProfilesByIds,
 } from "../lib/profile";
+import { queryClient, queryKeys } from "../lib/queryClient";
 import { elapsed } from "../utils/helpers";
 import TopBar from "../components/TopBar";
 import UserAvatar from "../components/UserAvatar";
-import AlertDetailModal from "../components/modals/AlertDetailModal";
 
 const GIG_NOTIF_TYPES = new Set([
   "gig_requested", "gig_request_sent", "gig_accepted", "gig_rejected", "gig_completed",
 ]);
+const REVIEW_NOTIF_TYPES = new Set(["review_received"]);
 
 const FALLBACK_STYLE = {
   review: { bg: "#fefce8", color: "#ca8a04", icon: <Star size={16} /> },
@@ -235,68 +238,85 @@ function StackedAvatars({ items, profileMap }) {
   );
 }
 
-export default function Alerts({ currentUserId, onNotificationsRead }) {
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [gigStatusMap, setGigStatusMap] = useState({});
-  const [profileMap, setProfileMap] = useState({});
-  const [selectedNotif, setSelectedNotif] = useState(null);
+function updateNotificationsCache(updater) {
+  queryClient.setQueryData(queryKeys.notifications, (old) => {
+    if (!old) return old;
+    return { ...old, notifications: updater(old.notifications) };
+  });
+}
+
+export default function Alerts({ currentUserId }) {
+  const navigate = useNavigate();
   const [acceptingId, setAcceptingId] = useState(null);
 
+  const { data: alertsData, isPending: alertsPending } = useQuery({
+    queryKey: queryKeys.notifications,
+    queryFn: async () => {
+      const { notifications: data } = await getMyNotifications();
+
+      const gigIds = [...new Set(
+        data.filter((n) => n.metadata?.gig_id).map((n) => n.metadata.gig_id)
+      )];
+      const userIds = collectUserIds(data);
+
+      const [statusMap, profiles] = await Promise.all([
+        gigIds.length > 0 ? getGigStatusesForNotifications(gigIds) : {},
+        userIds.length > 0 ? getProfilesByIds(userIds) : {},
+      ]);
+
+      return { notifications: data, gigStatusMap: statusMap, profileMap: profiles };
+    },
+    staleTime: 60_000,
+  });
+
+  const notifications = alertsData?.notifications || [];
+  const gigStatusMap = alertsData?.gigStatusMap || {};
+  const profileMap = alertsData?.profileMap || {};
+
   useEffect(() => {
-    loadNotifications();
-    markAllNotificationsRead().then(() => onNotificationsRead?.());
+    markAllNotificationsRead().then(() => {
+      updateNotificationsCache((items) => items.map((n) => ({ ...n, read: true })));
+      queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+    });
   }, []);
-
-  async function loadNotifications() {
-    setLoading(true);
-    const { notifications: data } = await getMyNotifications();
-    setNotifications(data);
-
-    const gigIds = [...new Set(
-      data.filter((n) => n.metadata?.gig_id).map((n) => n.metadata.gig_id)
-    )];
-    const userIds = collectUserIds(data);
-
-    const [statusMap, profiles] = await Promise.all([
-      gigIds.length > 0 ? getGigStatusesForNotifications(gigIds) : {},
-      userIds.length > 0 ? getProfilesByIds(userIds) : {},
-    ]);
-
-    setGigStatusMap(statusMap);
-    setProfileMap(profiles);
-    setLoading(false);
-  }
 
   async function handleMarkRead() {
     await markAllNotificationsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    onNotificationsRead?.();
+    updateNotificationsCache((items) => items.map((n) => ({ ...n, read: true })));
+    queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
   }
 
   async function handleDelete(notifId) {
     await deleteNotification(notifId);
-    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
-    onNotificationsRead?.();
+    updateNotificationsCache((items) => items.filter((n) => n.id !== notifId));
+    queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
   }
 
   async function handleDeleteGroup(items) {
     await Promise.all(items.map((n) => deleteNotification(n.id)));
     const ids = new Set(items.map((n) => n.id));
-    setNotifications((prev) => prev.filter((n) => !ids.has(n.id)));
-    onNotificationsRead?.();
+    updateNotificationsCache((all) => all.filter((n) => !ids.has(n.id)));
+    queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
   }
 
   async function handleNotifClick(n) {
     if (!n.read) {
       markNotificationRead(n.id);
-      setNotifications((prev) =>
-        prev.map((notif) => notif.id === n.id ? { ...notif, read: true } : notif)
+      updateNotificationsCache((items) =>
+        items.map((notif) => notif.id === n.id ? { ...notif, read: true } : notif)
       );
-      onNotificationsRead?.();
+      queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
     }
     if (GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id) {
-      setSelectedNotif(n);
+      navigate(`/gigdetails/${n.metadata.gig_id}`, {
+        state: { source: "alerts", notification: n, returnTo: "/alerts" },
+      });
+      return;
+    }
+    if (REVIEW_NOTIF_TYPES.has(n.type) && n.metadata?.reviewer_id) {
+      navigate(`/profile?reviews=1&reviewer=${encodeURIComponent(n.metadata.reviewer_id)}`, {
+        state: { returnTo: "/alerts" },
+      });
     }
   }
 
@@ -304,14 +324,16 @@ export default function Alerts({ currentUserId, onNotificationsRead }) {
     const unreadIds = items.filter((n) => !n.read).map((n) => n.id);
     if (unreadIds.length > 0) {
       await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
-      setNotifications((prev) =>
-        prev.map((n) => unreadIds.includes(n.id) ? { ...n, read: true } : n)
+      updateNotificationsCache((all) =>
+        all.map((n) => unreadIds.includes(n.id) ? { ...n, read: true } : n)
       );
-      onNotificationsRead?.();
+      queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
     }
     const latest = items[0];
     if (latest.metadata?.gig_id) {
-      setSelectedNotif(latest);
+      navigate(`/gigdetails/${latest.metadata.gig_id}`, {
+        state: { source: "alerts", notification: latest, returnTo: "/alerts" },
+      });
     }
   }
 
@@ -323,15 +345,11 @@ export default function Alerts({ currentUserId, onNotificationsRead }) {
     setAcceptingId(n.id);
     const { error } = await acceptGigRequest(meta.request_id);
     if (!error) {
-      await loadNotifications();
-      onNotificationsRead?.();
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+      queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+      queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
     }
     setAcceptingId(null);
-  }
-
-  function handleStatusChange() {
-    loadNotifications();
-    onNotificationsRead?.();
   }
 
   const hasUnread = notifications.some((n) => !n.read);
@@ -348,8 +366,8 @@ export default function Alerts({ currentUserId, onNotificationsRead }) {
         }
       />
 
-      <div className="scroll" style={{ paddingBottom: 80 }}>
-        {loading ? (
+      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+        {alertsPending ? (
           <div>
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <div key={i} style={{
@@ -446,7 +464,9 @@ export default function Alerts({ currentUserId, onNotificationsRead }) {
 
             const n = group.items[0];
             const canDelete = isDeletable(n, gigStatusMap);
-            const isClickable = GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id;
+            const isGigClickable = GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id;
+            const isReviewClickable = REVIEW_NOTIF_TYPES.has(n.type) && n.metadata?.reviewer_id;
+            const isClickable = isGigClickable || isReviewClickable;
             const showInlineAccept = n.type === "gig_requested" && n.metadata?.request_id;
             const gigStatus = n.metadata?.gig_id ? gigStatusMap[n.metadata.gig_id] : null;
             const alreadyAccepted = gigStatus && (gigStatus.status === "active" || gigStatus.status === "completed");
@@ -526,15 +546,6 @@ export default function Alerts({ currentUserId, onNotificationsRead }) {
           })
         )}
       </div>
-
-      {selectedNotif && (
-        <AlertDetailModal
-          notification={selectedNotif}
-          currentUserId={currentUserId}
-          onClose={() => { setSelectedNotif(null); loadNotifications(); }}
-          onStatusChange={handleStatusChange}
-        />
-      )}
     </div>
   );
 }

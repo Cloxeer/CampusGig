@@ -1,21 +1,49 @@
-import { useState, useRef } from "react";
-import { Lock, AtSign, Phone, Loader, Camera } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Camera, Loader } from "lucide-react";
 import { createProfile, uploadAvatar } from "../lib/profile";
 import { supabase } from "../lib/supabase";
+import ContactFields from "../components/ContactFields";
+import { nanpDigitsFromInput } from "../utils/phoneNanp";
+
+const EMPTY = {
+  phone: "",
+  venmo: "",
+  cashapp: "",
+  paypal: "",
+  snapchat: "",
+  instagram: "",
+  discord: "",
+  zelle: "",
+  apple_pay: "",
+  google_pay: "",
+};
+
+function trimOrNull(s) {
+  const t = s != null ? String(s).trim() : "";
+  return t === "" ? null : t;
+}
 
 export default function Onboarding({ onComplete }) {
   const fileInputRef = useRef(null);
-  const [profile, setProfile] = useState({
-    venmo: "",
-    cashapp: "",
-    paypal: "",
-    snapchat: "",
-    phone: "",
-  });
+  const [profile, setProfile] = useState(EMPTY);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailDisplay, setEmailDisplay] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) setEmailDisplay(user.email);
+    })();
+  }, []);
+
+  function onFieldChange(key, val) {
+    setProfile((p) => ({ ...p, [key]: val }));
+  }
 
   function handlePhotoSelect(e) {
     const file = e.target.files?.[0];
@@ -38,8 +66,10 @@ export default function Onboarding({ onComplete }) {
   const handleFinish = async () => {
     setError("");
 
-    if (!profile.phone.trim()) {
-      setError("Phone number is required.");
+    const phoneDigits = nanpDigitsFromInput(profile.phone);
+    const nationalLen = phoneDigits[0] === "1" ? phoneDigits.length - 1 : phoneDigits.length;
+    if (!phoneDigits || nationalLen !== 10) {
+      setError("Enter a valid 10-digit US phone number.");
       return;
     }
 
@@ -61,10 +91,15 @@ export default function Onboarding({ onComplete }) {
         firstName: user.user_metadata?.first_name || "",
         lastName: user.user_metadata?.last_name || "",
         email: user.email,
-        venmo: profile.venmo.trim() || null,
-        cashapp: profile.cashapp.trim() || null,
-        paypal: profile.paypal.trim() || null,
-        snapchat: profile.snapchat.trim() || null,
+        venmo: trimOrNull(profile.venmo),
+        cashapp: trimOrNull(profile.cashapp),
+        paypal: trimOrNull(profile.paypal),
+        snapchat: trimOrNull(profile.snapchat),
+        instagram: trimOrNull(profile.instagram),
+        discord: trimOrNull(profile.discord),
+        zelle: trimOrNull(profile.zelle),
+        apple_pay: trimOrNull(profile.apple_pay),
+        google_pay: trimOrNull(profile.google_pay),
       });
 
       if (createError) {
@@ -90,12 +125,12 @@ export default function Onboarding({ onComplete }) {
 
   const handleSkip = async () => {
     setError("");
-
-    if (!profile.phone.trim()) {
-      setError("Phone number is required — it's the only field you can't skip.");
+    const phoneDigits = nanpDigitsFromInput(profile.phone);
+    const nationalLen = phoneDigits[0] === "1" ? phoneDigits.length - 1 : phoneDigits.length;
+    if (!phoneDigits || nationalLen !== 10) {
+      setError("Phone number is required — enter a valid 10-digit US number.");
       return;
     }
-
     await handleFinish();
   };
 
@@ -106,17 +141,13 @@ export default function Onboarding({ onComplete }) {
           Set up your profile
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
-          Phone is required. Everything else is optional — update anytime.
+          Phone is required. Fill popular payment methods first — everything else is optional.
         </div>
       </div>
 
       <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* Profile photo */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <div
-            style={{ position: "relative", cursor: "pointer" }}
-            onClick={() => fileInputRef.current?.click()}
-          >
+          <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileInputRef.current?.click()}>
             {avatarPreview ? (
               <img
                 src={avatarPreview}
@@ -165,109 +196,19 @@ export default function Onboarding({ onComplete }) {
               <Camera size={13} />
             </div>
           </div>
-          <button
-            className="btn bg-btn bsm"
-            onClick={() => fileInputRef.current?.click()}
-          >
+          <button className="btn bg-btn bsm" onClick={() => fileInputRef.current?.click()}>
             {avatarPreview ? "Change photo" : "Add photo"}
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={handlePhotoSelect}
-          />
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoSelect} />
         </div>
 
-        <div className="callout">
-          <div className="ci">
-            <Lock size={13} />
-          </div>
-          <span className="ct">
-            <strong>Payment info is private.</strong> Only shared with the other party once you both accept a gig.
-          </span>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Phone <span style={{ color: "#dc2626", fontSize: 11, fontWeight: 600 }}>required</span>
-          </label>
-          <div className="ig">
-            <div className="iad">
-              <Phone size={13} />
-            </div>
-            <input
-              className="ii"
-              placeholder="+1 (000) 000-0000"
-              type="tel"
-              value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Snapchat <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>@</div>
-            <input
-              className="ii"
-              placeholder="yoursnapchat"
-              value={profile.snapchat}
-              onChange={(e) => setProfile({ ...profile, snapchat: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Venmo <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>@</div>
-            <input
-              className="ii"
-              placeholder="yourvenmo"
-              value={profile.venmo}
-              onChange={(e) => setProfile({ ...profile, venmo: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            Cash App <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>$</div>
-            <input
-              className="ii"
-              placeholder="yourcashtag"
-              value={profile.cashapp}
-              onChange={(e) => setProfile({ ...profile, cashapp: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label className="lbl">
-            PayPal <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>optional</span>
-          </label>
-          <div className="ig">
-            <div className="iad">
-              <AtSign size={13} />
-            </div>
-            <input
-              className="ii"
-              placeholder="email or @handle"
-              value={profile.paypal}
-              onChange={(e) => setProfile({ ...profile, paypal: e.target.value })}
-            />
-          </div>
-        </div>
+        <ContactFields
+          profile={profile}
+          onFieldChange={onFieldChange}
+          emailDisplay={emailDisplay}
+          phoneMode="formatted"
+          phoneRequired
+        />
 
         {error && (
           <div

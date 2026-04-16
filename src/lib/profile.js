@@ -13,7 +13,8 @@ function mergeUserPrivateContact(userRow) {
   return { ...rest, ...priv };
 }
 
-const USER_PRIVATE_SELECT = "phone, venmo, cashapp, paypal, snapchat, email";
+const USER_PRIVATE_SELECT =
+  "email, phone, venmo, cashapp, paypal, snapchat, instagram, discord, zelle, apple_pay, google_pay, contact_favorite_keys";
 
 // ──────────────────────────────────────────────────
 // Get profile
@@ -59,6 +60,59 @@ export async function getProfilesByIds(userIds) {
   return map;
 }
 
+/** Single bundle for the public user profile page (React Query cache key per user). */
+export async function getUserProfilePageData(userId) {
+  const { profile: p } = await getProfileById(userId);
+  if (!p) {
+    return {
+      profile: null,
+      avatarUrl: null,
+      reviews: [],
+      userActivity: { postedGigs: [], completedGigs: [] },
+      gigStats: { completed: 0, posted: 0 },
+      rank: null,
+      totalUsers: 0,
+      myReviewsToThem: [],
+      hasPendingReview: false,
+      firstPendingGigId: null,
+    };
+  }
+
+  let avatarUrl = null;
+  if (p.avatar_url) {
+    const url = getAvatarUrl(p.avatar_url);
+    if (url) avatarUrl = url;
+  }
+
+  const [reviewsRes, gigsRes, actRes, statsRes, rankRes, totalRes, myReviewsMap] = await Promise.all([
+    getReviewsForUser(userId),
+    getCompletedGigsBetweenUsers(userId),
+    getUserActivity(userId),
+    getUserGigStats(userId),
+    getCampusRank(p.rep_score || 0),
+    getTotalUsers(),
+    getMyReviewsToUserByGig(userId),
+  ]);
+
+  const byGig = myReviewsMap.byGigId || {};
+  const list = myReviewsMap.list || [];
+  const sharedGigs = gigsRes.gigs || [];
+  const pendingGigs = sharedGigs.filter((g) => !byGig[g.id]);
+
+  return {
+    profile: p,
+    avatarUrl,
+    reviews: reviewsRes.reviews || [],
+    userActivity: actRes,
+    gigStats: statsRes,
+    rank: rankRes.rank,
+    totalUsers: totalRes.total,
+    myReviewsToThem: list,
+    hasPendingReview: pendingGigs.length > 0,
+    firstPendingGigId: pendingGigs[0]?.id ?? null,
+  };
+}
+
 // ──────────────────────────────────────────────────
 // Create profile (used during onboarding)
 // ──────────────────────────────────────────────────
@@ -72,6 +126,11 @@ export async function createProfile({
   cashapp,
   paypal,
   snapchat,
+  instagram,
+  discord,
+  zelle,
+  apple_pay,
+  google_pay,
   avatarColor,
 }) {
   const {
@@ -98,6 +157,11 @@ export async function createProfile({
     ...(cashapp && { cashapp }),
     ...(paypal && { paypal }),
     ...(snapchat && { snapchat }),
+    ...(instagram && { instagram }),
+    ...(discord && { discord }),
+    ...(zelle && { zelle }),
+    ...(apple_pay && { apple_pay }),
+    ...(google_pay && { google_pay }),
   };
 
   const { error: contactError } = await supabase.from("user_private_contact").insert(contactRow);
@@ -110,7 +174,20 @@ export async function createProfile({
 // Update profile
 // ──────────────────────────────────────────────────
 
-const PRIVATE_USER_FIELDS = new Set(["phone", "email", "venmo", "cashapp", "paypal", "snapchat"]);
+const PRIVATE_USER_FIELDS = new Set([
+  "phone",
+  "email",
+  "venmo",
+  "cashapp",
+  "paypal",
+  "snapchat",
+  "instagram",
+  "discord",
+  "zelle",
+  "apple_pay",
+  "google_pay",
+  "contact_favorite_keys",
+]);
 
 export async function updateMyProfile(updates) {
   const {
@@ -122,8 +199,16 @@ export async function updateMyProfile(updates) {
   const userPatch = {};
   const privatePatch = {};
   for (const [k, v] of Object.entries(updates)) {
-    if (PRIVATE_USER_FIELDS.has(k)) privatePatch[k] = v;
-    else userPatch[k] = v;
+    if (PRIVATE_USER_FIELDS.has(k)) {
+      if (k === "phone") {
+        privatePatch[k] = v;
+      } else if (k === "contact_favorite_keys") {
+        privatePatch[k] = v;
+      } else {
+        const t = v == null ? "" : String(v).trim();
+        privatePatch[k] = t === "" ? null : t;
+      }
+    } else userPatch[k] = v;
   }
 
   if (Object.keys(userPatch).length > 0) {
@@ -143,6 +228,37 @@ export async function updateMyProfile(updates) {
 }
 
 // ──────────────────────────────────────────────────
+// Account deletion (grace period — see Privacy / Settings)
+// ──────────────────────────────────────────────────
+
+export async function getMyDeletionRequest() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { request: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("account_deletion_requests")
+    .select("requested_at, grace_ends_at, status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return { request: data || null, error };
+}
+
+export async function requestAccountDeletion() {
+  const { error } = await supabase.rpc("request_account_deletion");
+  return { error };
+}
+
+/** Clears a pending scheduled deletion (e.g. after a fresh sign-in). Returns whether a row was cancelled. */
+export async function cancelPendingAccountDeletion() {
+  const { data, error } = await supabase.rpc("cancel_pending_account_deletion");
+  return { cancelled: data === true, error };
+}
+
+// ──────────────────────────────────────────────────
 // Profile stats (real data)
 // ──────────────────────────────────────────────────
 
@@ -155,7 +271,7 @@ export async function getMyReviews() {
 
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, rating, text, created_at, reviewer:reviewer_id(first_name, last_name, avatar_color)")
+    .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name, avatar_color, avatar_url)")
     .eq("reviewee_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -281,7 +397,7 @@ export async function getMyActivity() {
       .limit(10),
     supabase
       .from("reviews")
-      .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name)")
+      .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name, avatar_color, avatar_url)")
       .eq("reviewee_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10),
@@ -308,11 +424,49 @@ export async function getMyActivity() {
 export async function getReviewsForUser(userId) {
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, rating, text, created_at, reviewer:reviewer_id(first_name, last_name, avatar_color)")
+    .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name, avatar_color, avatar_url)")
     .eq("reviewee_id", userId)
     .order("created_at", { ascending: false });
 
   return { reviews: data || [], error };
+}
+
+/**
+ * Unified reports table (`reports`): subject_type `review` | `gig`.
+ * UI can call this directly or use reportReview / reportGig helpers.
+ */
+export async function submitReport({ subjectType, reviewId, gigId, reason, details }) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: { message: "Not authenticated" } };
+  if (subjectType === "review" && !reviewId) {
+    return { error: { message: "reviewId is required" } };
+  }
+  if (subjectType === "gig" && !gigId) {
+    return { error: { message: "gigId is required" } };
+  }
+
+  const { error } = await supabase.from("reports").insert({
+    subject_type: subjectType,
+    review_id: subjectType === "review" ? reviewId : null,
+    gig_id: subjectType === "gig" ? gigId : null,
+    reporter_id: user.id,
+    reason,
+    details: details || null,
+  });
+
+  return { error };
+}
+
+export async function reportReview({ reviewId, reason, details }) {
+  return submitReport({ subjectType: "review", reviewId, reason, details });
+}
+
+/** Same reasons/modal flow as reviews; wire Gig detail “Report” to this next. */
+export async function reportGig({ gigId, reason, details }) {
+  return submitReport({ subjectType: "gig", gigId, reason, details });
 }
 
 export async function submitReview({ gigId, revieweeId, rating, text }) {
@@ -388,6 +542,49 @@ export async function getExistingReview(revieweeId, gigId) {
   const { data, error } = await q.maybeSingle();
 
   return { review: data, error };
+}
+
+/** All reviews you wrote about `revieweeId`, keyed by gig_id (for mutual per-gig reviews). */
+export async function getMyReviewsToUserByGig(revieweeId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { byGigId: {}, list: [], error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("id, rating, text, gig_id, gig:gig_id(title)")
+    .eq("reviewer_id", user.id)
+    .eq("reviewee_id", revieweeId);
+
+  const byGigId = {};
+  const list = [];
+  for (const r of data || []) {
+    const gigTitle = r.gig && typeof r.gig === "object" && !Array.isArray(r.gig) ? r.gig.title : null;
+    const row = {
+      id: r.id,
+      rating: r.rating,
+      text: r.text,
+      gig_id: r.gig_id,
+      gig_title: gigTitle || "Gig",
+    };
+    if (r.gig_id) byGigId[r.gig_id] = row;
+    list.push(row);
+  }
+  return { byGigId, list, error };
+}
+
+export async function deleteMyReview(reviewId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { error: { message: "Not authenticated" } };
+
+  const { error } = await supabase.from("reviews").delete().eq("id", reviewId).eq("reviewer_id", user.id);
+
+  return { error };
 }
 
 // ──────────────────────────────────────────────────
@@ -537,6 +734,77 @@ export async function postNewGig({ title, description, categoryLabel, price, loc
     .insert(row)
     .select()
     .single();
+
+  return { gig: data, error };
+}
+
+/** Poster-only; same window as delete — open or requested. Returns raw row for edit form. */
+export async function getGigForPosterEdit(gigId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { gig: null, error: { message: "Not authenticated" } };
+
+  const { data, error } = await supabase
+    .from("gigs")
+    .select("id, poster_id, title, description, price, location, expires_at, estimated_time, status, created_at, category:category_id(label)")
+    .eq("id", gigId)
+    .maybeSingle();
+
+  if (error) return { gig: null, error };
+  if (!data) return { gig: null, error: { message: "Gig not found" } };
+  if (data.poster_id !== user.id) {
+    return { gig: null, error: { message: "Only the poster can edit this gig." } };
+  }
+  if (data.status !== "open" && data.status !== "requested") {
+    return { gig: null, error: { message: "You can only edit before someone accepts this gig." } };
+  }
+  return { gig: data, error: null };
+}
+
+/** Poster-only; allowed while status is open or requested (not active/completed). */
+export async function updateMyGig(gigId, { title, description, categoryLabel, price, location, estimatedTime }) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { gig: null, error: { message: "Not authenticated" } };
+
+  const { data: gig, error: fetchErr } = await supabase
+    .from("gigs")
+    .select("id, poster_id, status")
+    .eq("id", gigId)
+    .maybeSingle();
+
+  if (fetchErr) return { gig: null, error: fetchErr };
+  if (!gig) return { gig: null, error: { message: "Gig not found" } };
+  if (gig.poster_id !== user.id) {
+    return { gig: null, error: { message: "Only the poster can update this gig." } };
+  }
+  if (gig.status !== "open" && gig.status !== "requested") {
+    return { gig: null, error: { message: "You can only update before someone accepts this gig." } };
+  }
+
+  const { data: cat } = await supabase.from("categories").select("id").eq("label", categoryLabel).single();
+  if (!cat) return { gig: null, error: { message: "Invalid category" } };
+
+  const row = {
+    title: String(title || "").trim(),
+    price: price || 0,
+    location: location != null ? String(location).trim() : null,
+    category_id: cat.id,
+  };
+  if (description != null && String(description).trim() !== "") {
+    row.description = String(description).trim();
+  } else {
+    row.description = null;
+  }
+  if (estimatedTime) {
+    row.expires_at = estimatedTime;
+  } else {
+    row.expires_at = null;
+  }
+
+  const { data, error } = await supabase.from("gigs").update(row).eq("id", gigId).select().single();
 
   return { gig: data, error };
 }

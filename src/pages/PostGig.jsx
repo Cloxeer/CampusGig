@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MapPin, Lock, Award, Clock, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
-import { postNewGig } from "../lib/profile";
+import { postNewGig, getGigForPosterEdit, updateMyGig } from "../lib/profile";
+import { queryClient, queryKeys } from "../lib/queryClient";
 import TopBar from "../components/TopBar";
 
 const ICON_MAP = {
@@ -32,8 +33,17 @@ const TIME_OPTIONS = [
   { label: "24 hours", minutes: 1440 },
 ];
 
+function timeLimitIndexFromExpires(createdAt, expiresAt) {
+  if (!expiresAt || !createdAt) return 0;
+  const mins = Math.round((new Date(expiresAt).getTime() - new Date(createdAt).getTime()) / 60000);
+  const i = TIME_OPTIONS.findIndex((o) => o.minutes === mins);
+  return i >= 0 ? i : 0;
+}
+
 export default function PostGig() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
   const [cat, setCat] = useState("Food");
   const [gigTitle, setGigTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -42,6 +52,36 @@ export default function PostGig() {
   const [timeLimitIdx, setTimeLimitIdx] = useState(0);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
+  const [loadingEdit, setLoadingEdit] = useState(!!editId);
+
+  useEffect(() => {
+    if (!editId) {
+      setLoadingEdit(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingEdit(true);
+      setError(null);
+      const { gig, error: loadErr } = await getGigForPosterEdit(editId);
+      if (cancelled) return;
+      if (loadErr || !gig) {
+        setError(loadErr?.message || "Couldn't load this gig to edit.");
+        setLoadingEdit(false);
+        return;
+      }
+      setCat(gig.category?.label || "Food");
+      setGigTitle(gig.title || "");
+      setDescription(gig.description || "");
+      setPrice(String(gig.price ?? 0));
+      setLocation(gig.location || "");
+      setTimeLimitIdx(timeLimitIndexFromExpires(gig.created_at, gig.expires_at));
+      setLoadingEdit(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId]);
 
   async function handlePost() {
     if (!gigTitle.trim()) {
@@ -58,29 +98,62 @@ export default function PostGig() {
       estimatedTime = new Date(Date.now() + selectedTime.minutes * 60 * 1000).toISOString();
     }
 
-    const { error: postError } = await postNewGig({
-      title: gigTitle.trim(),
-      description: description.trim() || null,
-      categoryLabel: cat,
-      price: parseFloat(price) || 0,
-      location: location.trim() || null,
-      estimatedTime,
-    });
+    if (editId) {
+      const { error: upErr } = await updateMyGig(editId, {
+        title: gigTitle.trim(),
+        description: description.trim() || null,
+        categoryLabel: cat,
+        price: parseFloat(price) || 0,
+        location: location.trim() || null,
+        estimatedTime,
+      });
+      if (upErr) {
+        setError(upErr.message || "Failed to save changes.");
+        setPosting(false);
+        return;
+      }
+    } else {
+      const { error: postError } = await postNewGig({
+        title: gigTitle.trim(),
+        description: description.trim() || null,
+        categoryLabel: cat,
+        price: parseFloat(price) || 0,
+        location: location.trim() || null,
+        estimatedTime,
+      });
 
-    if (postError) {
-      setError(postError.message || "Failed to post gig.");
-      setPosting(false);
-      return;
+      if (postError) {
+        setError(postError.message || "Failed to post gig.");
+        setPosting(false);
+        return;
+      }
     }
 
+    queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
     navigate("/", { replace: true });
   }
 
   return (
     <div className="page fadein">
-      <TopBar title="Post a gig" />
+      <TopBar title={editId ? "Edit gig" : "Post a gig"} />
 
-      <div className="scroll" style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 14, paddingBottom: 100 }}>
+      <div className="scroll scroll--post-pad scroll--fine-scrollbar" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {editId && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--fg3)",
+              lineHeight: 1.45,
+              padding: "10px 12px",
+              background: "var(--bg2)",
+              border: "1px solid var(--bd)",
+              borderRadius: "var(--r)",
+            }}
+          >
+            You can <strong>edit</strong> or <strong>delete</strong> your gig until someone accepts it. After that, contact
+            is managed through Alerts.
+          </div>
+        )}
         <div className="field">
           <label className="lbl">Category</label>
           <div className="cat-grid">
@@ -236,10 +309,24 @@ export default function PostGig() {
         <button
           className="btn bp bfull blg"
           onClick={handlePost}
-          disabled={posting}
-          style={{ opacity: posting ? 0.7 : 1 }}
+          disabled={posting || loadingEdit}
+          style={{ opacity: posting || loadingEdit ? 0.7 : 1 }}
         >
-          {posting ? <Loader size={16} className="spin" /> : "Post gig"}
+          {loadingEdit ? (
+            <>
+              <Loader size={16} className="spin" />
+              Loading…
+            </>
+          ) : posting ? (
+            <>
+              <Loader size={16} className="spin" />
+              {editId ? "Saving…" : "Posting…"}
+            </>
+          ) : editId ? (
+            "Save changes"
+          ) : (
+            "Post gig"
+          )}
         </button>
       </div>
     </div>

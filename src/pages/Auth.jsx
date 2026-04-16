@@ -50,7 +50,9 @@ export default function Auth() {
     }
 
     if (!isEduEmail(email)) {
-      setError("Only @nmsu.edu email addresses are allowed. Please use your NMSU email.");
+      setError(
+        "Only NMSU Main Campus (Las Cruces) addresses ending in @nmsu.edu are allowed — not extension campus emails like @dacc.nmsu.edu or @global.nmsu.edu."
+      );
       setLoading(false);
       return;
     }
@@ -87,8 +89,8 @@ export default function Auth() {
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
           {authMode === "signup"
-            ? "Sign up with your @nmsu.edu email. We'll send a magic link. Already joined? The link signs you in too."
-            : "Sign in with your @nmsu.edu email. We'll send a magic link."}
+            ? "Sign up with your Main Campus @nmsu.edu email. We'll send a magic link. Already joined? The link signs you in too."
+            : "Sign in with your Main Campus @nmsu.edu email. We'll send a magic link."}
         </div>
       </div>
 
@@ -139,10 +141,14 @@ export default function Auth() {
               <Shield size={13} />
             </div>
             <span className="ct">
-              <strong>@nmsu.edu required.</strong>{" "}
+              <strong>Main Campus @nmsu.edu only (Las Cruces).</strong>{" "}
+              Login must be exactly <strong>@nmsu.edu</strong> — not{" "}
+              <strong>@dacc.nmsu.edu</strong>, <strong>@alamogordo.nmsu.edu</strong>,{" "}
+              <strong>@grants.nmsu.edu</strong>, <strong>@global.nmsu.edu</strong>, or other NMSU
+              extension domains.{" "}
               {authMode === "signup"
-                ? "Only verified NMSU students can join GetCampusGig."
-                : "Enter the @nmsu.edu email you signed up with."}
+                ? "Off-campus and branch-campus emails cannot be used."
+                : "Enter the Main Campus @nmsu.edu email you signed up with."}
             </span>
           </div>
         </div>

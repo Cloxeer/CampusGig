@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.user_private_contact (
   cashapp VARCHAR(255),
   paypal VARCHAR(255),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT user_private_contact_email_edu CHECK (email ~* '\.edu$')
+  CONSTRAINT user_private_contact_email_nmsu CHECK (email ~* '@nmsu\.edu$')
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS user_private_contact_email_key

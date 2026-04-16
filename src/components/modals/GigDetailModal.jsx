@@ -1,12 +1,35 @@
 import { useState, useEffect } from "react";
-import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer, Loader } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MapPin, Clock, FileText, Lock, CheckCircle, Check, Timer, Loader, Flag } from "lucide-react";
 import LevelBadge from "../LevelBadge";
 import Stars from "../Stars";
 import UserAvatar from "../UserAvatar";
 import { elapsed, countdown } from "../../utils/helpers";
 import { getMyRequestForGig, deleteMyGig } from "../../lib/profile";
+import { GigDetailModalSkeleton } from "../GigDetailSkeletons";
+import ReportModal from "./ReportModal";
 
-export default function GigDetailModal({ gig, tick, requested, onRequest, onClose, onViewProfile, currentUserId, onGigDeleted }) {
+export default function GigDetailModal({
+  gig,
+  loading = false,
+  tick,
+  requested,
+  onRequest,
+  onClose,
+  onViewProfile,
+  currentUserId,
+  onGigDeleted,
+}) {
+  const navigate = useNavigate();
+
+  if (loading) {
+    return <GigDetailModalSkeleton onClose={onClose} />;
+  }
+
+  if (!gig) {
+    return null;
+  }
+
   const cd = countdown(gig.deadline);
   const taskDesc = gig.description || gig.notes || "No additional details.";
   const [requesting, setRequesting] = useState(false);
@@ -15,6 +38,7 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
   const [checkingRequest, setCheckingRequest] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const isOwnGig = currentUserId && gig.posterId === currentUserId;
   const canPosterDelete = isOwnGig && (gig.status === "open" || gig.status === "requested");
@@ -63,7 +87,7 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
   } else if (gig.eta && gig.eta !== "—") {
     detailRows.push({ icon: <Clock size={14} />, label: "Est. time", val: gig.eta });
   }
-  detailRows.push({ icon: <FileText size={14} />, label: "Task description", val: taskDesc });
+  detailRows.push({ icon: <FileText size={14} />, label: "Gig description", val: taskDesc });
 
   async function handleRequest() {
     setRequesting(true);
@@ -91,46 +115,75 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 25,
-        maxWidth: 393,
-        margin: "0 auto",
-        background: "var(--bg)",
-      }}
-    >
+    <>
+    <div className="gig-detail-surface gig-detail-surface--modal">
       <div className="page fadein">
         <div className="topbar">
           <button className="btn bg-btn bico" onClick={onClose}>
             <span style={{ fontSize: 15 }}>←</span>
           </button>
           <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>Gig Details</span>
-          {canPosterDelete ? (
+          {!isOwnGig && currentUserId ? (
             <button
               type="button"
-              className="btn bg-btn bsm"
-              onClick={handleDelete}
-              disabled={deleting}
-              style={{
-                color: "var(--err)",
-                borderColor: "var(--err)",
-                background: "transparent",
-                fontSize: 12,
-                fontWeight: 600,
-                padding: "5px 10px",
-                opacity: deleting ? 0.6 : 1,
-              }}
+              className="rev-flag"
+              aria-label="Report gig"
+              onClick={() => setReportOpen(true)}
+              style={{ flexShrink: 0 }}
             >
-              {deleting ? "…" : "Delete"}
+              <Flag size={13} strokeWidth={1.75} />
             </button>
+          ) : canPosterDelete ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <button
+                type="button"
+                className="btn bg-btn bsm"
+                onClick={() => navigate(`/post?edit=${gig.id}`)}
+                style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px" }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="btn bg-btn bsm"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  color: "var(--err)",
+                  borderColor: "var(--err)",
+                  background: "transparent",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "5px 10px",
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                {deleting ? "…" : "Delete"}
+              </button>
+            </div>
           ) : (
             <div style={{ width: 34 }} />
           )}
         </div>
 
-        <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+          {canPosterDelete && (
+            <div
+              style={{
+                margin: "12px 16px 0",
+                padding: "10px 12px",
+                fontSize: 12,
+                color: "var(--fg3)",
+                lineHeight: 1.45,
+                background: "var(--bg2)",
+                border: "1px solid var(--bd)",
+                borderRadius: "var(--r)",
+              }}
+            >
+              <strong style={{ color: "var(--fg)" }}>Your gig.</strong> You can edit details or delete this post until
+              someone accepts it.
+            </div>
+          )}
           <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--bd)" }}>
             <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-.02em", color: "var(--fg)", lineHeight: 1.4, marginBottom: 8 }}>
               {gig.title}
@@ -339,5 +392,10 @@ export default function GigDetailModal({ gig, tick, requested, onRequest, onClos
         </div>
       </div>
     </div>
+
+    {reportOpen && gig?.id && (
+      <ReportModal subjectType="gig" gigId={gig.id} onClose={() => setReportOpen(false)} />
+    )}
+    </>
   );
 }

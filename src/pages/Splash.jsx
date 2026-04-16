@@ -109,7 +109,7 @@ export default function Splash() {
       <div className="splash-body">
         <div className="sgrid" />
         <div className="sfade" />
-        <div className="scontent">
+        <div className="scontent shell-prose">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 44 }}>
             <LogoMark size={32} style={{ borderRadius: "var(--r)" }} />
             <Logo size={17} />
@@ -118,7 +118,7 @@ export default function Splash() {
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
             <div className="sdot" />
             <span style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--fg3)" }}>
-              student-to-student · nmsu.edu verified
+              student-to-student · Main Campus @nmsu.edu
             </span>
           </div>
 
@@ -177,7 +177,7 @@ export default function Splash() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, paddingTop: 2 }}>
           <Lock size={11} color="var(--fg4)" />
           <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--fg4)" }}>
-            nmsu.edu only · GO aggies
+            Las Cruces Main Campus @nmsu.edu only · GO aggies
           </span>
         </div>
       </div>

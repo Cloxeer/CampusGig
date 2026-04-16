@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Loader, MapPin, Timer, FileText, CheckCircle, XCircle, Clock,
-  Phone, AtSign, DollarSign, Smartphone, Lock,
+  Phone, AtSign, DollarSign, Smartphone, Lock, Mail, MessageCircle, Star,
 } from "lucide-react";
 import { getGigDetail, acceptGigRequest, rejectGigRequest, completeGig } from "../../lib/profile";
+import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../../lib/queryClient";
 import { getLevel, countdown, useTimer } from "../../utils/helpers";
 import LevelBadge from "../LevelBadge";
 import UserAvatar from "../UserAvatar";
+import { AlertGigDetailSkeleton } from "../GigDetailSkeletons";
 
 const STATUS_CONFIG = {
   requested: { label: "Pending Approval", color: "var(--amber)", bg: "var(--amber-bg)", bd: "var(--amber-bd)", dot: "#f59e0b" },
@@ -63,15 +66,55 @@ function UserCard({ user, label, onClick }) {
   );
 }
 
+const OPTIONAL_CONTACT_ORDER = [
+  "venmo",
+  "cashapp",
+  "paypal",
+  "snapchat",
+  "instagram",
+  "discord",
+  "zelle",
+  "apple_pay",
+  "google_pay",
+];
+
+function sortOptionalContacts(rows, favoriteKeys) {
+  const fav = Array.isArray(favoriteKeys) ? favoriteKeys : [];
+  return [...rows].sort((a, b) => {
+    const ai = fav.indexOf(a.key);
+    const bi = fav.indexOf(b.key);
+    const aFav = ai >= 0;
+    const bFav = bi >= 0;
+    if (aFav && !bFav) return -1;
+    if (!aFav && bFav) return 1;
+    if (aFav && bFav) return ai - bi;
+    return OPTIONAL_CONTACT_ORDER.indexOf(a.key) - OPTIONAL_CONTACT_ORDER.indexOf(b.key);
+  });
+}
+
 function ContactSection({ user, label }) {
   if (!user) return null;
-  const contacts = [
-    user.snapchat && { icon: <Smartphone size={13} />, label: "Snapchat", val: user.snapchat },
-    user.phone && { icon: <Phone size={13} />, label: "Phone", val: user.phone },
-    user.venmo && { icon: <DollarSign size={13} />, label: "Venmo", val: user.venmo },
-    user.cashapp && { icon: <DollarSign size={13} />, label: "CashApp", val: user.cashapp },
-    user.paypal && { icon: <AtSign size={13} />, label: "PayPal", val: user.paypal },
+  const favKeys = user.contact_favorite_keys;
+
+  const primary = [
+    user.phone && { key: "phone", icon: <Phone size={13} />, label: "Phone", val: user.phone },
+    user.email && { key: "email", icon: <Mail size={13} />, label: "School email", val: user.email },
   ].filter(Boolean);
+
+  const optionalRaw = [
+    user.venmo && { key: "venmo", icon: <DollarSign size={13} />, label: "Venmo", val: user.venmo },
+    user.cashapp && { key: "cashapp", icon: <DollarSign size={13} />, label: "Cash App", val: user.cashapp },
+    user.paypal && { key: "paypal", icon: <AtSign size={13} />, label: "PayPal", val: user.paypal },
+    user.snapchat && { key: "snapchat", icon: <Smartphone size={13} />, label: "Snapchat", val: user.snapchat },
+    user.instagram && { key: "instagram", icon: <AtSign size={13} />, label: "Instagram", val: user.instagram },
+    user.discord && { key: "discord", icon: <MessageCircle size={13} />, label: "Discord", val: user.discord },
+    user.zelle && { key: "zelle", icon: <DollarSign size={13} />, label: "Zelle", val: user.zelle },
+    user.apple_pay && { key: "apple_pay", icon: <Smartphone size={13} />, label: "Apple Pay", val: user.apple_pay },
+    user.google_pay && { key: "google_pay", icon: <DollarSign size={13} />, label: "Google Pay", val: user.google_pay },
+  ].filter(Boolean);
+
+  const optional = sortOptionalContacts(optionalRaw, favKeys);
+  const contacts = [...primary, ...optional];
 
   if (contacts.length === 0) return null;
 
@@ -85,7 +128,7 @@ function ContactSection({ user, label }) {
         borderRadius: "var(--r)", overflow: "hidden",
       }}>
         {contacts.map((c, i) => (
-          <div key={c.label} style={{
+          <div key={c.key} style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "10px 12px",
             borderTop: i > 0 ? "1px solid var(--bd)" : "none",
@@ -102,11 +145,8 @@ function ContactSection({ user, label }) {
   );
 }
 
-export default function AlertDetailModal({ notification, gigId: gigIdProp, currentUserId, onClose, onStatusChange }) {
+export default function AlertDetailModal({ notification, gigId: gigIdProp, currentUserId, onClose, onStatusChange, asPage = false }) {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [gig, setGig] = useState(null);
-  const [requests, setRequests] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
   const tick = useTimer();
@@ -114,17 +154,18 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
   const meta = notification?.metadata || {};
   const resolvedGigId = gigIdProp || meta.gig_id;
 
-  useEffect(() => {
-    if (resolvedGigId) loadDetail();
-  }, [resolvedGigId]);
+  const { data: detailData, isPending: detailPending } = useQuery({
+    queryKey: queryKeys.gigAlertDetail(resolvedGigId),
+    queryFn: async () => {
+      const r = await getGigDetail(resolvedGigId);
+      return { gig: r.gig, requests: r.requests || [] };
+    },
+    enabled: Boolean(resolvedGigId),
+    staleTime: GIG_DETAIL_STALE_MS,
+  });
 
-  async function loadDetail() {
-    setLoading(true);
-    const { gig: g, requests: r } = await getGigDetail(resolvedGigId);
-    setGig(g);
-    setRequests(r || []);
-    setLoading(false);
-  }
+  const gig = detailData?.gig ?? null;
+  const requests = detailData?.requests ?? [];
 
   const role = meta.role || (gig && currentUserId
     ? (gig.poster?.id === currentUserId ? "poster" : "requester")
@@ -141,7 +182,9 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
       setActionLoading(false);
       return;
     }
-    await loadDetail();
+    await queryClient.invalidateQueries({ queryKey: queryKeys.gigAlertDetail(resolvedGigId) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.gigById(resolvedGigId) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
     setActionLoading(false);
     onStatusChange?.();
   }
@@ -152,6 +195,9 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
     setActionLoading(true);
     const { error } = await rejectGigRequest(req.id);
     if (!error) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.gigAlertDetail(resolvedGigId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.gigById(resolvedGigId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
       onStatusChange?.();
       onClose();
     }
@@ -167,40 +213,38 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
       setActionLoading(false);
       return;
     }
-    await loadDetail();
+    await queryClient.invalidateQueries({ queryKey: queryKeys.gigAlertDetail(resolvedGigId) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.gigById(resolvedGigId) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
     setActionLoading(false);
     onStatusChange?.();
   }
 
   function handleViewProfile(userId) {
-    onClose();
-    navigate(`/users/${userId}`);
+    if (!resolvedGigId) {
+      navigate(`/users/${userId}`);
+      return;
+    }
+    navigate(`/users/${userId}`, {
+      state: { returnTo: `/gigdetails/${resolvedGigId}` },
+    });
   }
 
-  if (loading) {
+  const containerClass = asPage
+    ? "gig-detail-surface gig-detail-surface--page"
+    : "gig-detail-surface gig-detail-surface--modal alert-detail-surface";
+
+  if (resolvedGigId && detailPending) {
+    return <AlertGigDetailSkeleton onClose={onClose} asPage={asPage} />;
+  }
+
+  if (!resolvedGigId || !gig) {
     return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 30, maxWidth: 393, margin: "0 auto", background: "var(--bg)" }}>
+      <div className={containerClass}>
         <div className="page fadein">
           <div className="topbar">
             <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Task Details</span>
-            <div style={{ width: 34 }} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 300 }}>
-            <Loader size={20} className="spin" color="var(--fg3)" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!gig) {
-    return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 30, maxWidth: 393, margin: "0 auto", background: "var(--bg)" }}>
-        <div className="page fadein">
-          <div className="topbar">
-            <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Task Details</span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
             <div style={{ width: 34 }} />
           </div>
           <div style={{ padding: "48px 20px", textAlign: "center" }}>
@@ -230,15 +274,15 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
   if (hasPendingRequest && gig.status === "open") effectiveStatus = "requested";
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 30, maxWidth: 393, margin: "0 auto", background: "var(--bg)" }}>
+    <div className={containerClass}>
       <div className="page fadein">
         <div className="topbar">
           <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-          <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>Task Details</span>
+          <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>Gig Details</span>
           <div style={{ width: 34 }} />
         </div>
 
-        <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
           <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--bd)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <span style={{
@@ -329,7 +373,7 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
                   justifyContent: "center", flexShrink: 0, color: "var(--fg3)",
                 }}><FileText size={14} /></div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 1 }}>Task description</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 1 }}>Gig description</div>
                   <div style={{ fontSize: 14, color: "var(--fg)", lineHeight: 1.5 }}>{gig.description}</div>
                 </div>
               </div>
@@ -471,6 +515,33 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
               }}>
                 <span style={{ fontSize: 16 }}>🏅</span>
                 Completed
+              </div>
+            )}
+
+            {isCompleted && taker && poster && currentUserId && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {currentUserId === poster.id && (
+                  <button
+                    type="button"
+                    className="btn bp bfull"
+                    onClick={() => navigate(`/users/${taker.id}?reviews=1`)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  >
+                    <Star size={15} strokeWidth={2} />
+                    Review {`${taker.first_name || "them"}`.trim()}
+                  </button>
+                )}
+                {currentUserId === taker.id && (
+                  <button
+                    type="button"
+                    className="btn bp bfull"
+                    onClick={() => navigate(`/users/${poster.id}?reviews=1`)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  >
+                    <Star size={15} strokeWidth={2} />
+                    Review {`${poster.first_name || "them"}`.trim()}
+                  </button>
+                )}
               </div>
             )}
 

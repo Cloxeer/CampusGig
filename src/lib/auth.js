@@ -6,7 +6,7 @@ import { supabase } from "./supabase";
 
 const ALLOWED_DOMAINS = ["nmsu.edu"];
 
-/** Returns true if the email belongs to an allowed school domain. */
+/** Returns true if the email is Main Campus @nmsu.edu only (exact domain; excludes *.nmsu.edu subdomains like dacc, alamogordo, grants, global). */
 export function isEduEmail(email) {
   const trimmed = email?.trim().toLowerCase();
   if (!trimmed) return false;
@@ -34,7 +34,10 @@ export async function sendMagicLink(email, options = {}) {
   if (!isEduEmail(trimmedEmail)) {
     return {
       data: null,
-      error: { message: "Only @nmsu.edu email addresses are allowed." },
+      error: {
+        message:
+          "Only NMSU Main Campus (Las Cruces) @nmsu.edu addresses are allowed — not extension domains (e.g. dacc, alamogordo, grants, global).",
+      },
     };
   }
 

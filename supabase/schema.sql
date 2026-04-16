@@ -27,7 +27,7 @@ CREATE TABLE users (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL
-        CONSTRAINT email_must_be_edu CHECK (email ~* '\.edu$'),
+        CONSTRAINT email_must_be_nmsu CHECK (email ~* '@nmsu\.edu$'),
     phone VARCHAR(255) UNIQUE NOT NULL,
     snapchat VARCHAR(255) UNIQUE,
     venmo VARCHAR(255) UNIQUE,

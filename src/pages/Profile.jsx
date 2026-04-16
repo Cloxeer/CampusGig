@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader, Timer } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Award, Trophy, LogOut, Pencil, CheckCircle, Star, Package, Loader, Timer, Settings, HelpCircle, Shield, FileText, BookOpen } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import { getMyProfile, getMyReviews, getMyGigStats, getCampusRank, getTotalUsers, getLeaderboard, getMyActivity, getAvatarUrl, parseDeadline } from "../lib/profile";
 import { logout } from "../lib/auth";
+import { queryClient, queryKeys } from "../lib/queryClient";
 import { getLevel } from "../utils/helpers";
-import { useModalParam } from "../hooks/useModalParam";
+import { useModalParam, safeAppReturnTo } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import LevelBadge from "../components/LevelBadge";
 import UserAvatar from "../components/UserAvatar";
@@ -14,62 +16,160 @@ import ReviewSheetModal from "../components/modals/ReviewSheetModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
 import AlertDetailModal from "../components/modals/AlertDetailModal";
 
+const PROFILE_MENU_EXIT_FALLBACK_MS = 520;
+const STATS_STALE_TIME = 5 * 60 * 1000;
+
 export default function Profile({ currentUserId }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const profileBackTarget = safeAppReturnTo(location.state);
   const [repOpen, openRep, closeRep] = useModalParam("rep");
   const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
 
   const [pTab, setPTab] = useState("activity");
-  const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileMenuShow, setProfileMenuShow] = useState(false);
+  const [profileMenuLeave, setProfileMenuLeave] = useState(false);
+  const profileMenuRef = useRef(null);
+  const profileMenuExitTimerRef = useRef(null);
   const [selectedGigId, setSelectedGigId] = useState(null);
+  const [targetReviewerId, setTargetReviewerId] = useState(null);
 
-  const [profile, setProfile] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [gigStats, setGigStats] = useState({ completed: 0, posted: 0 });
-  const [rank, setRank] = useState(null);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [activity, setActivity] = useState({ completedGigs: [], receivedReviews: [], postedGigs: [] });
-  const [avatarUrl, setAvatarUrl] = useState(null);
+  const { data: profileData, isPending: profilePending } = useQuery({
+    queryKey: queryKeys.myProfile,
+    queryFn: getMyProfile,
+  });
 
-  useEffect(() => {
-    loadProfileData();
-  }, []);
+  const profile = profileData?.profile || null;
 
-  async function loadProfileData() {
-    setLoading(true);
-    const { profile: p } = await getMyProfile();
-    setProfile(p);
+  const { data: reviewsData } = useQuery({
+    queryKey: queryKeys.myReviews,
+    queryFn: getMyReviews,
+    enabled: !!profile,
+    staleTime: STATS_STALE_TIME,
+  });
 
-    if (p) {
-      if (p.avatar_url) {
-        const url = getAvatarUrl(p.avatar_url);
-        if (url) setAvatarUrl(url);
-      }
+  const { data: gigStatsData } = useQuery({
+    queryKey: queryKeys.myGigStats,
+    queryFn: getMyGigStats,
+    enabled: !!profile,
+    staleTime: STATS_STALE_TIME,
+  });
 
-      const [reviewsRes, statsRes, rankRes, totalRes, boardRes, actRes] = await Promise.all([
-        getMyReviews(),
-        getMyGigStats(),
-        getCampusRank(p.rep_score || 0),
-        getTotalUsers(),
-        getLeaderboard(100),
-        getMyActivity(),
-      ]);
-      setReviews(reviewsRes.reviews);
-      setGigStats(statsRes);
-      setRank(rankRes.rank);
-      setTotalUsers(totalRes.total);
-      setLeaderboard(boardRes.leaderboard);
-      setActivity(actRes);
-    }
-    setLoading(false);
+  const { data: rankData } = useQuery({
+    queryKey: queryKeys.campusRank,
+    queryFn: () => getCampusRank(profile?.rep_score || 0),
+    enabled: !!profile,
+    staleTime: STATS_STALE_TIME,
+  });
+
+  const { data: totalUsersData } = useQuery({
+    queryKey: queryKeys.totalUsers,
+    queryFn: getTotalUsers,
+    enabled: !!profile,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: leaderboardData } = useQuery({
+    queryKey: queryKeys.leaderboard(100),
+    queryFn: () => getLeaderboard(100),
+    enabled: !!profile,
+    staleTime: STATS_STALE_TIME,
+  });
+
+  const { data: activityData } = useQuery({
+    queryKey: queryKeys.myActivity,
+    queryFn: getMyActivity,
+    enabled: !!profile,
+    staleTime: STATS_STALE_TIME,
+  });
+
+  const reviews = reviewsData?.reviews || [];
+  const gigStats = gigStatsData || { completed: 0, posted: 0 };
+  const rank = rankData?.rank || null;
+  const totalUsers = totalUsersData?.total || 0;
+  const leaderboard = leaderboardData?.leaderboard || [];
+  const activity = activityData || { completedGigs: [], receivedReviews: [], postedGigs: [] };
+  const avatarUrl = profile?.avatar_url ? getAvatarUrl(profile.avatar_url) : null;
+
+  /** Only block the whole page until the main profile row exists in cache. Stats/tabs fill in without a full-screen skeleton. */
+  const loading = profilePending;
+
+  function refreshProfileData() {
+    queryClient.invalidateQueries({ queryKey: queryKeys.myProfile });
+    queryClient.invalidateQueries({ queryKey: queryKeys.myGigStats });
+    queryClient.invalidateQueries({ queryKey: queryKeys.myActivity });
+    queryClient.invalidateQueries({ queryKey: queryKeys.campusRank });
+    queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard(100) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.totalUsers });
+    queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldOpenReviews = params.get("reviews") === "1";
+    const reviewerId = params.get("reviewer");
+    setTargetReviewerId(reviewerId || null);
+    if (shouldOpenReviews && !reviewsOpen) {
+      openReviews();
+    }
+  }, [location.search, reviewsOpen, openReviews]);
+
+  const finishProfileMenuExit = useCallback(() => {
+    if (profileMenuExitTimerRef.current) {
+      clearTimeout(profileMenuExitTimerRef.current);
+      profileMenuExitTimerRef.current = null;
+    }
+    setProfileMenuShow(false);
+    setProfileMenuLeave(false);
+  }, []);
+
   async function handleLogout() {
+    setProfileMenuOpen(false);
     setLoggingOut(true);
     await logout();
   }
+
+  useEffect(() => {
+    if (!profileMenuOpen && profileMenuShow && !profileMenuLeave) {
+      setProfileMenuLeave(true);
+    }
+  }, [profileMenuOpen, profileMenuShow, profileMenuLeave]);
+
+  useEffect(() => {
+    if (!profileMenuLeave) return;
+    profileMenuExitTimerRef.current = setTimeout(finishProfileMenuExit, PROFILE_MENU_EXIT_FALLBACK_MS);
+    return () => {
+      if (profileMenuExitTimerRef.current) {
+        clearTimeout(profileMenuExitTimerRef.current);
+        profileMenuExitTimerRef.current = null;
+      }
+    };
+  }, [profileMenuLeave, finishProfileMenuExit]);
+
+  function handleProfileMenuAnimationEnd(e) {
+    if (e.target !== e.currentTarget) return;
+    if (!profileMenuLeave) return;
+    const name = e.animationName || "";
+    if (name.includes("EaseIn") || name.includes("InReduced")) return;
+    finishProfileMenuExit();
+  }
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    function closeOnOutside(ev) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(ev.target)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", closeOnOutside);
+    document.addEventListener("touchstart", closeOnOutside);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutside);
+      document.removeEventListener("touchstart", closeOnOutside);
+    };
+  }, [profileMenuOpen]);
 
   if (loading) {
     return (
@@ -80,9 +180,9 @@ export default function Profile({ currentUserId }) {
             <div className="skel" style={{ width: 26, height: 26, borderRadius: 6 }} />
             <div className="skel" style={{ width: 90, height: 16 }} />
           </div>
-          <div className="skel" style={{ width: 72, height: 30, borderRadius: 6 }} />
+          <div className="skel" style={{ width: 34, height: 34, borderRadius: "var(--r)" }} />
         </div>
-        <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
               <div className="skel skel-circle" style={{ width: 56, height: 56, flexShrink: 0 }} />
@@ -130,7 +230,6 @@ export default function Profile({ currentUserId }) {
 
   const repScore = profile.rep_score || 0;
   const lvl = getLevel(repScore);
-  const initials = `${profile.first_name?.charAt(0) || ""}${profile.last_name?.charAt(0) || ""}`.toUpperCase();
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
   const avgRating = reviews.length > 0 ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : "0.0";
 
@@ -200,33 +299,229 @@ export default function Profile({ currentUserId }) {
     <>
       <div className="page fadein">
         <div className="topbar">
-          <button className="btn bg-btn bico" onClick={() => navigate("/")}>
+          <button
+            className="btn bg-btn bico"
+            onClick={() =>
+              profileBackTarget ? navigate(profileBackTarget, { replace: true }) : navigate("/")
+            }
+          >
             <span style={{ fontSize: 15 }}>←</span>
           </button>
           <div className="tlogo">
             <LogoMark />
             <Logo />
           </div>
-          <button
-            className="btn bsm"
-            onClick={handleLogout}
-            disabled={loggingOut}
-            style={{
-              opacity: loggingOut ? 0.6 : 1,
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              background: "#fef2f2",
-              color: "#dc2626",
-              border: "1px solid #fecaca",
-            }}
-          >
-            {loggingOut ? <Loader size={12} className="spin" /> : <LogOut size={12} />}
-            {loggingOut ? "…" : "Log out"}
-          </button>
+          <div ref={profileMenuRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              className="btn bg-btn bico"
+              aria-label="Open profile menu"
+              aria-expanded={profileMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => {
+                setProfileMenuOpen((o) => {
+                  const next = !o;
+                  if (next) {
+                    setProfileMenuShow(true);
+                    setProfileMenuLeave(false);
+                  }
+                  return next;
+                });
+              }}
+            >
+              <Settings size={17} strokeWidth={2} />
+            </button>
+            {profileMenuShow && (
+              <div
+                role="menu"
+                className={`profile-menu-dropdown${profileMenuLeave ? " profile-menu-dropdown--leave" : ""}`}
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  zIndex: 50,
+                  minWidth: 208,
+                  padding: 6,
+                  borderRadius: "var(--r)",
+                  border: "1px solid var(--bd)",
+                  background: "var(--bg)",
+                  boxShadow:
+                    "0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.1), 0 2px 10px rgba(0, 0, 0, 0.05)",
+                }}
+                onAnimationEnd={handleProfileMenuAnimationEnd}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate("/settings");
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "transparent",
+                  }}
+                >
+                  <Settings size={15} />
+                  Settings
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate("/profile/edit", { state: { returnTo: "/profile" } });
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "transparent",
+                  }}
+                >
+                  <Pencil size={15} />
+                  Edit contacts
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate("/app-intro", { state: { returnTo: "/profile" } });
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "transparent",
+                  }}
+                >
+                  <BookOpen size={15} />
+                  View onboarding tutorial
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    window.location.href = "mailto:support@getcampusgig.com?subject=CampusGig%20help";
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "transparent",
+                  }}
+                >
+                  <HelpCircle size={15} />
+                  Help &amp; support
+                </button>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    color: "var(--fg3)",
+                    fontFamily: "var(--mono)",
+                    padding: "6px 10px 4px",
+                  }}
+                >
+                  Legal
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate("/terms");
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "transparent",
+                  }}
+                >
+                  <FileText size={15} />
+                  Terms of service
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    navigate("/privacy");
+                  }}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "transparent",
+                  }}
+                >
+                  <Shield size={15} />
+                  Privacy policy
+                </button>
+                <div style={{ height: 1, background: "var(--bd)", margin: "4px 4px" }} />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="btn"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  style={{
+                    width: "100%",
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    border: "none",
+                    background: "#fef2f2",
+                    color: "#dc2626",
+                  }}
+                >
+                  {loggingOut ? <Loader size={15} className="spin" /> : <LogOut size={15} />}
+                  {loggingOut ? "Signing out…" : "Log out"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="scroll" style={{ paddingBottom: 80 }}>
+        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
           <div style={{ padding: "20px 16px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
               <UserAvatar
@@ -241,13 +536,6 @@ export default function Profile({ currentUserId }) {
                 </div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                   <LevelBadge label={lvl.label} />
-                  <span
-                    className="badge bn"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate("/profile/edit")}
-                  >
-                    <Pencil size={9} /> Edit
-                  </span>
                 </div>
               </div>
               <div
@@ -513,11 +801,16 @@ export default function Profile({ currentUserId }) {
 
       {reviewsOpen && (
         <ReviewSheetModal
-          onClose={closeReviews}
+          onClose={() => {
+            closeReviews();
+            setTargetReviewerId(null);
+          }}
           reviews={reviews}
           avgRating={parseFloat(avgRating)}
           reviewCount={reviews.length}
           isOwnProfile
+          currentUserId={currentUserId}
+          targetReviewerId={targetReviewerId}
         />
       )}
       {repOpen && (
@@ -530,8 +823,8 @@ export default function Profile({ currentUserId }) {
         <AlertDetailModal
           gigId={selectedGigId}
           currentUserId={currentUserId}
-          onClose={() => { setSelectedGigId(null); loadProfileData(); }}
-          onStatusChange={loadProfileData}
+          onClose={() => { setSelectedGigId(null); refreshProfileData(); }}
+          onStatusChange={refreshProfileData}
         />
       )}
     </>

@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Search, X } from "lucide-react";
-import { getOpenGigs, normalizeGig, requestGig } from "../lib/profile";
+import { useQuery } from "@tanstack/react-query";
+import { getOpenGigs, normalizeGig, requestGig, getGigById } from "../lib/profile";
+import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../lib/queryClient";
 import { useTimer } from "../utils/helpers";
 import { useModalParam } from "../hooks/useModalParam";
 import TopBar from "../components/TopBar";
@@ -10,45 +12,49 @@ import GigDetailModal from "../components/modals/GigDetailModal";
 
 export default function Explore({ currentUserId }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [gigParam, openGig, closeGig] = useModalParam("gig");
 
   const [searchQ, setSearchQ] = useState("");
-  const [allGigs, setAllGigs] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [requested, setRequested] = useState(false);
   const tick = useTimer();
 
-  useEffect(() => {
-    loadGigs();
-  }, []);
+  const { data: gigsData, isPending: gigsPending } = useQuery({
+    queryKey: queryKeys.openGigs,
+    queryFn: getOpenGigs,
+    staleTime: 30_000,
+    refetchOnWindowFocus: "always",
+  });
+
+  const allGigs = useMemo(() => (gigsData?.gigs || []).map(normalizeGig), [gigsData]);
 
   useEffect(() => {
     setRequested(false);
   }, [gigParam]);
 
-  useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState !== "visible") return;
-      getOpenGigs().then(({ gigs: raw }) => {
-        setAllGigs((raw || []).map(normalizeGig));
-      });
-    }
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+  const listGig = useMemo(() => {
+    if (!gigParam) return undefined;
+    if (gigsPending) return undefined;
+    return allGigs.find((g) => g.id === gigParam) ?? null;
+  }, [gigParam, gigsPending, allGigs]);
+
+  const { data: modalGig, isPending: gigModalPending } = useQuery({
+    queryKey: queryKeys.gigById(gigParam),
+    queryFn: async () => {
+      const { gig } = await getGigById(gigParam);
+      return gig ?? null;
+    },
+    enabled: Boolean(gigParam),
+    staleTime: GIG_DETAIL_STALE_MS,
+    placeholderData: listGig != null ? listGig : undefined,
+  });
 
   useEffect(() => {
-    if (!loading && gigParam && !allGigs.some((g) => g.id === gigParam)) {
-      closeGig();
-    }
-  }, [loading, gigParam, allGigs, closeGig]);
-
-  async function loadGigs() {
-    setLoading(true);
-    const { gigs } = await getOpenGigs();
-    setAllGigs((gigs || []).map(normalizeGig));
-    setLoading(false);
-  }
+    if (!gigParam) return;
+    if (gigsPending) return;
+    if (listGig !== null) return;
+    if (!gigModalPending && modalGig === null) closeGig();
+  }, [gigParam, gigsPending, listGig, gigModalPending, modalGig, closeGig]);
 
   const searchResults = allGigs.filter((g) =>
     searchQ.trim() === ""
@@ -59,13 +65,9 @@ export default function Explore({ currentUserId }) {
         g.poster.toLowerCase().includes(searchQ.toLowerCase())
   );
 
-  const selectedGig = gigParam && !loading
-    ? allGigs.find((g) => g.id === gigParam) || null
-    : null;
-
   return (
     <div className="page fadein">
-      <TopBar title="Search" />
+      <TopBar title="Search" onBack={() => navigate("/", { replace: true })} />
 
       <div style={{ padding: "12px 16px 0" }}>
         <div
@@ -107,9 +109,9 @@ export default function Explore({ currentUserId }) {
         </div>
       </div>
 
-      <div className="scroll" style={{ paddingBottom: 80 }}>
-        {loading ? (
-          <div style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 7 }}>
+      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+        {gigsPending ? (
+          <div className="gig-grid" style={{ padding: "16px 16px 0" }}>
             {[0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="skel" style={{ width: "100%", height: 88, borderRadius: "var(--rlg)" }} />
             ))}
@@ -132,7 +134,7 @@ export default function Explore({ currentUserId }) {
             <div style={{ padding: "0 16px 8px", fontSize: 12, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
               {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
             </div>
-            <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 7 }}>
+            <div className="gig-grid" style={{ padding: "0 16px" }}>
               {searchResults.map((g) => (
                 <GigCard
                   key={g.id}
@@ -146,27 +148,34 @@ export default function Explore({ currentUserId }) {
         )}
       </div>
 
-      {selectedGig && (
+      {gigParam && (modalGig != null || gigModalPending) && (
         <GigDetailModal
-          gig={selectedGig}
+          gig={modalGig}
+          loading={gigModalPending && modalGig == null}
           tick={tick}
           requested={requested}
           currentUserId={currentUserId}
           onRequest={async () => {
-            const result = await requestGig(selectedGig.id);
+            const result = await requestGig(gigParam);
             if (!result.error) {
               setRequested(true);
-              const { gigs: raw } = await getOpenGigs();
-              setAllGigs((raw || []).map(normalizeGig));
+              queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
+              queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
               return { error: null };
             }
             return result;
           }}
           onClose={closeGig}
-          onViewProfile={(userId) => navigate(`/users/${userId}`)}
-          onGigDeleted={async () => {
-            const { gigs: raw } = await getOpenGigs();
-            setAllGigs((raw || []).map(normalizeGig));
+          onViewProfile={(userId) =>
+            navigate(`/users/${userId}`, {
+              state: {
+                returnTo: `${location.pathname}?gig=${encodeURIComponent(gigParam)}`,
+              },
+            })
+          }
+          onGigDeleted={() => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
+            queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
           }}
         />
       )}
