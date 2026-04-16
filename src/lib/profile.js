@@ -16,6 +16,24 @@ function mergeUserPrivateContact(userRow) {
 const USER_PRIVATE_SELECT =
   "email, phone, venmo, cashapp, paypal, snapchat, instagram, discord, zelle, apple_pay, google_pay, contact_favorite_keys";
 
+/** 48h after gig completion (matches Postgres `interval '2 days'`). */
+export const REVIEW_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** End of review window in ms since epoch; null if unknown. */
+export function reviewWindowEndMs(gig) {
+  const raw = gig?.completed_at ?? gig?.updated_at;
+  if (raw == null || raw === "") return null;
+  const ms = Date.parse(String(raw).trim());
+  if (Number.isNaN(ms)) return null;
+  return ms + REVIEW_WINDOW_MS;
+}
+
+export function isReviewWindowOpen(gig) {
+  const end = reviewWindowEndMs(gig);
+  if (end == null) return false;
+  return Date.now() <= end;
+}
+
 // ──────────────────────────────────────────────────
 // Get profile
 // ──────────────────────────────────────────────────
@@ -75,6 +93,8 @@ export async function getUserProfilePageData(userId) {
       myReviewsToThem: [],
       hasPendingReview: false,
       firstPendingGigId: null,
+      eligiblePendingGigIds: [],
+      hasExpiredReviewOpportunity: false,
     };
   }
 
@@ -97,7 +117,9 @@ export async function getUserProfilePageData(userId) {
   const byGig = myReviewsMap.byGigId || {};
   const list = myReviewsMap.list || [];
   const sharedGigs = gigsRes.gigs || [];
-  const pendingGigs = sharedGigs.filter((g) => !byGig[g.id]);
+  const pendingNoReview = sharedGigs.filter((g) => !byGig[g.id]);
+  const eligiblePendingGigs = pendingNoReview.filter((g) => isReviewWindowOpen(g));
+  const stalePending = pendingNoReview.filter((g) => !isReviewWindowOpen(g));
 
   return {
     profile: p,
@@ -108,8 +130,10 @@ export async function getUserProfilePageData(userId) {
     rank: rankRes.rank,
     totalUsers: totalRes.total,
     myReviewsToThem: list,
-    hasPendingReview: pendingGigs.length > 0,
-    firstPendingGigId: pendingGigs[0]?.id ?? null,
+    hasPendingReview: eligiblePendingGigs.length > 0,
+    firstPendingGigId: eligiblePendingGigs[0]?.id ?? null,
+    eligiblePendingGigIds: eligiblePendingGigs.map((g) => g.id),
+    hasExpiredReviewOpportunity: stalePending.length > 0 && eligiblePendingGigs.length === 0,
   };
 }
 
@@ -519,7 +543,7 @@ export async function getCompletedGigsBetweenUsers(otherUserId) {
 
   const { data, error } = await supabase
     .from("gigs")
-    .select("id, title")
+    .select("id, title, completed_at, updated_at")
     .eq("status", "completed")
     .or(
       `and(poster_id.eq.${user.id},taker_id.eq.${otherUserId}),and(poster_id.eq.${otherUserId},taker_id.eq.${user.id})`
@@ -927,7 +951,7 @@ export async function getGigDetail(gigId) {
   const { data: gig, error: gigError } = await supabase
     .from("gigs")
     .select(`
-      id, title, description, price, location, estimated_time, expires_at, status, created_at, updated_at,
+      id, title, description, price, location, estimated_time, expires_at, status, created_at, updated_at, completed_at,
       category:category_id(label),
       poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, user_private_contact(${USER_PRIVATE_SELECT})),
       taker:taker_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, user_private_contact(${USER_PRIVATE_SELECT}))

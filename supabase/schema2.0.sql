@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS public.gigs (
     CONSTRAINT valid_status CHECK (status IN ('open', 'requested', 'active', 'completed', 'cancelled')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMPTZ,
   CONSTRAINT expires_after_created CHECK (expires_at IS NULL OR expires_at > created_at)
 );
 
@@ -432,21 +433,25 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  g RECORD;
 BEGIN
   IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
     IF NEW.gig_id IS NULL THEN
       RAISE EXCEPTION 'reviews.gig_id is required';
     END IF;
-    IF NOT EXISTS (
-      SELECT 1 FROM public.gigs g
-      WHERE g.id = NEW.gig_id
-        AND g.status = 'completed'
-        AND g.taker_id IS NOT NULL
-        AND NEW.reviewer_id IN (g.poster_id, g.taker_id)
-        AND NEW.reviewee_id IN (g.poster_id, g.taker_id)
-        AND NEW.reviewer_id <> NEW.reviewee_id
-    ) THEN
+    SELECT * INTO g FROM public.gigs WHERE id = NEW.gig_id;
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'Review not allowed: need completed gig with both parties';
+    END IF;
+    IF g.status <> 'completed' OR g.taker_id IS NULL
+       OR NEW.reviewer_id NOT IN (g.poster_id, g.taker_id)
+       OR NEW.reviewee_id NOT IN (g.poster_id, g.taker_id)
+       OR NEW.reviewer_id = NEW.reviewee_id THEN
+      RAISE EXCEPTION 'Review not allowed: need completed gig with both parties';
+    END IF;
+    IF now() > COALESCE(g.completed_at, g.updated_at) + interval '2 days' THEN
+      RAISE EXCEPTION 'Review window closed';
     END IF;
   END IF;
   RETURN NEW;
@@ -638,7 +643,7 @@ BEGIN
   IF NOT FOUND OR g.poster_id <> uid THEN RAISE EXCEPTION 'Only the poster can mark a gig as done'; END IF;
   IF g.status <> 'active' THEN RAISE EXCEPTION 'Gig must be active to complete'; END IF;
   PERFORM public._cg_set_gig_lifecycle_ok();
-  UPDATE public.gigs SET status = 'completed' WHERE id = p_gig_id;
+  UPDATE public.gigs SET status = 'completed', completed_at = now() WHERE id = p_gig_id;
 END;
 $$;
 

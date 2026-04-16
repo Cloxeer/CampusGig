@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { logout } from "../../lib/auth";
@@ -45,6 +45,7 @@ export default function ProfilePage({ currentUserId }) {
   const [loggingOut, setLoggingOut] = useState(false);
   const [selectedGigId, setSelectedGigId] = useState(null);
   const [targetReviewerId, setTargetReviewerId] = useState(null);
+  const [deepLinkGigId, setDeepLinkGigId] = useState(null);
 
   const [reviewForm, setReviewForm] = useState(null);
   const [settingsMenuReviewId, setSettingsMenuReviewId] = useState(null);
@@ -56,9 +57,17 @@ export default function ProfilePage({ currentUserId }) {
     reviewsOpen,
     openReviews,
     setTargetReviewerId,
+    setDeepLinkGigId,
   });
 
   const q = useProfilePageQueries(routeUserId);
+
+  const effectivePendingGigId = useMemo(() => {
+    if (!routeUserId) return null;
+    const eligible = q.eligiblePendingGigIds || [];
+    if (deepLinkGigId && eligible.includes(deepLinkGigId)) return deepLinkGigId;
+    return q.firstPendingGigId ?? null;
+  }, [routeUserId, q.firstPendingGigId, q.eligiblePendingGigIds, deepLinkGigId]);
 
   const { data: modalGig, isPending: gigModalPending } = useQuery({
     queryKey: queryKeys.gigById(gigParam),
@@ -156,6 +165,7 @@ export default function ProfilePage({ currentUserId }) {
                 fullName={fullName}
                 currentUserId={currentUserId}
                 hasPendingReview={q.hasPendingReview}
+                hasExpiredReviewOpportunity={q.hasExpiredReviewOpportunity}
                 myReviewsToThem={q.myReviewsToThem}
                 openReviews={openReviews}
                 setReviewForm={setReviewForm}
@@ -185,8 +195,9 @@ export default function ProfilePage({ currentUserId }) {
             isOwnProfile={false}
             currentUserId={currentUserId}
             revieweeId={routeUserId}
-            pendingGigId={q.firstPendingGigId}
+            pendingGigId={effectivePendingGigId}
             hasPendingReview={q.hasPendingReview}
+            hasExpiredReviewOpportunity={q.hasExpiredReviewOpportunity}
             myReviewsToThem={q.myReviewsToThem}
             reviewForm={reviewForm}
             setReviewForm={setReviewForm}
@@ -194,6 +205,14 @@ export default function ProfilePage({ currentUserId }) {
               closeReviews();
               setReviewForm(null);
               refreshOtherProfile();
+              if (effectivePendingGigId) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.gigAlertDetail(effectivePendingGigId) });
+              }
+              if (effectivePendingGigId && routeUserId) {
+                queryClient.invalidateQueries({
+                  queryKey: queryKeys.existingReview(effectivePendingGigId, routeUserId),
+                });
+              }
             }}
           />
         )}

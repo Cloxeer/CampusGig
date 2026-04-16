@@ -872,6 +872,50 @@ body {
   }
 }
 
+/* Review sheet: inverted breakpoints vs generic .overlay (mobile + desktop = bottom-anchored sheet; shell width on small viewports). */
+.overlay.overlay--reviews {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+}
+/* Mobile: shell width + anchored to bottom of the viewport */
+.overlay.overlay--reviews .sheet {
+  border-radius: 20px 20px 0 0;
+  max-width: min(var(--shell-max-sm), 100%);
+  width: 100%;
+  max-height: 90vh;
+}
+.overlay.overlay--reviews .sheet.sheet-full {
+  width: min(var(--shell-max-sm), 100%);
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+}
+.overlay.overlay--reviews .handle {
+  display: block;
+}
+@media (min-width: 900px) {
+  .overlay.overlay--reviews {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
+  .overlay.overlay--reviews .sheet {
+    border-radius: 20px 20px 0 0;
+    max-width: none;
+    width: 100%;
+    max-height: 90vh;
+  }
+  .overlay.overlay--reviews .sheet.sheet-full {
+    width: 100%;
+    height: calc(100vh - 32px);
+    max-height: calc(100vh - 32px);
+  }
+  .overlay.overlay--reviews .handle {
+    display: block;
+  }
+}
+
 /* ── Favorite field hint (anchored speech bubble) ───────────── */
 .fav-hint-layer {
   position: fixed;

@@ -15,6 +15,7 @@ export default function ReviewSheetModal({
   revieweeId,
   pendingGigId = null,
   hasPendingReview = false,
+  hasExpiredReviewOpportunity = false,
   myReviewsToThem = [],
   reviewForm = null,
   setReviewForm = () => {},
@@ -88,7 +89,9 @@ export default function ReviewSheetModal({
 
     if (error) {
       const msg = error.message || "";
-      if (msg.includes("not-null") || msg.includes("gig_id")) {
+      if (/review window closed/i.test(msg)) {
+        setSubmitError("The review window for this gig has closed.");
+      } else if (msg.includes("not-null") || msg.includes("gig_id")) {
         setSubmitError("Complete a gig with this user before leaving a review.");
       } else {
         setSubmitError(msg || "Failed to submit review.");
@@ -103,6 +106,8 @@ export default function ReviewSheetModal({
   }
 
   const showPendingBanner = !isOwnProfile && !reviewForm && hasPendingReview;
+  const showExpiredBanner =
+    !isOwnProfile && !reviewForm && hasExpiredReviewOpportunity && !hasPendingReview;
 
   useEffect(() => {
     if (!targetReviewerId) return;
@@ -121,7 +126,7 @@ export default function ReviewSheetModal({
 
   return (
     <>
-      <div className="overlay" onClick={onClose}>
+      <div className="overlay overlay--reviews" onClick={onClose}>
         <div className="sheet sheet-full slidein" onClick={(e) => e.stopPropagation()}>
           <div className="handle" />
 
@@ -154,11 +159,20 @@ export default function ReviewSheetModal({
             <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--bd)", background: "var(--bg2)", flexShrink: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>You completed a gig with them</div>
               <div style={{ fontSize: 12, color: "var(--fg3)", marginBottom: 10, lineHeight: 1.45 }}>
-                Leave one review per completed gig. You can edit or delete your reviews from the profile card (settings).
+                Leave one review per completed gig within 48 hours of it being marked done. You can edit or delete your reviews from the profile card (settings) while the window is open.
               </div>
               <button type="button" className="btn bp bfull" onClick={() => setReviewForm({ type: "new" })}>
                 Write a review
               </button>
+            </div>
+          )}
+
+          {showExpiredBanner && (
+            <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--bd)", background: "var(--bg3)", flexShrink: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Review window closed</div>
+              <div style={{ fontSize: 12, color: "var(--fg3)", lineHeight: 1.45 }}>
+                The 48-hour window to leave a review for this gig has ended. Not reviewing in time does not change your Rep.
+              </div>
             </div>
           )}
 

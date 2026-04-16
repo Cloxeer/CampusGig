@@ -88,6 +88,8 @@ export function useProfilePageQueries(routeUserId) {
     const avatarUrl = op?.avatarUrl ?? null;
     const firstPendingGigId = op?.firstPendingGigId ?? null;
     const hasPendingReview = op?.hasPendingReview ?? false;
+    const eligiblePendingGigIds = op?.eligiblePendingGigIds ?? [];
+    const hasExpiredReviewOpportunity = op?.hasExpiredReviewOpportunity ?? false;
     const myReviewsToThem = op?.myReviewsToThem ?? [];
     const userActivity = op?.userActivity ?? { postedGigs: [], completedGigs: [] };
     const gigStats = op?.gigStats ?? { completed: 0, posted: 0 };
@@ -109,6 +111,8 @@ export function useProfilePageQueries(routeUserId) {
       avatarUrl,
       firstPendingGigId,
       hasPendingReview,
+      eligiblePendingGigIds,
+      hasExpiredReviewOpportunity,
       myReviewsToThem,
       userActivity,
     };
@@ -139,6 +143,8 @@ export function useProfilePageQueries(routeUserId) {
     avatarUrl,
     firstPendingGigId: null,
     hasPendingReview: false,
+    eligiblePendingGigIds: [],
+    hasExpiredReviewOpportunity: false,
     myReviewsToThem: [],
     userActivity: { postedGigs: [], completedGigs: [] },
   };

@@ -9,6 +9,7 @@ export default function ProfileOtherReviewsTab({
   fullName,
   currentUserId,
   hasPendingReview,
+  hasExpiredReviewOpportunity = false,
   myReviewsToThem,
   openReviews,
   setReviewForm,
@@ -168,6 +169,23 @@ export default function ProfileOtherReviewsTab({
           <Star size={14} />
           Leave a review
         </button>
+      ) : hasExpiredReviewOpportunity ? (
+        <div
+          style={{
+            marginTop: 16,
+            padding: "10px 12px",
+            background: "var(--bg3)",
+            border: "1px solid var(--bd)",
+            borderRadius: "var(--r)",
+            fontSize: 12,
+            color: "var(--fg3)",
+            fontFamily: "var(--mono)",
+            textAlign: "center",
+            lineHeight: 1.45,
+          }}
+        >
+          The review window has closed for the gig(s) you didn’t review in time. Skipping a review does not affect your Rep.
+        </div>
       ) : myReviewsToThem.length === 0 ? (
         <div
           style={{

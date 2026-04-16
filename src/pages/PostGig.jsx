@@ -296,7 +296,7 @@ export default function PostGig() {
             <Award size={13} />
           </div>
           <span className="ct" style={{ color: "var(--green-text)" }}>
-            <strong>+1 Rep</strong> for posting. When you mark the gig done, you and your taker each earn <strong>+10</strong>. They can earn +5 for a 5-star rating from you.
+            <strong>+1 Rep</strong> for posting. When you mark the gig done, you earn <strong>+9</strong> and your taker <strong>+10</strong>. Each review adds <strong>+1 Rep per star</strong> (1–5) to the person being reviewed.
           </span>
         </div>
 

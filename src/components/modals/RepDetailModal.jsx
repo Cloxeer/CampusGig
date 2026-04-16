@@ -121,10 +121,8 @@ export default function RepDetailModal({ onClose, repScore: repScoreProp }) {
               {[
                 { t: "Complete a gig you took (taker)", d: "+10 pts", positive: true },
                 { t: "Mark your gig done (poster)", d: "+8 pts", positive: true },
-                { t: "Receive a 5-star rating", d: "+5 pts", positive: true },
+                { t: "Receive a review", d: "+1 pt per star (1–5)", positive: true },
                 { t: "Post a gig (encourages activity)", d: "+2 pts", positive: true },
-                { t: "Receive a 1-star rating", d: "+1 pt", positive: true },
-                { t: "Receive a 0-star rating", d: "-10 pts", positive: false },
               ].map((r, i, arr) => (
                 <div
                   key={i}

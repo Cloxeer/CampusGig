@@ -32,4 +32,6 @@ export const queryKeys = {
   gigById: (gigId) => ["gigById", gigId],
   /** Full gig + requests for AlertDetailModal / gigdetails route (getGigDetail). */
   gigAlertDetail: (gigId) => ["gigAlertDetail", gigId],
+  /** Whether the current user already left a review for reviewee on this gig (getExistingReview). */
+  existingReview: (gigId, revieweeId) => ["existingReview", gigId, revieweeId],
 };

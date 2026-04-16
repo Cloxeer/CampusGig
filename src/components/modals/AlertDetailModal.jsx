@@ -5,7 +5,14 @@ import {
   Loader, MapPin, Timer, FileText, CheckCircle, XCircle, Clock,
   Phone, AtSign, DollarSign, Smartphone, Lock, Mail, MessageCircle, Star,
 } from "lucide-react";
-import { getGigDetail, acceptGigRequest, rejectGigRequest, completeGig } from "../../lib/profile";
+import {
+  getGigDetail,
+  acceptGigRequest,
+  rejectGigRequest,
+  completeGig,
+  getExistingReview,
+  isReviewWindowOpen,
+} from "../../lib/profile";
 import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../../lib/queryClient";
 import { getLevel, countdown, useTimer } from "../../utils/helpers";
 import LevelBadge from "../LevelBadge";
@@ -154,11 +161,25 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
   const meta = notification?.metadata || {};
   const resolvedGigId = gigIdProp || meta.gig_id;
 
-  const { data: detailData, isPending: detailPending } = useQuery({
+  const {
+    data: detailData,
+    isPending: detailPending,
+    isError: detailError,
+    refetch: refetchGigDetail,
+  } = useQuery({
     queryKey: queryKeys.gigAlertDetail(resolvedGigId),
     queryFn: async () => {
       const r = await getGigDetail(resolvedGigId);
-      return { gig: r.gig, requests: r.requests || [] };
+      if (r.error) {
+        const msg = String(r.error.message || "");
+        const code = r.error.code;
+        if (code === "PGRST116" || msg.includes("No rows") || msg.includes("JSON object")) {
+          return { gig: null, requests: [], notFound: true };
+        }
+        throw r.error;
+      }
+      if (!r.gig) return { gig: null, requests: [], notFound: true };
+      return { gig: r.gig, requests: r.requests || [], notFound: false };
     },
     enabled: Boolean(resolvedGigId),
     staleTime: GIG_DETAIL_STALE_MS,
@@ -166,6 +187,37 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
 
   const gig = detailData?.gig ?? null;
   const requests = detailData?.requests ?? [];
+  const gigNotFound = detailData?.notFound === true;
+
+  const poster = gig?.poster || {};
+  const taker = gig?.taker || null;
+  const revieweeForReview =
+    currentUserId && poster.id && taker?.id
+      ? currentUserId === poster.id
+        ? taker.id
+        : currentUserId === taker.id
+          ? poster.id
+          : null
+      : null;
+
+  const {
+    data: existingReviewData,
+    isPending: existingReviewPending,
+    isError: existingReviewError,
+  } = useQuery({
+    queryKey: queryKeys.existingReview(resolvedGigId, revieweeForReview),
+    queryFn: async () => {
+      const r = await getExistingReview(revieweeForReview, resolvedGigId);
+      if (r.error) throw new Error(r.error.message || "Failed to load review status");
+      return r;
+    },
+    enabled: Boolean(
+      resolvedGigId &&
+      gig?.status === "completed" &&
+      currentUserId &&
+      revieweeForReview
+    ),
+  });
 
   const role = meta.role || (gig && currentUserId
     ? (gig.poster?.id === currentUserId ? "poster" : "requester")
@@ -238,7 +290,7 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
     return <AlertGigDetailSkeleton onClose={onClose} asPage={asPage} />;
   }
 
-  if (!resolvedGigId || !gig) {
+  if (!resolvedGigId) {
     return (
       <div className={containerClass}>
         <div className="page fadein">
@@ -255,8 +307,47 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
     );
   }
 
-  const poster = gig.poster || {};
-  const taker = gig.taker || null;
+  if (!detailPending && !gig && detailError) {
+    return (
+      <div className={containerClass}>
+        <div className="page fadein">
+          <div className="topbar">
+            <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
+            <div style={{ width: 34 }} />
+          </div>
+          <div style={{ padding: "48px 20px", textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+            <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Could not load gig details.</div>
+            <button type="button" className="btn bp bfull" style={{ maxWidth: 280 }} onClick={() => refetchGigDetail()}>
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!detailPending && !gig && gigNotFound) {
+    return (
+      <div className={containerClass}>
+        <div className="page fadein">
+          <div className="topbar">
+            <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
+            <div style={{ width: 34 }} />
+          </div>
+          <div style={{ padding: "48px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>This gig is no longer available.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!gig) {
+    return <AlertGigDetailSkeleton onClose={onClose} asPage={asPage} />;
+  }
+
   const pendingReq = requests.find((r) => r.status === "pending");
   const acceptedReq = requests.find((r) => r.status === "accepted");
   const requesterUser = taker || pendingReq?.requester || acceptedReq?.requester || null;
@@ -272,6 +363,39 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
 
   let effectiveStatus = gig.status;
   if (hasPendingRequest && gig.status === "open") effectiveStatus = "requested";
+
+  const showReviewUserButton =
+    isCompleted && taker && poster.id && currentUserId && revieweeForReview;
+
+  const revieweeFirstName = showReviewUserButton
+    ? `${(currentUserId === poster.id ? taker : poster).first_name || "them"}`.trim()
+    : "";
+
+  const reviewWindowOpenForGig = showReviewUserButton && gig ? isReviewWindowOpen(gig) : false;
+  const alreadyLeftReviewForGig = Boolean(existingReviewData?.review?.id);
+  const reviewUserButtonDisabled =
+    showReviewUserButton &&
+    (existingReviewPending ||
+      existingReviewError ||
+      alreadyLeftReviewForGig ||
+      !reviewWindowOpenForGig);
+
+  let reviewUserButtonTitle = "Leave a review for this gig";
+  if (showReviewUserButton) {
+    if (existingReviewPending) reviewUserButtonTitle = "Checking review status…";
+    else if (existingReviewError) reviewUserButtonTitle = "Could not load review status";
+    else if (alreadyLeftReviewForGig) reviewUserButtonTitle = "You already left a review for this gig";
+    else if (!reviewWindowOpenForGig) reviewUserButtonTitle = "The review window for this gig has closed";
+  }
+
+  let reviewUserCaption = null;
+  if (showReviewUserButton && !existingReviewPending) {
+    if (existingReviewError) reviewUserCaption = "Could not load review status. Try again later.";
+    else if (alreadyLeftReviewForGig) reviewUserCaption = "You already left a review for this gig.";
+    else if (!reviewWindowOpenForGig && !alreadyLeftReviewForGig) {
+      reviewUserCaption = "The review window for this gig has closed.";
+    }
+  }
 
   return (
     <div className={containerClass}>
@@ -518,30 +642,52 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
               </div>
             )}
 
-            {isCompleted && taker && poster && currentUserId && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {currentUserId === poster.id && (
-                  <button
-                    type="button"
-                    className="btn bp bfull"
-                    onClick={() => navigate(`/profile/${taker.id}?reviews=1`)}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-                  >
+            {showReviewUserButton && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  type="button"
+                  className="btn bp bfull"
+                  disabled={reviewUserButtonDisabled}
+                  title={reviewUserButtonTitle}
+                  onClick={() => {
+                    if (reviewUserButtonDisabled) return;
+                    navigate(
+                      `/profile/${revieweeForReview}?reviews=1&gig=${encodeURIComponent(gig.id)}`,
+                      {
+                        state: resolvedGigId
+                          ? { returnTo: `/gigdetails/${resolvedGigId}` }
+                          : undefined,
+                      }
+                    );
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    opacity: reviewUserButtonDisabled ? 0.65 : 1,
+                    cursor: reviewUserButtonDisabled ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {existingReviewPending ? (
+                    <Loader size={16} className="spin" />
+                  ) : (
                     <Star size={15} strokeWidth={2} />
-                    Review {`${taker.first_name || "them"}`.trim()}
-                  </button>
-                )}
-                {currentUserId === taker.id && (
-                  <button
-                    type="button"
-                    className="btn bp bfull"
-                    onClick={() => navigate(`/profile/${poster.id}?reviews=1`)}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  )}
+                  Review {revieweeFirstName}
+                </button>
+                {reviewUserCaption ? (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--fg3)",
+                      textAlign: "center",
+                      lineHeight: 1.45,
+                    }}
                   >
-                    <Star size={15} strokeWidth={2} />
-                    Review {`${poster.first_name || "them"}`.trim()}
-                  </button>
-                )}
+                    {reviewUserCaption}
+                  </div>
+                ) : null}
               </div>
             )}
 
