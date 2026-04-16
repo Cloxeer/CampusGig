@@ -222,10 +222,10 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
 
   function handleViewProfile(userId) {
     if (!resolvedGigId) {
-      navigate(`/users/${userId}`);
+      navigate(`/profile/${userId}`);
       return;
     }
-    navigate(`/users/${userId}`, {
+    navigate(`/profile/${userId}`, {
       state: { returnTo: `/gigdetails/${resolvedGigId}` },
     });
   }
@@ -524,7 +524,7 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
                   <button
                     type="button"
                     className="btn bp bfull"
-                    onClick={() => navigate(`/users/${taker.id}?reviews=1`)}
+                    onClick={() => navigate(`/profile/${taker.id}?reviews=1`)}
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                   >
                     <Star size={15} strokeWidth={2} />
@@ -535,7 +535,7 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
                   <button
                     type="button"
                     className="btn bp bfull"
-                    onClick={() => navigate(`/users/${poster.id}?reviews=1`)}
+                    onClick={() => navigate(`/profile/${poster.id}?reviews=1`)}
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                   >
                     <Star size={15} strokeWidth={2} />

@@ -1399,3 +1399,21 @@ body {
   animation: shimmer 1.4s ease infinite;
   border-radius: var(--r);
 }
+
+/* Fixed toasts (Settings preview + global alerts) */
+@keyframes campus-toast-progress-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+.campus-toast-progress {
+  animation: campus-toast-progress-shrink var(--toast-duration, 4000ms) linear forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .campus-toast-host {
+    transition: opacity 0.2s ease !important;
+  }
+}

@@ -26,7 +26,7 @@ export const queryKeys = {
   leaderboard: (limit) => ["leaderboard", limit],
   myActivity: ["myActivity"],
   accountDeletion: ["accountDeletion"],
-  /** Public /users/:id page bundle (profile + reviews + activity + stats). */
+  /** Public `/profile/:userId` bundle (profile + reviews + activity + stats). */
   userProfilePage: (userId) => ["userProfilePage", userId],
   /** Normalized gig for GigDetailModal (getGigById). */
   gigById: (gigId) => ["gigById", gigId],

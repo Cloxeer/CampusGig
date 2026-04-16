@@ -167,7 +167,7 @@ export default function Explore({ currentUserId }) {
           }}
           onClose={closeGig}
           onViewProfile={(userId) =>
-            navigate(`/users/${userId}`, {
+            navigate(`/profile/${userId}`, {
               state: {
                 returnTo: `${location.pathname}?gig=${encodeURIComponent(gigParam)}`,
               },

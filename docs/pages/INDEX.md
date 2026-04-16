@@ -12,7 +12,7 @@ Each file is one screen. Read any file in 30 seconds.
 - docs/pages/page-alerts.md — route `/alerts` — notifications inbox
 - docs/pages/page-profile.md — route `/profile` — me + activity + board
 - docs/pages/page-profile-edit.md — route `/profile/edit` — change my profile
-- docs/pages/page-user-profile.md — route `/users/:id` — someone else’s profile
+- docs/pages/page-user-profile.md — route `/profile/:id` — someone else’s profile
 
 APP SHELL (not a page)
 

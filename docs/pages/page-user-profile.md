@@ -1,13 +1,13 @@
 # User Profile (Someone Else)
 
-**Route:** `/users/:userId`
+**Route:** `/profile/:userId` (legacy `/users/:userId` redirects here)
 
 ================================================================================
 
 WHAT IT IS
 
-  Read-only public view of another student. Rep, reviews, maybe their open gigs.
-  Not the same as /profile — this is “stalk safe” campus directory.
+  Read-only public view of another student. Rep, reviews, activity, stats.
+  Same screen family as “me” (`/profile`) but route is `/profile/:userId` (no bottom nav).
 
 ================================================================================
 
@@ -40,7 +40,7 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  UserProfile.jsx + fetches by id.
+  `ProfilePage.jsx` (other-user mode) + `getUserProfilePageData(userId)`.
 
 ================================================================================
 

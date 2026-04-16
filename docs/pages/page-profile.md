@@ -26,7 +26,7 @@ TLA+ IN CAVEMAN
 
   tap_activity_row:
     if gig → selected_gig_id = gig
-    if reviewer → navigate /users/:reviewerId
+    if reviewer → navigate /profile/:reviewerId
 
   tap_rep_card → open RepDetailModal (query param rep)
 
