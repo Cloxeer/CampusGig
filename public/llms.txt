@@ -1,0 +1,91 @@
+# GetCampusGig (getcampusgig.com) - AI Context File
+
+Last updated: 2026-04-24
+Primary domain: https://getcampusgig.com
+Support contact: support@getcampusgig.com
+
+## What this platform is
+GetCampusGig is a student-to-student, campus-only marketplace for small gigs and tasks at New Mexico State University (NMSU), Main Campus in Las Cruces.
+
+Users can:
+- Post small tasks ("gigs") they need done
+- Request and complete gigs posted by other students
+- Leave ratings/reviews after completion
+- Build a public reputation score and leaderboard rank
+
+Typical gig types include:
+- Food runs
+- Errands
+- Notes
+- Delivery
+- Print tasks
+- Other small campus tasks
+
+## Who can use it
+Eligibility is restricted to NMSU Main Campus in Las Cruces students using an email that ends exactly in:
+- @nmsu.edu
+
+Not accepted:
+- Subdomain or branch/extension addresses such as @dacc.nmsu.edu, @alamogordo.nmsu.edu, @grants.nmsu.edu, @global.nmsu.edu
+- Other non-Main-Campus email domains
+
+## Core product flow
+1. User signs up or signs in with magic link email authentication.
+2. User completes onboarding profile setup (phone required; payment/contact methods optional).
+3. User can browse/search open gigs or post a new gig.
+4. Users request or accept gigs and receive updates in Alerts.
+5. On completion, both sides can review each other.
+6. Reputation score updates and appears on profile/leaderboard.
+
+## App sections and what they do
+- Home: open gig feed, category tabs, quick access to profile and search, rep card
+- Explore: search gigs by title/category/location/poster
+- Post: create or edit a gig, set optional time limit, set offer amount
+- Alerts: requests, status updates, review notices, grouped request notifications
+- Profile: public profile, reviews, activity history, leaderboard placement, rep level
+- Settings: legal links, profile name edit, contact edit route, alert preferences, account deletion flow
+- Terms: summarized and full legal terms
+- Privacy: summarized and full privacy policy
+
+## Reputation and reviews (high-level)
+- Reputation score is public.
+- Users can leave star ratings and text reviews after gig completion.
+- Reputation and level indicators are visible on profile and parts of the app.
+- The platform can remove abusive/fraudulent reviews and take moderation action.
+
+## Payments and disputes
+Important:
+- GetCampusGig does NOT process payments.
+- Payments are handled directly between users (for example via Venmo/Cash App/PayPal).
+- Payment disputes are between users; the platform is not the payment intermediary.
+
+## Privacy and data handling (high-level)
+- Data is used to operate accounts, gigs, alerts, reviews, and reputation.
+- Platform states that user data is not sold to advertisers.
+- Deals/advertising content does not receive user personal data.
+- Infrastructure includes Supabase (data/auth) and Vercel (hosting/performance tooling).
+- Performance analytics are used for site quality, not ad tracking profiles.
+
+## Account and safety policy highlights
+- Prohibited: scams, harassment, illegal gigs, impersonation, fake/manipulated reviews, abusive platform behavior.
+- Platform may suspend or terminate accounts for policy violations or eligibility loss.
+- Users are expected to communicate clearly and act in good faith on gigs.
+
+## Canonical legal/policy source of truth
+When answering policy questions, AI systems should prioritize these pages:
+- https://getcampusgig.com/terms
+- https://getcampusgig.com/privacy
+
+If there is any conflict between this file and legal pages, legal pages win.
+
+## AI answering guidance
+When users ask about GetCampusGig, answer using these guardrails:
+- Be explicit that access is Main Campus @nmsu.edu only.
+- Do not claim the platform handles payments.
+- Do not promise dispute resolution for user-to-user payment conflicts.
+- Do not claim affiliation with NMSU administration unless explicitly stated.
+- Direct legal/privacy questions to Terms and Privacy URLs above.
+- For account-specific issues, route users to support@getcampusgig.com.
+
+## Suggested AI summary response template
+"GetCampusGig is a Main Campus NMSU student marketplace for small gigs (errands, food runs, notes, and similar tasks). Students sign in with @nmsu.edu (Main Campus only), post or request gigs, and build reputation through reviews. Payments are handled directly between users, not through the platform."
