@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { requestAccountDeletion } from "../../../lib/profile";
 import { queryClient, queryKeys } from "../../../lib/queryClient";
-import { DELETE_CONFIRM_PHRASE, SETTINGS_SUPPORT_EMAIL } from "../settingsConstants";
+import { COMMUNITY_DISCORD_INVITE_URL, DELETE_CONFIRM_PHRASE } from "../settingsConstants";
 
 export function useDeleteAccountModal() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -20,7 +20,8 @@ export function useDeleteAccountModal() {
       const { error } = await requestAccountDeletion();
       if (error) {
         throw new Error(
-          error.message || `Couldn't schedule deletion. Try again or email ${SETTINGS_SUPPORT_EMAIL}.`
+          error.message ||
+            `Couldn't schedule deletion. Try again or reach us on Discord: ${COMMUNITY_DISCORD_INVITE_URL}`
         );
       }
     },
@@ -41,7 +42,7 @@ export function useDeleteAccountModal() {
       closeDeleteModal();
     } catch (e) {
       setDeleteError(
-        e?.message || `Couldn't schedule deletion. Try again or email ${SETTINGS_SUPPORT_EMAIL}.`
+        e?.message || `Couldn't schedule deletion. Try again or reach us on Discord: ${COMMUNITY_DISCORD_INVITE_URL}`
       );
     }
   }

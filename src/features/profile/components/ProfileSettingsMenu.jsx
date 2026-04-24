@@ -1,4 +1,44 @@
-import { Settings, Pencil, LogOut, Loader, HelpCircle, Shield, FileText, BookOpen } from "lucide-react";
+import { Settings, Pencil, LogOut, Loader, HelpCircle, Shield, FileText, BookOpen, Bug } from "lucide-react";
+
+const MENU_ITEM_STYLE = {
+  width: "100%",
+  justifyContent: "flex-start",
+  gap: 8,
+  padding: "8px 10px",
+  fontSize: 13,
+  fontWeight: 500,
+  border: "none",
+  background: "transparent",
+};
+
+function MenuSection({ title, children }) {
+  return (
+    <>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.06em",
+          color: "var(--fg3)",
+          fontFamily: "var(--mono)",
+          padding: "6px 10px 4px",
+        }}
+      >
+        {title}
+      </div>
+      {children}
+    </>
+  );
+}
+
+function MenuRow({ icon: Icon, children, ...rest }) {
+  return (
+    <button type="button" role="menuitem" className="btn" style={MENU_ITEM_STYLE} {...rest}>
+      <Icon size={15} />
+      {children}
+    </button>
+  );
+}
 
 export default function ProfileSettingsMenu({
   navigate,
@@ -11,7 +51,14 @@ export default function ProfileSettingsMenu({
   profileMenuLeave,
   handleProfileMenuAnimationEnd,
   toggleProfileMenu,
+  onOpenBugReport,
+  onOpenSupportReport,
 }) {
+  function closeThen(fn) {
+    setProfileMenuOpen(false);
+    fn();
+  }
+
   return (
     <div ref={profileMenuRef} style={{ position: "relative" }}>
       <button
@@ -34,6 +81,7 @@ export default function ProfileSettingsMenu({
             right: 0,
             zIndex: 50,
             minWidth: 208,
+            maxWidth: "min(100vw - 32px, 280px)",
             padding: 6,
             borderRadius: "var(--r)",
             border: "1px solid var(--bd)",
@@ -43,150 +91,50 @@ export default function ProfileSettingsMenu({
           }}
           onAnimationEnd={handleProfileMenuAnimationEnd}
         >
-          <button
-            type="button"
-            role="menuitem"
-            className="btn"
-            onClick={() => {
-              setProfileMenuOpen(false);
-              navigate("/settings");
-            }}
-            style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
-              background: "transparent",
-            }}
-          >
-            <Settings size={15} />
+          <MenuRow icon={Settings} onClick={() => closeThen(() => navigate("/settings"))}>
             Settings
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="btn"
-            onClick={() => {
-              setProfileMenuOpen(false);
-              navigate("/profile/edit", { state: { returnTo: "/profile" } });
-            }}
-            style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
-              background: "transparent",
-            }}
+          </MenuRow>
+          <MenuRow
+            icon={Pencil}
+            onClick={() => closeThen(() => navigate("/profile/edit", { state: { returnTo: "/profile" } }))}
           >
-            <Pencil size={15} />
             Edit contacts
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="btn"
-            onClick={() => {
-              setProfileMenuOpen(false);
-              navigate("/app-intro", { state: { returnTo: "/profile" } });
-            }}
-            style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
-              background: "transparent",
-            }}
+          </MenuRow>
+          <MenuRow
+            icon={BookOpen}
+            onClick={() => closeThen(() => navigate("/app-intro", { state: { returnTo: "/profile" } }))}
           >
-            <BookOpen size={15} />
             View onboarding tutorial
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="btn"
-            onClick={() => {
-              setProfileMenuOpen(false);
-              window.location.href = "mailto:support@getcampusgig.com?subject=CampusGig%20help";
-            }}
-            style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
-              background: "transparent",
-            }}
-          >
-            <HelpCircle size={15} />
-            Help &amp; support
-          </button>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.06em",
-              color: "var(--fg3)",
-              fontFamily: "var(--mono)",
-              padding: "6px 10px 4px",
-            }}
-          >
-            Legal
-          </div>
-          <button
-            type="button"
-            role="menuitem"
-            className="btn"
-            onClick={() => {
-              setProfileMenuOpen(false);
-              navigate("/terms");
-            }}
-            style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
-              background: "transparent",
-            }}
-          >
-            <FileText size={15} />
-            Terms of service
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="btn"
-            onClick={() => {
-              setProfileMenuOpen(false);
-              navigate("/privacy");
-            }}
-            style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
-              background: "transparent",
-            }}
-          >
-            <Shield size={15} />
-            Privacy policy
-          </button>
+          </MenuRow>
+
+          <MenuSection title="Help & support">
+            <MenuRow
+              icon={HelpCircle}
+              onClick={() => closeThen(() => {
+                if (onOpenSupportReport) onOpenSupportReport();
+              })}
+            >
+              Help & support
+            </MenuRow>
+            {onOpenBugReport && (
+              <MenuRow
+                icon={Bug}
+                onClick={() => closeThen(() => onOpenBugReport())}
+              >
+                Report a bug
+              </MenuRow>
+            )}
+          </MenuSection>
+
+          <MenuSection title="Legal">
+            <MenuRow icon={FileText} onClick={() => closeThen(() => navigate("/terms"))}>
+              Terms of service
+            </MenuRow>
+            <MenuRow icon={Shield} onClick={() => closeThen(() => navigate("/privacy"))}>
+              Privacy policy
+            </MenuRow>
+          </MenuSection>
+
           <div style={{ height: 1, background: "var(--bd)", margin: "4px 4px" }} />
           <button
             type="button"
@@ -195,13 +143,7 @@ export default function ProfileSettingsMenu({
             onClick={onLogout}
             disabled={loggingOut}
             style={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 8,
-              padding: "8px 10px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "none",
+              ...MENU_ITEM_STYLE,
               background: "#fef2f2",
               color: "#dc2626",
             }}

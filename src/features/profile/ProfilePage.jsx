@@ -29,6 +29,7 @@ import ProfileLeaderboardTab from "./components/ProfileLeaderboardTab";
 import ProfileModals from "./components/ProfileModals";
 import ProfileOtherReviewsTab from "./components/ProfileOtherReviewsTab";
 import ProfileOtherActivityTab from "./components/ProfileOtherActivityTab";
+import ReportModal from "../../components/modals/ReportModal";
 
 export default function ProfilePage({ currentUserId }) {
   const navigate = useNavigate();
@@ -50,6 +51,8 @@ export default function ProfilePage({ currentUserId }) {
   const [reviewForm, setReviewForm] = useState(null);
   const [settingsMenuReviewId, setSettingsMenuReviewId] = useState(null);
   const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
+  const [supportReportOpen, setSupportReportOpen] = useState(false);
 
   const menu = useProfileMenu();
   useProfileReviewsUrlSync({
@@ -214,6 +217,12 @@ export default function ProfilePage({ currentUserId }) {
                 });
               }
             }}
+            onReviewerPress={(reviewerId) => {
+              setReviewForm(null);
+              navigate(`/profile/${reviewerId}`, {
+                state: { returnTo: `/profile/${routeUserId}` },
+              });
+            }}
           />
         )}
         {deleteConfirmReviewId && (
@@ -263,6 +272,8 @@ export default function ProfilePage({ currentUserId }) {
             profileMenuLeave={menu.profileMenuLeave}
             handleProfileMenuAnimationEnd={menu.handleProfileMenuAnimationEnd}
             toggleProfileMenu={menu.toggleProfileMenu}
+            onOpenBugReport={() => setBugReportOpen(true)}
+            onOpenSupportReport={() => setSupportReportOpen(true)}
           />
         </div>
 
@@ -339,7 +350,21 @@ export default function ProfilePage({ currentUserId }) {
           refreshProfileData();
         }}
         onGigStatusChange={refreshProfileData}
+        onReviewerPress={(reviewerId) => {
+          setTargetReviewerId(null);
+          navigate(`/profile/${reviewerId}`, { state: { returnTo: "/profile" } });
+        }}
       />
+      {bugReportOpen && (
+        <ReportModal
+          subjectType="BugReport"
+          initialPagePath={location.pathname}
+          onClose={() => setBugReportOpen(false)}
+        />
+      )}
+      {supportReportOpen && (
+        <ReportModal subjectType="SupportReport" onClose={() => setSupportReportOpen(false)} />
+      )}
     </>
   );
 }

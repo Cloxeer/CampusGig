@@ -1,5 +1,5 @@
 import { Trash2, AlertTriangle } from "lucide-react";
-import { SETTINGS_SUPPORT_EMAIL } from "../settingsConstants";
+import { COMMUNITY_DISCORD_INVITE_URL, DISCORD_SUPPORT_USERNAME } from "../settingsConstants";
 
 export default function SettingsDangerZone({
   isPendingDeletion,
@@ -43,7 +43,16 @@ export default function SettingsDangerZone({
                 requested). <strong>To cancel:</strong> This will sign you out. After you sign in again with your{" "}
                 <strong>@nmsu.edu</strong> magic link, a fresh sign-in clears this schedule automatically. If you delete
                 again later, you'll go through the full delete flow from scratch.
-                Stuck? Email <strong>{SETTINGS_SUPPORT_EMAIL}</strong>.
+                Stuck? Join our{" "}
+                <a
+                  href={COMMUNITY_DISCORD_INVITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--green-d)", fontWeight: 600 }}
+                >
+                  Discord
+                </a>{" "}
+                (GetCampusGig) and ask for <strong>@{DISCORD_SUPPORT_USERNAME}</strong>.
               </div>
             </div>
           </div>

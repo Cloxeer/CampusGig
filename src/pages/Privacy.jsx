@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Scale } from "lucide-react";
+import { COMMUNITY_DISCORD_INVITE_URL, DISCORD_SUPPORT_USERNAME } from "../utils/supportCommunity";
 
 const LAST_UPDATED = "April 14, 2026";
 
@@ -72,7 +73,8 @@ function SummarizedPrivacy() {
           You can start account deletion in <strong>Settings</strong>. During the grace period you can cancel:{" "}
           <strong>this will sign you out</strong>; after you sign in again with your @nmsu.edu, a fresh sign-in clears the
           scheduled deletion. You
-          can also email <strong>support@getcampusgig.com</strong> for help. After the grace period we remove your profile,
+          can also reach us via <strong>Help &amp; support</strong> on your profile or the GetCampusGig community Discord.
+          After the grace period we remove your profile,
           gig history, reviews, rep, and related data.
         </P>
         <P>Heads up: once it's deleted, it's deleted. We can't get it back for you.</P>
@@ -193,7 +195,15 @@ function LegalPrivacy() {
           <LI><strong>Deletion:</strong> Request deletion of your account and all associated personal data.</LI>
           <LI><strong>Portability:</strong> Request your data in a structured, commonly used format.</LI>
         </ul>
-        <LP>To exercise any of these rights, contact us at <strong>support@getcampusgig.com</strong>. We will respond to verified requests within thirty (30) days.</LP>
+        <LP>
+          To exercise any of these rights, use <strong>Help &amp; support</strong> from your profile in the app (include how
+          to reach you), or join our community Discord (
+          <a href={COMMUNITY_DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+            invite link
+          </a>
+          ) and ask for <strong>@{DISCORD_SUPPORT_USERNAME}</strong>. We will respond to verified requests within thirty (30)
+          days where feasible.
+        </LP>
       </LegalSection>
 
       <LegalSection num="9" title="Children's Privacy">
@@ -209,9 +219,17 @@ function LegalPrivacy() {
       </LegalSection>
 
       <LegalSection num="12" title="Contact Information">
-        <LP>For questions, concerns, or requests regarding this Privacy Policy or your personal data, please contact us at:</LP>
-        <LP><strong>Email:</strong> support@getcampusgig.com</LP>
-        <LP><strong>Website:</strong> getcampusgig.com</LP>
+        <LP>
+          For questions about this Privacy Policy or your personal data, use <strong>Help &amp; support</strong> from your
+          profile in the app, or join the GetCampusGig community Discord (
+          <a href={COMMUNITY_DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+            invite link
+          </a>
+          ) and ask for <strong>@{DISCORD_SUPPORT_USERNAME}</strong>.
+        </LP>
+        <LP>
+          <strong>Website:</strong> getcampusgig.com
+        </LP>
       </LegalSection>
 
       <div style={{ fontSize: 12, color: "var(--fg4)", fontFamily: "var(--mono)", textAlign: "center", marginTop: 8 }}>

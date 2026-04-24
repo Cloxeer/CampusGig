@@ -2,7 +2,7 @@ export const DELETE_CONFIRM_PHRASE = "DELETE";
 
 export const APP_VERSION = "1.0.0";
 
-export const SETTINGS_SUPPORT_EMAIL = "support@getcampusgig.com";
+export { COMMUNITY_DISCORD_INVITE_URL, DISCORD_SUPPORT_USERNAME } from "../../utils/supportCommunity";
 
 /** localStorage keys for device-only notification UI prefs */
 export const DEVICE_STORAGE_KEYS = {

@@ -2,7 +2,7 @@
 
 Last updated: 2026-04-24
 Primary domain: https://getcampusgig.com
-Support contact: support@getcampusgig.com
+Community help: GetCampusGig Discord https://discord.gg/cz5y2gZwUN (ask for @cloxeer); in-app Help & support from Profile
 
 ## What this platform is
 GetCampusGig is a student-to-student, campus-only marketplace for small gigs and tasks at New Mexico State University (NMSU), Main Campus in Las Cruces.
@@ -85,7 +85,7 @@ When users ask about GetCampusGig, answer using these guardrails:
 - Do not promise dispute resolution for user-to-user payment conflicts.
 - Do not claim affiliation with NMSU administration unless explicitly stated.
 - Direct legal/privacy questions to Terms and Privacy URLs above.
-- For account-specific issues, route users to support@getcampusgig.com.
+- For account-specific issues, route users to in-app Help & support (Profile) or the Discord above.
 
 ## Suggested AI summary response template
 "GetCampusGig is a Main Campus NMSU student marketplace for small gigs (errands, food runs, notes, and similar tasks). Students sign in with @nmsu.edu (Main Campus only), post or request gigs, and build reputation through reviews. Payments are handled directly between users, not through the platform."

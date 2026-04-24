@@ -7,6 +7,7 @@ import { submitReview } from "../../lib/profile";
 
 export default function ReviewSheetModal({
   onClose,
+  onReviewerPress,
   reviews = [],
   avgRating = 0,
   reviewCount = 0,
@@ -271,13 +272,35 @@ export default function ReviewSheetModal({
 
             {reviews.map((r, i) => {
               const reviewer = r.reviewer || {};
+              const rid = r.reviewer_id;
+              const isHighlight = String(rid || "") === String(targetReviewerId || "");
+              const isSelfReview =
+                revieweeId != null && rid != null && String(rid) === String(revieweeId);
+              const rowNavigable = Boolean(onReviewerPress && rid && !isSelfReview);
+              const reviewerLabel = `${reviewer.first_name || "User"}'s profile`.trim();
+
+              function goToReviewer() {
+                onReviewerPress(String(rid));
+              }
+
+              function onRowKeyDown(e) {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                goToReviewer();
+              }
+
               return (
                 <div
                   key={r.id || i}
-                  className="rev-row"
+                  className={`rev-row${rowNavigable ? " rev-row--navigate" : ""}`}
                   data-review-id={r.id || ""}
+                  role={rowNavigable ? "link" : undefined}
+                  tabIndex={rowNavigable ? 0 : undefined}
+                  aria-label={rowNavigable ? `View ${reviewerLabel}` : undefined}
+                  onClick={rowNavigable ? goToReviewer : undefined}
+                  onKeyDown={rowNavigable ? onRowKeyDown : undefined}
                   style={
-                    String(r.reviewer_id || "") === String(targetReviewerId || "")
+                    isHighlight
                       ? { background: "var(--green-bg)", border: "1px solid var(--green-bd)", borderRadius: "var(--r)" }
                       : undefined
                   }

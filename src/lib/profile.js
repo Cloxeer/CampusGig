@@ -456,8 +456,9 @@ export async function getReviewsForUser(userId) {
 }
 
 /**
- * Unified reports table (`reports`): subject_type `review` | `gig`.
- * UI can call this directly or use reportReview / reportGig helpers.
+ * Unified reports table (`reports`): subject_type `review` | `gig` | `BugReport` | `SupportReport`.
+ * For `BugReport`, `reason` = page path; `details` = description.
+ * For `SupportReport`, `reason` = how to reach the student (email, Discord handle, etc.); `details` = what they need.
  */
 export async function submitReport({ subjectType, reviewId, gigId, reason, details }) {
   const {
@@ -465,6 +466,36 @@ export async function submitReport({ subjectType, reviewId, gigId, reason, detai
   } = await supabase.auth.getUser();
 
   if (!user) return { error: { message: "Not authenticated" } };
+  if (subjectType === "SupportReport") {
+    const contact = typeof reason === "string" ? reason.trim() : "";
+    const body = typeof details === "string" ? details.trim() : "";
+    if (!contact) return { error: { message: "Please add how we can reach you (email, @ on Discord, etc.)." } };
+    if (!body) return { error: { message: "Please describe what you need help with." } };
+    const { error } = await supabase.from("reports").insert({
+      subject_type: "SupportReport",
+      review_id: null,
+      gig_id: null,
+      reporter_id: user.id,
+      reason: contact,
+      details: body,
+    });
+    return { error };
+  }
+  if (subjectType === "BugReport") {
+    const page = typeof reason === "string" ? reason.trim() : "";
+    const body = typeof details === "string" ? details.trim() : "";
+    if (!page) return { error: { message: "Please choose where you saw the issue." } };
+    if (!body) return { error: { message: "Please add a short description of what happened." } };
+    const { error } = await supabase.from("reports").insert({
+      subject_type: "BugReport",
+      review_id: null,
+      gig_id: null,
+      reporter_id: user.id,
+      reason: page,
+      details: body,
+    });
+    return { error };
+  }
   if (subjectType === "review" && !reviewId) {
     return { error: { message: "reviewId is required" } };
   }

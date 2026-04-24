@@ -1342,6 +1342,19 @@ body {
   align-items: center;
   position: relative;
 }
+.rev-row--navigate {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease;
+}
+.rev-row--navigate:active {
+  background: var(--bg3);
+}
+@media (hover: hover) and (pointer: fine) {
+  .rev-row--navigate:hover {
+    background: var(--bg2);
+  }
+}
 .rev-flag {
   flex-shrink: 0;
   align-self: center;

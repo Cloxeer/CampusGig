@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Scale } from "lucide-react";
+import { COMMUNITY_DISCORD_INVITE_URL, DISCORD_SUPPORT_USERNAME } from "../utils/supportCommunity";
 
 const LAST_UPDATED = "April 13, 2026";
 
@@ -199,9 +200,18 @@ function LegalTerms() {
       </LegalSection>
 
       <LegalSection num="16" title="Contact">
-        <LP>For questions or concerns regarding these Terms, please contact us at:</LP>
-        <LP><strong>Email:</strong> support@getcampusgig.com</LP>
-        <LP><strong>Website:</strong> getcampusgig.com</LP>
+        <LP>
+          For questions about these Terms, join the GetCampusGig community Discord (
+          <a href={COMMUNITY_DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+            invite link
+          </a>
+          ) and ask for <strong>@{DISCORD_SUPPORT_USERNAME}</strong>. You can also use{" "}
+          <strong>Help &amp; support</strong> from your profile in the app to leave a message with your preferred contact
+          details.
+        </LP>
+        <LP>
+          <strong>Website:</strong> getcampusgig.com
+        </LP>
       </LegalSection>
 
       <div style={{ fontSize: 12, color: "var(--fg4)", fontFamily: "var(--mono)", textAlign: "center", marginTop: 8 }}>

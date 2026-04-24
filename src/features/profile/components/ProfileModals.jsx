@@ -15,12 +15,14 @@ export default function ProfileModals({
   selectedGigId,
   onCloseGigModal,
   onGigStatusChange,
+  onReviewerPress,
 }) {
   return (
     <>
       {reviewsOpen && (
         <ReviewSheetModal
           onClose={onCloseReviews}
+          onReviewerPress={onReviewerPress}
           reviews={reviews}
           avgRating={parseFloat(avgRating)}
           reviewCount={reviews.length}
