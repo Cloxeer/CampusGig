@@ -252,7 +252,7 @@ export default function Terms() {
       <div style={{ padding: "16px 20px 0", borderBottom: "1px solid var(--bd)" }}>
         <button
           className="btn bg-btn"
-          style={{ padding: 0, gap: 4, marginBottom: 16 }}
+          style={{ padding: "0 6px", gap: 4, marginBottom: 16 }}
           onClick={() => navigate(-1)}
         >
           <ArrowLeft size={13} /> Back
