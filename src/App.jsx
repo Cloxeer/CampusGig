@@ -23,6 +23,8 @@ import { supabase } from "./lib/supabase";
 import { getMyProfile, getUnreadNotificationCount, cancelPendingAccountDeletion } from "./lib/profile";
 import { queryClient, queryKeys } from "./lib/queryClient";
 
+const INDEXABLE_PATHS = new Set(["/", "/welcome", "/terms", "/privacy"]);
+
 /** `/profile/:userId` — redirect to `/profile` when viewing your own id (bookmark parity). */
 function ProfileByIdRoute({ currentUserId }) {
   const { userId } = useParams();
@@ -54,11 +56,26 @@ function NavLayout({ unreadCount }) {
 }
 
 export default function App() {
+  const location = useLocation();
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const profileCheckRef = useRef(false);
+
+  useEffect(() => {
+    const shouldIndex = INDEXABLE_PATHS.has(location.pathname);
+    let robotsMeta = document.querySelector('meta[name="robots"]');
+    if (!robotsMeta) {
+      robotsMeta = document.createElement("meta");
+      robotsMeta.setAttribute("name", "robots");
+      document.head.appendChild(robotsMeta);
+    }
+    robotsMeta.setAttribute(
+      "content",
+      shouldIndex ? "index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" : "noindex,nofollow,noarchive"
+    );
+  }, [location.pathname]);
 
   const { data: profileQueryData, isPending: profilePending } = useQuery({
     queryKey: queryKeys.myProfile,

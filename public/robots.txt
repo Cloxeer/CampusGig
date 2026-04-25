@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Disallow: /auth
+Disallow: /magic
+Disallow: /onboarding
+Disallow: /app-intro
+Disallow: /explore
+Disallow: /post
+Disallow: /alerts
+Disallow: /profile
+Disallow: /settings
+Disallow: /gigdetails
+Disallow: /users
+
+Sitemap: https://getcampusgig.com/sitemap.xml
+LLMS: https://getcampusgig.com/llms.txt
