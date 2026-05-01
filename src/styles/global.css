@@ -399,6 +399,17 @@ body {
     min-height: 100dvh;
   }
 }
+/* Gig details `/gigdetails/:id`: `.page` sits under `.gig-detail-surface--page`, not `.shell-view`. */
+.shell--session .shell-view > .gig-detail-surface--page > .page {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+@media (min-width: 900px) {
+  .shell--session .shell-view > .gig-detail-surface--page > .page {
+    height: 100%;
+    overflow: hidden;
+  }
+}
 .scroll {
   flex: 1;
   overflow-y: auto;

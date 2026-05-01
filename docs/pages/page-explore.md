@@ -7,7 +7,7 @@
 WHAT IT IS
 
   Search / browse open gigs. Similar to home but search-first UX.
-  Tap card → GigDetailModal (modal param `gig` in URL).
+  Tap card → `/gig/:id` full page. Legacy `?gig=` redirects to that route.
 
 ================================================================================
 
@@ -19,13 +19,13 @@ WHO MAY OPEN IT
 
 TLA+ IN CAVEMAN
 
-  vars: search_q  all_gigs  gig_modal_id  requested_flag
+  vars: search_q  all_gigs
 
   INIT: load open gigs
 
   type_search → filter list client-side (or server if you add it later)
 
-  open_gig(id) → set URL param ?gig=  → modal opens
+  open_gig(id) → navigate /gig/:id state.returnTo=/explore
 
   tab_back_to_visible → optional refresh gigs (visibility listener exists)
 
@@ -42,11 +42,11 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  Explore.jsx + useModalParam("gig") + GigDetailModal.
+  Explore.jsx + navigate to `/gig/:id` (OpenGig page).
 
 ================================================================================
 
 GAPS TO WATCH
 
 - Search is local filter today — if gig count grows, add server search.
-- Modal state vs URL: deep link to ?gig= should open correct gig.
+- Deep link: legacy `?gig=` is replaced with `/gig/:id` on load.

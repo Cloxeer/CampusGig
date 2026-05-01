@@ -12,7 +12,8 @@ export const BUG_REPORT_PAGE_OPTIONS = [
   { path: "/profile/edit", label: "Edit profile" },
   { path: "/settings", label: "Settings" },
   { path: "/app-intro", label: "Onboarding tutorial" },
-  { path: "/gigdetails/:gigId", label: "Gig detail page" },
+  { path: "/gigdetails/:gigId", label: "Gig detail (alerts / activity)" },
+  { path: "/gig/:gigId", label: "Open gig (browse / request)" },
   { path: "/terms", label: "Terms of service" },
   { path: "/privacy", label: "Privacy policy" },
 ];
@@ -23,6 +24,7 @@ export const BUG_REPORT_PAGE_OPTIONS = [
 export function bugReportPathFromLocation(pathname) {
   if (!pathname) return "";
   if (pathname.startsWith("/gigdetails/")) return "/gigdetails/:gigId";
+  if (/^\/gig\/[^/]+$/.test(pathname)) return "/gig/:gigId";
   if (pathname === "/profile") return "/profile";
   if (/^\/profile\/[^/]+$/.test(pathname)) return "/profile/:userId";
   const exact = BUG_REPORT_PAGE_OPTIONS.some((o) => o.path === pathname);

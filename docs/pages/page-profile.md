@@ -8,7 +8,8 @@ WHAT IT IS
 
   My face, my rep, my stats, my reviews summary.
   Tabs: Activity (things I did / gigs / reviews I got) and Leaderboard.
-  Activity rows open gig detail (AlertDetailModal) or reviewer profile.
+  Activity rows navigate to `/gigdetails/:gigId` (full page, `returnTo: /profile`) or to reviewer profile.
+  On another student’s profile (`/profile/:userId`), activity gig rows open `/gig/:gigId` (browse / request) with `returnTo` that profile.
 
 ================================================================================
 
@@ -20,12 +21,12 @@ WHO MAY OPEN IT
 
 TLA+ IN CAVEMAN
 
-  vars: profile  activity_items  leaderboard  modals  selected_gig_id
+  vars: profile  activity_items  leaderboard  modals
 
   INIT: load profile + activity + reviews + board
 
   tap_activity_row:
-    if gig → selected_gig_id = gig
+    if gig → navigate /gigdetails/:id state.returnTo=/profile
     if reviewer → navigate /profile/:reviewerId
 
   tap_rep_card → open RepDetailModal (query param rep)
@@ -45,11 +46,11 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  Profile.jsx + getMyActivity + UserAvatar + AlertDetailModal for owned gig drill-in.
+  ProfilePage + getMyActivity + navigate to `/gigdetails/:id` for owned gig drill-in (AlertDetailModal with `asPage` on that route).
 
 ================================================================================
 
 GAPS TO WATCH
 
 - Leaderboard pagination: top 100 only — fine until huge campus.
-- Refresh after modal actions: onClose reloads profile data in places — keep consistent.
+- After gig actions on `/gigdetails/:id`, returning to `/profile` remounts the page and refetches activity/reviews as queries run again.

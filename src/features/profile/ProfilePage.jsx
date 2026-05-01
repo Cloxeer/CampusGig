@@ -1,15 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { logout } from "../../lib/auth";
 import { useModalParam, safeAppReturnTo } from "../../hooks/useModalParam";
-import { getLevel, useTimer } from "../../utils/helpers";
-import { getGigById } from "../../lib/profile";
-import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../../lib/queryClient";
+import { getLevel } from "../../utils/helpers";
+import { queryClient, queryKeys } from "../../lib/queryClient";
 import TopBar from "../../components/TopBar";
 import ReviewSheetModal from "../../components/modals/ReviewSheetModal";
 import DeleteReviewConfirmModal from "../../components/modals/DeleteReviewConfirmModal";
-import GigDetailModal from "../../components/modals/GigDetailModal";
 import { useProfilePageQueries } from "./hooks/useProfilePageQueries";
 import { useProfileMenu } from "./hooks/useProfileMenu";
 import { useProfileReviewsUrlSync } from "./hooks/useProfileReviewsUrlSync";
@@ -40,11 +37,10 @@ export default function ProfilePage({ currentUserId }) {
   const profileBackTarget = safeAppReturnTo(location.state);
   const [repOpen, openRep, closeRep] = useModalParam("rep");
   const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
-  const [gigParam, openGig, closeGig] = useModalParam("gig");
+  const [searchParams] = useSearchParams();
 
   const [pTab, setPTab] = useState(() => (routeUserId ? "reviews" : "activity"));
   const [loggingOut, setLoggingOut] = useState(false);
-  const [selectedGigId, setSelectedGigId] = useState(null);
   const [targetReviewerId, setTargetReviewerId] = useState(null);
   const [deepLinkGigId, setDeepLinkGigId] = useState(null);
 
@@ -72,22 +68,16 @@ export default function ProfilePage({ currentUserId }) {
     return q.firstPendingGigId ?? null;
   }, [routeUserId, q.firstPendingGigId, q.eligiblePendingGigIds, deepLinkGigId]);
 
-  const { data: modalGig, isPending: gigModalPending } = useQuery({
-    queryKey: queryKeys.gigById(gigParam),
-    queryFn: async () => {
-      const { gig } = await getGigById(gigParam);
-      return gig ?? null;
-    },
-    enabled: Boolean(gigParam && isOtherProfile),
-    staleTime: GIG_DETAIL_STALE_MS,
-  });
-
-  const tick = useTimer();
-
   useEffect(() => {
-    if (!gigParam || !isOtherProfile) return;
-    if (!gigModalPending && modalGig === null) closeGig();
-  }, [gigParam, gigModalPending, modalGig, closeGig, isOtherProfile]);
+    if (!isOtherProfile || !routeUserId) return;
+    const legacy = searchParams.get("gig");
+    if (!legacy || searchParams.get("reviews") === "1") return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("gig");
+    const qs = next.toString();
+    const returnPath = `/profile/${routeUserId}${qs ? `?${qs}` : ""}`;
+    navigate(`/gig/${legacy}`, { replace: true, state: { returnTo: returnPath } });
+  }, [isOtherProfile, routeUserId, searchParams, navigate]);
 
   if (q.loading) {
     return <ProfilePageSkeleton variant={isOtherProfile ? "other" : "self"} />;
@@ -179,7 +169,11 @@ export default function ProfilePage({ currentUserId }) {
             )}
 
             {pTab === "activity" && (
-              <ProfileOtherActivityTab activityItems={activityItemsOther} openGig={openGig} />
+              <ProfileOtherActivityTab
+                activityItems={activityItemsOther}
+                navigate={navigate}
+                profileUserId={routeUserId}
+              />
             )}
 
             <div style={{ height: 32 }} />
@@ -231,25 +225,6 @@ export default function ProfilePage({ currentUserId }) {
             gigTitle={q.myReviewsToThem.find((x) => x.id === deleteConfirmReviewId)?.gig_title}
             onClose={() => setDeleteConfirmReviewId(null)}
             onDeleted={() => refreshOtherProfile()}
-          />
-        )}
-        {gigParam && (modalGig != null || gigModalPending) && (
-          <GigDetailModal
-            gig={modalGig}
-            loading={gigModalPending && modalGig == null}
-            tick={tick}
-            requested={false}
-            onRequest={() => {}}
-            onClose={closeGig}
-            onViewProfile={(uid) => {
-              const qStr = gigParam ? `?gig=${encodeURIComponent(gigParam)}` : "";
-              navigate(`/profile/${uid}`, { state: { returnTo: `/profile/${routeUserId}${qStr}` } });
-            }}
-            currentUserId={currentUserId}
-            onGigDeleted={() => {
-              refreshOtherProfile();
-              queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
-            }}
           />
         )}
       </>
@@ -309,7 +284,6 @@ export default function ProfilePage({ currentUserId }) {
               activityItems={activityItemsSelf}
               activityLoading={q.activityPending}
               navigate={navigate}
-              setSelectedGigId={setSelectedGigId}
             />
           )}
 
@@ -344,12 +318,6 @@ export default function ProfilePage({ currentUserId }) {
         repOpen={repOpen}
         closeRep={closeRep}
         repScore={repScore}
-        selectedGigId={selectedGigId}
-        onCloseGigModal={() => {
-          setSelectedGigId(null);
-          refreshProfileData();
-        }}
-        onGigStatusChange={refreshProfileData}
         onReviewerPress={(reviewerId) => {
           setTargetReviewerId(null);
           navigate(`/profile/${reviewerId}`, { state: { returnTo: "/profile" } });

@@ -13,6 +13,7 @@ import Explore from "./pages/Explore";
 import PostGig from "./pages/PostGig";
 import Alerts from "./pages/Alerts";
 import GigDetails from "./pages/GigDetails";
+import OpenGig from "./pages/OpenGig";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import Settings from "./pages/Settings";
@@ -255,6 +256,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/app-intro" element={<AppIntro />} />
           <Route path="/gigdetails/:gigId" element={<GigDetails currentUserId={currentUserId} />} />
+          <Route path="/gig/:gigId" element={<OpenGig currentUserId={currentUserId} />} />
           <Route path="/users/:userId" element={<UsersToProfileRedirect />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />

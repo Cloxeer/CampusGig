@@ -7,7 +7,9 @@ import UserAvatar from "../UserAvatar";
 import { elapsed, countdown } from "../../utils/helpers";
 import { getMyRequestForGig, deleteMyGig } from "../../lib/profile";
 import { GigDetailModalSkeleton } from "../GigDetailSkeletons";
+import GigNotFoundPanel from "../GigNotFoundPanel";
 import ReportModal from "./ReportModal";
+import { renderGigDescription } from "../../utils/gigDescriptionMarkup";
 
 export default function GigDetailModal({
   gig,
@@ -19,19 +21,9 @@ export default function GigDetailModal({
   onViewProfile,
   currentUserId,
   onGigDeleted,
+  asPage = false,
 }) {
   const navigate = useNavigate();
-
-  if (loading) {
-    return <GigDetailModalSkeleton onClose={onClose} />;
-  }
-
-  if (!gig) {
-    return null;
-  }
-
-  const cd = countdown(gig.deadline);
-  const taskDesc = gig.description || gig.notes || "No additional details.";
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState(null);
   const [existingRequest, setExistingRequest] = useState(null);
@@ -40,23 +32,24 @@ export default function GigDetailModal({
   const [deleteError, setDeleteError] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
 
-  const isOwnGig = currentUserId && gig.posterId === currentUserId;
-  const canPosterDelete = isOwnGig && (gig.status === "open" || gig.status === "requested");
+  const gigId = gig?.id;
+  const isOwnGig = Boolean(currentUserId && gig && gig.posterId === currentUserId);
+  const canPosterDelete = Boolean(isOwnGig && gig && (gig.status === "open" || gig.status === "requested"));
 
   useEffect(() => {
     setDeleteError(null);
-  }, [gig.id]);
+  }, [gigId]);
 
   useEffect(() => {
     let cancelled = false;
     async function check() {
-      if (!gig?.id || isOwnGig || !currentUserId) {
+      if (!gigId || isOwnGig || !currentUserId) {
         setExistingRequest(null);
         setCheckingRequest(false);
         return;
       }
       setCheckingRequest(true);
-      const { request } = await getMyRequestForGig(gig.id);
+      const { request } = await getMyRequestForGig(gigId);
       if (!cancelled) {
         setExistingRequest(request);
         setCheckingRequest(false);
@@ -66,7 +59,25 @@ export default function GigDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [gig.id, isOwnGig, currentUserId]);
+  }, [gigId, isOwnGig, currentUserId]);
+
+  if (loading) {
+    return <GigDetailModalSkeleton onClose={onClose} asPage={asPage} />;
+  }
+
+  if (!gig) {
+    const notFoundInner = (
+      <div className="page fadein">
+        <GigNotFoundPanel onBack={onClose} />
+      </div>
+    );
+    return asPage ? notFoundInner : (
+      <div className="gig-detail-surface gig-detail-surface--modal">{notFoundInner}</div>
+    );
+  }
+
+  const cd = countdown(gig.deadline);
+  const taskDesc = gig.description || gig.notes || "No additional details.";
 
   const showAlreadyRequested =
     requested ||
@@ -87,7 +98,12 @@ export default function GigDetailModal({
   } else if (gig.eta && gig.eta !== "—") {
     detailRows.push({ icon: <Clock size={14} />, label: "Est. time", val: gig.eta });
   }
-  detailRows.push({ icon: <FileText size={14} />, label: "Gig description", val: taskDesc });
+  detailRows.push({
+    icon: <FileText size={14} />,
+    label: "Gig description",
+    val: taskDesc,
+    preserveWhitespace: true,
+  });
 
   async function handleRequest() {
     setRequesting(true);
@@ -114,10 +130,8 @@ export default function GigDetailModal({
     onClose();
   }
 
-  return (
+  const pageInner = (
     <>
-    <div className="gig-detail-surface gig-detail-surface--modal">
-      <div className="page fadein">
         <div className="topbar">
           <button className="btn bg-btn bico" onClick={onClose}>
             <span style={{ fontSize: 15 }}>←</span>
@@ -238,7 +252,7 @@ export default function GigDetailModal({
                 >
                   {r.icon}
                 </div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 1 }}>
                     {r.label}
                   </div>
@@ -247,9 +261,12 @@ export default function GigDetailModal({
                       fontSize: 14,
                       color: r.expired ? "var(--err)" : "var(--fg)",
                       fontWeight: r.expired ? 600 : 400,
+                      ...(r.preserveWhitespace
+                        ? { whiteSpace: "pre-wrap", wordBreak: "break-word" }
+                        : {}),
                     }}
                   >
-                    {r.val}
+                    {r.preserveWhitespace ? renderGigDescription(r.val) : r.val}
                   </div>
                 </div>
               </div>
@@ -390,8 +407,18 @@ export default function GigDetailModal({
           </div>
           <div style={{ height: 24 }} />
         </div>
+    </>
+  );
+
+  return (
+    <>
+    {asPage ? (
+      <div className="page fadein">{pageInner}</div>
+    ) : (
+      <div className="gig-detail-surface gig-detail-surface--modal">
+        <div className="page fadein">{pageInner}</div>
       </div>
-    </div>
+    )}
 
     {reportOpen && gig?.id && (
       <ReportModal subjectType="gig" gigId={gig.id} onClose={() => setReportOpen(false)} />

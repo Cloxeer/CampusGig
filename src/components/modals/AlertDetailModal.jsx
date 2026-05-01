@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Loader, MapPin, Timer, FileText, CheckCircle, XCircle, Clock,
+  Loader, MapPin, Timer, FileText, CheckCircle, Clock,
   Phone, AtSign, DollarSign, Smartphone, Lock, Mail, MessageCircle, Star,
 } from "lucide-react";
 import {
@@ -18,20 +18,34 @@ import { getLevel, countdown, useTimer } from "../../utils/helpers";
 import LevelBadge from "../LevelBadge";
 import UserAvatar from "../UserAvatar";
 import { AlertGigDetailSkeleton } from "../GigDetailSkeletons";
+import GigNotFoundPanel from "../GigNotFoundPanel";
+import { renderGigDescription } from "../../utils/gigDescriptionMarkup";
+
+const DOT_LIVE = "#22c55e";
+const DOT_UNAVAILABLE = "#a1a1aa";
 
 const STATUS_CONFIG = {
   requested: { label: "Pending Approval", color: "var(--amber)", bg: "var(--amber-bg)", bd: "var(--amber-bd)", dot: "#f59e0b" },
   active: { label: "Active", color: "var(--green-d)", bg: "var(--green-bg)", bd: "var(--green-bd)", dot: "#22c55e" },
   completed: { label: "Completed", color: "var(--green-d)", bg: "var(--green-bg)", bd: "var(--green-bd)", dot: "#16a34a" },
   cancelled: { label: "Cancelled", color: "var(--fg3)", bg: "var(--bg3)", bd: "var(--bd)", dot: "#a1a1aa" },
-  open: { label: "Open", color: "var(--fg3)", bg: "var(--bg3)", bd: "var(--bd)", dot: "#a1a1aa" },
+  open: { label: "Open", color: "var(--green-d)", bg: "var(--green-bg)", bd: "var(--green-bd)", dot: "#22c55e" },
+  open_unavailable: { label: "Unavailable", color: "var(--fg3)", bg: "var(--bg3)", bd: "var(--bd)", dot: "#a1a1aa" },
 };
 
 function StatusBadge({ status, expired }) {
-  const displayStatus = expired && (status === "active" || status === "requested") ? "time_ended" : status;
+  let displayStatus = status;
+  if (expired && (status === "active" || status === "requested")) displayStatus = "time_ended";
+  else if (expired && status === "open") displayStatus = "open_unavailable";
+
   const cfg = displayStatus === "time_ended"
     ? { label: "Time Ended", color: "var(--err)", bg: "var(--err-bg)", bd: "#fecaca", dot: "#dc2626" }
-    : (STATUS_CONFIG[status] || STATUS_CONFIG.open);
+    : (STATUS_CONFIG[displayStatus] || STATUS_CONFIG.open);
+
+  const isLive =
+    !expired &&
+    (displayStatus === "open" || displayStatus === "requested" || displayStatus === "active");
+  const dotColor = isLive ? DOT_LIVE : DOT_UNAVAILABLE;
 
   return (
     <div style={{
@@ -40,7 +54,7 @@ function StatusBadge({ status, expired }) {
       fontSize: 12, fontWeight: 600, fontFamily: "var(--mono)",
       background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.bd}`,
     }}>
-      <div style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot }} />
+      <div style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor }} />
       {cfg.label}
     </div>
   );
@@ -152,6 +166,18 @@ function ContactSection({ user, label }) {
   );
 }
 
+/** Routed gig details: `.page` must be direct under `.shell-view` so session flex + `.scroll` work. Modal: fixed overlay + inner `.page`. */
+function GigAlertDetailShell({ asPage, children }) {
+  if (asPage) {
+    return <div className="page fadein">{children}</div>;
+  }
+  return (
+    <div className="gig-detail-surface gig-detail-surface--modal alert-detail-surface">
+      <div className="page fadein">{children}</div>
+    </div>
+  );
+}
+
 export default function AlertDetailModal({ notification, gigId: gigIdProp, currentUserId, onClose, onStatusChange, asPage = false }) {
   const navigate = useNavigate();
   const [actionLoading, setActionLoading] = useState(false);
@@ -172,8 +198,18 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
       const r = await getGigDetail(resolvedGigId);
       if (r.error) {
         const msg = String(r.error.message || "");
+        const details = String(r.error.details || "");
+        const hint = String(r.error.hint || "");
         const code = r.error.code;
-        if (code === "PGRST116" || msg.includes("No rows") || msg.includes("JSON object")) {
+        const combined = `${msg} ${details} ${hint}`.toLowerCase();
+        const looksMissingRow =
+          code === "PGRST116" ||
+          msg.includes("No rows") ||
+          msg.includes("JSON object") ||
+          msg.includes("0 rows") ||
+          combined.includes("multiple (or no) rows") ||
+          combined.includes("coerce the result to a single json object");
+        if (looksMissingRow) {
           return { gig: null, requests: [], notFound: true };
         }
         throw r.error;
@@ -187,7 +223,6 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
 
   const gig = detailData?.gig ?? null;
   const requests = detailData?.requests ?? [];
-  const gigNotFound = detailData?.notFound === true;
 
   const poster = gig?.poster || {};
   const taker = gig?.taker || null;
@@ -282,70 +317,42 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
     });
   }
 
-  const containerClass = asPage
-    ? "gig-detail-surface gig-detail-surface--page"
-    : "gig-detail-surface gig-detail-surface--modal alert-detail-surface";
-
   if (resolvedGigId && detailPending) {
     return <AlertGigDetailSkeleton onClose={onClose} asPage={asPage} />;
   }
 
   if (!resolvedGigId) {
     return (
-      <div className={containerClass}>
-        <div className="page fadein">
-          <div className="topbar">
-            <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
-            <div style={{ width: 34 }} />
-          </div>
-          <div style={{ padding: "48px 20px", textAlign: "center" }}>
-            <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>This gig is no longer available.</div>
-          </div>
-        </div>
-      </div>
+      <GigAlertDetailShell asPage={asPage}>
+        <GigNotFoundPanel onBack={onClose} />
+      </GigAlertDetailShell>
     );
   }
 
   if (!detailPending && !gig && detailError) {
     return (
-      <div className={containerClass}>
-        <div className="page fadein">
-          <div className="topbar">
-            <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
-            <div style={{ width: 34 }} />
-          </div>
-          <div style={{ padding: "48px 20px", textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
-            <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Could not load gig details.</div>
-            <button type="button" className="btn bp bfull" style={{ maxWidth: 280 }} onClick={() => refetchGigDetail()}>
-              Try again
-            </button>
-          </div>
+      <GigAlertDetailShell asPage={asPage}>
+        <div className="topbar">
+          <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
+          <div style={{ width: 34 }} />
         </div>
-      </div>
+        <div style={{ padding: "48px 20px", textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Could not load gig details.</div>
+          <button type="button" className="btn bp bfull" style={{ maxWidth: 280 }} onClick={() => refetchGigDetail()}>
+            Try again
+          </button>
+        </div>
+      </GigAlertDetailShell>
     );
   }
 
-  if (!detailPending && !gig && gigNotFound) {
+  if (!detailPending && !gig) {
     return (
-      <div className={containerClass}>
-        <div className="page fadein">
-          <div className="topbar">
-            <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Gig Details</span>
-            <div style={{ width: 34 }} />
-          </div>
-          <div style={{ padding: "48px 20px", textAlign: "center" }}>
-            <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>This gig is no longer available.</div>
-          </div>
-        </div>
-      </div>
+      <GigAlertDetailShell asPage={asPage}>
+        <GigNotFoundPanel onBack={onClose} />
+      </GigAlertDetailShell>
     );
-  }
-
-  if (!gig) {
-    return <AlertGigDetailSkeleton onClose={onClose} asPage={asPage} />;
   }
 
   const pendingReq = requests.find((r) => r.status === "pending");
@@ -398,15 +405,14 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
   }
 
   return (
-    <div className={containerClass}>
-      <div className="page fadein">
-        <div className="topbar">
-          <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
-          <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>Gig Details</span>
-          <div style={{ width: 34 }} />
-        </div>
+    <GigAlertDetailShell asPage={asPage}>
+      <div className="topbar">
+        <button className="btn bg-btn bico" onClick={onClose}><span style={{ fontSize: 15 }}>←</span></button>
+        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>Gig Details</span>
+        <div style={{ width: 34 }} />
+      </div>
 
-        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
           <div style={{ padding: "16px 20px 14px", borderBottom: "1px solid var(--bd)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <span style={{
@@ -496,9 +502,19 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
                   border: "1px solid var(--bd)", display: "flex", alignItems: "center",
                   justifyContent: "center", flexShrink: 0, color: "var(--fg3)",
                 }}><FileText size={14} /></div>
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 1 }}>Gig description</div>
-                  <div style={{ fontSize: 14, color: "var(--fg)", lineHeight: 1.5 }}>{gig.description}</div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: "var(--fg)",
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {renderGigDescription(gig.description)}
+                  </div>
                 </div>
               </div>
             )}
@@ -700,7 +716,6 @@ export default function AlertDetailModal({ notification, gigId: gigIdProp, curre
             <button className="btn bo bfull" onClick={onClose}>Close</button>
           </div>
         </div>
-      </div>
-    </div>
+    </GigAlertDetailShell>
   );
 }

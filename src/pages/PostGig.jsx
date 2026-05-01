@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MapPin, Lock, Award, Clock, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
 import { postNewGig, getGigForPosterEdit, updateMyGig } from "../lib/profile";
@@ -53,6 +53,37 @@ export default function PostGig() {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
+  const [descFocused, setDescFocused] = useState(false);
+  const descRef = useRef(null);
+
+  const COLLAPSED_DESC_PX = 80;
+
+  const syncDescriptionHeight = useCallback(() => {
+    const el = descRef.current;
+    if (!el) return;
+    const apply = () => {
+      if (!descFocused) {
+        el.style.height = `${COLLAPSED_DESC_PX}px`;
+        el.style.overflowY = "auto";
+        return;
+      }
+      el.style.overflowY = "hidden";
+      el.style.height = "auto";
+      const next = Math.max(COLLAPSED_DESC_PX, el.scrollHeight);
+      el.style.height = `${next}px`;
+    };
+    if (descFocused) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(apply);
+      });
+    } else {
+      apply();
+    }
+  }, [descFocused]);
+
+  useEffect(() => {
+    syncDescriptionHeight();
+  }, [description, descFocused, syncDescriptionHeight, loadingEdit]);
 
   useEffect(() => {
     if (!editId) {
@@ -101,7 +132,7 @@ export default function PostGig() {
     if (editId) {
       const { error: upErr } = await updateMyGig(editId, {
         title: gigTitle.trim(),
-        description: description.trim() || null,
+        description: String(description).trim() === "" ? null : description,
         categoryLabel: cat,
         price: parseFloat(price) || 0,
         location: location.trim() || null,
@@ -115,7 +146,7 @@ export default function PostGig() {
     } else {
       const { error: postError } = await postNewGig({
         title: gigTitle.trim(),
-        description: description.trim() || null,
+        description: String(description).trim() === "" ? null : description,
         categoryLabel: cat,
         price: parseFloat(price) || 0,
         location: location.trim() || null,
@@ -179,11 +210,24 @@ export default function PostGig() {
         <div className="field">
           <label className="lbl">Task description</label>
           <textarea
+            ref={descRef}
             className="ta"
             placeholder="Describe exactly what you need. Be specific — better descriptions get done faster."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            onFocus={() => setDescFocused(true)}
+            onBlur={() => setDescFocused(false)}
+            rows={1}
+            style={{
+              minHeight: COLLAPSED_DESC_PX,
+              overflowY: descFocused ? "hidden" : "auto",
+            }}
           />
+          <span className="hint" style={{ display: "block", marginTop: 6 }}>
+            Line breaks and spaces are kept as you type. Use <code style={{ fontSize: 11 }}>&amp;B</code>…<code style={{ fontSize: 11 }}>&amp;B</code> for bold,{" "}
+            <code style={{ fontSize: 11 }}>&amp;I</code>…<code style={{ fontSize: 11 }}>&amp;I</code> for italics,{" "}
+            <code style={{ fontSize: 11 }}>&amp;U</code>…<code style={{ fontSize: 11 }}>&amp;U</code> for underline.
+          </span>
         </div>
 
         <div className="field">

@@ -1,4 +1,4 @@
-export default function ProfileOtherActivityTab({ activityItems, openGig }) {
+export default function ProfileOtherActivityTab({ activityItems, navigate, profileUserId }) {
   if (activityItems.length === 0) {
     return (
       <div style={{ padding: "0 16px" }}>
@@ -22,7 +22,12 @@ export default function ProfileOtherActivityTab({ activityItems, openGig }) {
             borderBottom: i < arr.length - 1 ? "1px solid var(--bd)" : "none",
             cursor: a.gigId ? "pointer" : "default",
           }}
-          onClick={() => a.gigId && openGig(a.gigId)}
+          onClick={() => {
+            if (!a.gigId) return;
+            navigate(`/gig/${a.gigId}`, {
+              state: { returnTo: `/profile/${profileUserId}` },
+            });
+          }}
         >
           <div
             style={{

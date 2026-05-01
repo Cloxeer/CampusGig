@@ -781,7 +781,7 @@ export async function postNewGig({ title, description, categoryLabel, price, loc
     price: price || 0,
     location,
   };
-  if (description != null && String(description).trim() !== "") row.description = String(description).trim();
+  if (description != null && String(description).trim() !== "") row.description = String(description);
   if (estimatedTime) row.expires_at = estimatedTime;
 
   const { data, error } = await supabase
@@ -849,7 +849,7 @@ export async function updateMyGig(gigId, { title, description, categoryLabel, pr
     category_id: cat.id,
   };
   if (description != null && String(description).trim() !== "") {
-    row.description = String(description).trim();
+    row.description = String(description);
   } else {
     row.description = null;
   }

@@ -1,6 +1,5 @@
 import ReviewSheetModal from "../../../components/modals/ReviewSheetModal";
 import RepDetailModal from "../../../components/modals/RepDetailModal";
-import AlertDetailModal from "../../../components/modals/AlertDetailModal";
 
 export default function ProfileModals({
   reviewsOpen,
@@ -12,9 +11,6 @@ export default function ProfileModals({
   repOpen,
   closeRep,
   repScore,
-  selectedGigId,
-  onCloseGigModal,
-  onGigStatusChange,
   onReviewerPress,
 }) {
   return (
@@ -35,14 +31,6 @@ export default function ProfileModals({
         <RepDetailModal
           onClose={closeRep}
           repScore={repScore}
-        />
-      )}
-      {selectedGigId && (
-        <AlertDetailModal
-          gigId={selectedGigId}
-          currentUserId={currentUserId}
-          onClose={onCloseGigModal}
-          onStatusChange={onGigStatusChange}
         />
       )}
     </>

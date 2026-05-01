@@ -1,6 +1,6 @@
 import ProfileActivitySkeleton from "./ProfileActivitySkeleton";
 
-export default function ProfileActivityTab({ activityItems, activityLoading, navigate, setSelectedGigId }) {
+export default function ProfileActivityTab({ activityItems, activityLoading, navigate }) {
   if (activityLoading) {
     return <ProfileActivitySkeleton />;
   }
@@ -24,8 +24,9 @@ export default function ProfileActivityTab({ activityItems, activityLoading, nav
             cursor: (a.gigId || a.reviewerId) ? "pointer" : "default",
           }}
           onClick={() => {
-            if (a.gigId) setSelectedGigId(a.gigId);
-            else if (a.reviewerId) navigate(`/profile/${a.reviewerId}`);
+            if (a.gigId) {
+              navigate(`/gigdetails/${a.gigId}`, { state: { returnTo: "/profile" } });
+            } else if (a.reviewerId) navigate(`/profile/${a.reviewerId}`);
           }}
         >
           <div

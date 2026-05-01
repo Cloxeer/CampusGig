@@ -6,7 +6,7 @@
 
 WHAT IT IS
 
-  Main gig feed for logged-in users. See gigs. Tap card → gig detail modal.
+  Main gig feed for logged-in users. See gigs. Tap card → `/gig/:id` full page (browse / request).
   This is the default after login + profile.
 
 ================================================================================
@@ -19,12 +19,12 @@ WHO MAY OPEN IT
 
 TLA+ IN CAVEMAN
 
-  vars: gig_list  modal_gig_id  loading  current_user_id
+  vars: gig_list  loading  current_user_id
 
   INIT: load gigs from DB
 
-  open_card(gig_id) → modal_gig_id = gig_id
-  close_modal → modal_gig_id = null
+  open_card(gig_id) → navigate /gig/:id state.returnTo=/
+  legacy ?gig=id → replace navigate /gig/:id
 
   pull_refresh / remount → reload gig_list
 
@@ -42,7 +42,7 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  Home.jsx + GigDetailModal + normalizeGig / getGigs style loaders.
+  Home.jsx + navigate to `/gig/:id` (OpenGig + GigDetailModal asPage) + normalizeGig / getOpenGigs.
   User avatar in header uses UserAvatar.
 
 ================================================================================

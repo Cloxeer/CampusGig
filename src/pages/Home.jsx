@@ -1,15 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Search, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig, requestGig, getGigById } from "../lib/profile";
-import { queryClient, queryKeys, GIG_DETAIL_STALE_MS } from "../lib/queryClient";
+import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig } from "../lib/profile";
+import { queryKeys } from "../lib/queryClient";
 import { getLevel, useTimer } from "../utils/helpers";
 import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
-import GigDetailModal from "../components/modals/GigDetailModal";
 import RepDetailModal from "../components/modals/RepDetailModal";
 
 const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
@@ -61,11 +60,10 @@ function HomeSkeleton() {
 export default function Home({ currentUserId }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [repOpen, openRep, closeRep] = useModalParam("rep");
-  const [gigParam, openGig, closeGig] = useModalParam("gig");
 
   const [tab, setTab] = useState("Recent");
-  const [requested, setRequested] = useState(false);
   const tick = useTimer();
 
   const { data: profileData, isPending: profilePending } = useQuery({
@@ -87,32 +85,14 @@ export default function Home({ currentUserId }) {
   const showFullSkeleton = profilePending;
 
   useEffect(() => {
-    setRequested(false);
-  }, [gigParam]);
-
-  const listGig = useMemo(() => {
-    if (!gigParam) return undefined;
-    if (gigsPending) return undefined;
-    return gigs.find((g) => g.id === gigParam) ?? null;
-  }, [gigParam, gigsPending, gigs]);
-
-  const { data: modalGig, isPending: gigModalPending } = useQuery({
-    queryKey: queryKeys.gigById(gigParam),
-    queryFn: async () => {
-      const { gig } = await getGigById(gigParam);
-      return gig ?? null;
-    },
-    enabled: Boolean(gigParam),
-    staleTime: GIG_DETAIL_STALE_MS,
-    placeholderData: listGig != null ? listGig : undefined,
-  });
-
-  useEffect(() => {
-    if (!gigParam) return;
-    if (gigsPending) return;
-    if (listGig !== null) return;
-    if (!gigModalPending && modalGig === null) closeGig();
-  }, [gigParam, gigsPending, listGig, gigModalPending, modalGig, closeGig]);
+    const legacy = searchParams.get("gig");
+    if (!legacy) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("gig");
+    const qs = next.toString();
+    const returnPath = `${location.pathname}${qs ? `?${qs}` : ""}` || "/";
+    navigate(`/gig/${legacy}`, { replace: true, state: { returnTo: returnPath } });
+  }, [searchParams, navigate, location.pathname]);
 
   const repScore = profile?.rep_score || 0;
   const lvl = getLevel(repScore);
@@ -220,45 +200,13 @@ export default function Home({ currentUserId }) {
                 key={g.id}
                 gig={g}
                 tick={tick}
-                onClick={() => openGig(g.id)}
+                onClick={() => navigate(`/gig/${g.id}`, { state: { returnTo: "/" } })}
               />
             ))
           )}
         </div>
         <div style={{ height: 16 }} />
       </div>
-
-      {gigParam && (modalGig != null || gigModalPending) && (
-        <GigDetailModal
-          gig={modalGig}
-          loading={gigModalPending && modalGig == null}
-          tick={tick}
-          requested={requested}
-          currentUserId={currentUserId}
-          onRequest={async () => {
-            const result = await requestGig(gigParam);
-            if (!result.error) {
-              setRequested(true);
-              queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
-              queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
-              return { error: null };
-            }
-            return result;
-          }}
-          onClose={closeGig}
-          onViewProfile={(userId) =>
-            navigate(`/profile/${userId}`, {
-              state: {
-                returnTo: `${location.pathname}?gig=${encodeURIComponent(gigParam)}`,
-              },
-            })
-          }
-          onGigDeleted={() => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
-            queryClient.invalidateQueries({ queryKey: queryKeys.gigById(gigParam) });
-          }}
-        />
-      )}
 
       {repOpen && <RepDetailModal onClose={closeRep} />}
     </div>
