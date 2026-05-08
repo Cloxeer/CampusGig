@@ -419,6 +419,10 @@ body {
 .scroll--nav-pad {
   padding-bottom: 80px;
 }
+/* Rep path (and similar) hide bottom nav — avoid a tall empty inset */
+.nav-layout__main-fill--no-bnav .scroll--nav-pad {
+  padding-bottom: 24px;
+}
 @media (min-width: 900px) {
   .scroll--nav-pad {
     padding-bottom: 24px;

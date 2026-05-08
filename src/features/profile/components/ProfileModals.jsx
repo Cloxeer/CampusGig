@@ -1,5 +1,4 @@
 import ReviewSheetModal from "../../../components/modals/ReviewSheetModal";
-import RepDetailModal from "../../../components/modals/RepDetailModal";
 
 export default function ProfileModals({
   reviewsOpen,
@@ -8,9 +7,6 @@ export default function ProfileModals({
   avgRating,
   currentUserId,
   targetReviewerId,
-  repOpen,
-  closeRep,
-  repScore,
   onReviewerPress,
 }) {
   return (
@@ -25,12 +21,6 @@ export default function ProfileModals({
           isOwnProfile
           currentUserId={currentUserId}
           targetReviewerId={targetReviewerId}
-        />
-      )}
-      {repOpen && (
-        <RepDetailModal
-          onClose={closeRep}
-          repScore={repScore}
         />
       )}
     </>

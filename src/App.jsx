@@ -15,6 +15,7 @@ import Alerts from "./pages/Alerts";
 import GigDetails from "./pages/GigDetails";
 import OpenGig from "./pages/OpenGig";
 import Profile from "./pages/Profile";
+import ProfileRep from "./pages/ProfileRep";
 import EditProfile from "./pages/EditProfile";
 import Settings from "./pages/Settings";
 import BottomNav from "./components/BottomNav";
@@ -43,15 +44,18 @@ function UsersToProfileRedirect() {
 }
 
 function NavLayout({ unreadCount }) {
+  const { pathname } = useLocation();
+  const hideBottomNav = pathname === "/profile/rep";
+
   return (
     <div className="nav-layout">
       <DesktopSidebar unreadCount={unreadCount} />
       <div className="nav-layout__main">
-        <div className="nav-layout__main-fill">
+        <div className={`nav-layout__main-fill${hideBottomNav ? " nav-layout__main-fill--no-bnav" : ""}`}>
           <Outlet />
         </div>
       </div>
-      <BottomNav unreadCount={unreadCount} />
+      {!hideBottomNav ? <BottomNav unreadCount={unreadCount} /> : null}
     </div>
   );
 }
@@ -249,6 +253,7 @@ export default function App() {
             <Route path="/explore" element={<Explore currentUserId={currentUserId} />} />
             <Route path="/post" element={<PostGig />} />
             <Route path="/alerts" element={<Alerts />} />
+            <Route path="/profile/rep" element={<ProfileRep />} />
             <Route path="/profile" element={<Profile currentUserId={currentUserId} />} />
           </Route>
           <Route path="/profile/edit" element={<EditProfile />} />

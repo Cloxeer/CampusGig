@@ -87,7 +87,7 @@ export async function getUserProfilePageData(userId) {
       avatarUrl: null,
       reviews: [],
       userActivity: { postedGigs: [], completedGigs: [] },
-      gigStats: { completed: 0, posted: 0 },
+      gigStats: { completed: 0, posted: 0, posterCompleted: 0 },
       rank: null,
       totalUsers: 0,
       myReviewsToThem: [],
@@ -307,9 +307,9 @@ export async function getMyGigStats() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return { completed: 0, posted: 0, error: { message: "Not authenticated" } };
+  if (!user) return { completed: 0, posted: 0, posterCompleted: 0, error: { message: "Not authenticated" } };
 
-  const [takerRes, posterRes] = await Promise.all([
+  const [takerRes, posterRes, posterDoneRes] = await Promise.all([
     supabase
       .from("gigs")
       .select("id", { count: "exact", head: true })
@@ -319,17 +319,23 @@ export async function getMyGigStats() {
       .from("gigs")
       .select("id", { count: "exact", head: true })
       .eq("poster_id", user.id),
+    supabase
+      .from("gigs")
+      .select("id", { count: "exact", head: true })
+      .eq("poster_id", user.id)
+      .eq("status", "completed"),
   ]);
 
   return {
     completed: takerRes.count || 0,
     posted: posterRes.count || 0,
-    error: takerRes.error || posterRes.error,
+    posterCompleted: posterDoneRes.count || 0,
+    error: takerRes.error || posterRes.error || posterDoneRes.error,
   };
 }
 
 export async function getUserGigStats(userId) {
-  const [takerRes, posterRes] = await Promise.all([
+  const [takerRes, posterRes, posterDoneRes] = await Promise.all([
     supabase
       .from("gigs")
       .select("id", { count: "exact", head: true })
@@ -339,12 +345,18 @@ export async function getUserGigStats(userId) {
       .from("gigs")
       .select("id", { count: "exact", head: true })
       .eq("poster_id", userId),
+    supabase
+      .from("gigs")
+      .select("id", { count: "exact", head: true })
+      .eq("poster_id", userId)
+      .eq("status", "completed"),
   ]);
 
   return {
     completed: takerRes.count || 0,
     posted: posterRes.count || 0,
-    error: takerRes.error || posterRes.error,
+    posterCompleted: posterDoneRes.count || 0,
+    error: takerRes.error || posterRes.error || posterDoneRes.error,
   };
 }
 

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { MapPin, Lock, Award, Clock, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
 import { postNewGig, getGigForPosterEdit, updateMyGig } from "../lib/profile";
 import { queryClient, queryKeys } from "../lib/queryClient";
+import { readDraft, writeDraft, clearDraft } from "../utils/postGigDraft";
 import TopBar from "../components/TopBar";
 
 const ICON_MAP = {
@@ -44,7 +45,7 @@ export default function PostGig() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("edit");
-  const [cat, setCat] = useState("Food");
+  const [cat, setCat] = useState("Other");
   const [gigTitle, setGigTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("0");
@@ -54,9 +55,32 @@ export default function PostGig() {
   const [error, setError] = useState(null);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
   const [descFocused, setDescFocused] = useState(false);
+  const [draftHydrated, setDraftHydrated] = useState(!!editId);
   const descRef = useRef(null);
 
   const COLLAPSED_DESC_PX = 80;
+
+  useLayoutEffect(() => {
+    if (editId) {
+      setDraftHydrated(true);
+      return;
+    }
+    const d = readDraft();
+    if (d) {
+      setCat(d.cat);
+      setGigTitle(d.gigTitle);
+      setDescription(d.description);
+      setPrice(d.price);
+      setLocation(d.location);
+      setTimeLimitIdx(d.timeLimitIdx);
+    }
+    setDraftHydrated(true);
+  }, [editId]);
+
+  useEffect(() => {
+    if (editId || !draftHydrated) return;
+    writeDraft({ cat, gigTitle, description, price, location, timeLimitIdx });
+  }, [editId, draftHydrated, cat, gigTitle, description, price, location, timeLimitIdx]);
 
   const syncDescriptionHeight = useCallback(() => {
     const el = descRef.current;
@@ -101,7 +125,7 @@ export default function PostGig() {
         setLoadingEdit(false);
         return;
       }
-      setCat(gig.category?.label || "Food");
+      setCat(gig.category?.label || "Other");
       setGigTitle(gig.title || "");
       setDescription(gig.description || "");
       setPrice(String(gig.price ?? 0));
@@ -158,6 +182,7 @@ export default function PostGig() {
         setPosting(false);
         return;
       }
+      clearDraft();
     }
 
     queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
@@ -166,7 +191,34 @@ export default function PostGig() {
 
   return (
     <div className="page fadein">
-      <TopBar title={editId ? "Edit gig" : "Post a gig"} />
+      <TopBar
+        title={editId ? "Edit gig" : "Post a gig"}
+        right={
+          editId ? (
+            <button
+              type="button"
+              className="btn bp bsm"
+              onClick={handlePost}
+              disabled={posting || loadingEdit}
+              style={{ opacity: posting || loadingEdit ? 0.7 : 1 }}
+            >
+              {loadingEdit ? (
+                <>
+                  <Loader size={14} className="spin" />
+                  Loading…
+                </>
+              ) : posting ? (
+                <>
+                  <Loader size={14} className="spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save"
+              )}
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="scroll scroll--post-pad scroll--fine-scrollbar" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {editId && (

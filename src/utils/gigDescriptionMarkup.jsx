@@ -2,22 +2,48 @@ import { Fragment, createElement } from "react";
 
 /** Paired delimiters; inner segments recurse so nested &B/&I/&U pairs work. */
 const PAIRS = [
-  { token: "&B", wrap: "strong", style: undefined },
-  { token: "&I", wrap: "em", style: undefined },
+  { token: "&B", wrap: "strong", style: { fontWeight: 700 } },
+  { token: "&I", wrap: "em", style: { fontStyle: "italic" } },
   { token: "&U", wrap: "span", style: { textDecoration: "underline" } },
 ];
 
-function findEarliestPairStart(s, from) {
-  let bestIdx = -1;
-  let pair = null;
+/** `&` + letter (B/I/U), both cases — used for open and close. */
+function delimiterForms(pair) {
+  const letter = pair.token[1];
+  const upper = `&${letter.toUpperCase()}`;
+  const lower = `&${letter.toLowerCase()}`;
+  return upper === lower ? [upper] : [upper, lower];
+}
+
+/** Rich text / email clients sometimes store `&amp;B` instead of `&B`. */
+function normalizeMarkupSource(s) {
+  return String(s).replace(/&amp;([BIU])/gi, (_, ch) => `&${ch.toUpperCase()}`);
+}
+
+/** Earliest opening delimiter among B/I/U (case-insensitive on the letter). */
+function findEarliestOpen(s, from) {
+  let best = null;
   for (const p of PAIRS) {
-    const i = s.indexOf(p.token, from);
-    if (i >= 0 && (bestIdx < 0 || i < bestIdx)) {
-      bestIdx = i;
-      pair = p;
+    for (const open of delimiterForms(p)) {
+      const idx = s.indexOf(open, from);
+      if (idx < 0) continue;
+      const better =
+        !best ||
+        idx < best.index ||
+        (idx === best.index && PAIRS.indexOf(p) < PAIRS.indexOf(best.pair));
+      if (better) best = { index: idx, pair: p, openLen: open.length };
     }
   }
-  return bestIdx >= 0 ? { index: bestIdx, pair } : null;
+  return best;
+}
+
+function findCloseIdx(s, innerStart, pair) {
+  let best = -1;
+  for (const close of delimiterForms(pair)) {
+    const j = s.indexOf(close, innerStart);
+    if (j >= 0 && (best < 0 || j < best)) best = j;
+  }
+  return best;
 }
 
 function parseToNodes(s, keyPrefix) {
@@ -26,7 +52,7 @@ function parseToNodes(s, keyPrefix) {
   let seq = 0;
 
   while (i < s.length) {
-    const hit = findEarliestPairStart(s, i);
+    const hit = findEarliestOpen(s, i);
     if (!hit) {
       if (i < s.length) nodes.push(s.slice(i));
       break;
@@ -34,9 +60,9 @@ function parseToNodes(s, keyPrefix) {
     if (hit.index > i) {
       nodes.push(s.slice(i, hit.index));
     }
-    const { pair } = hit;
-    const innerStart = hit.index + pair.token.length;
-    const closeIdx = s.indexOf(pair.token, innerStart);
+    const { pair, openLen } = hit;
+    const innerStart = hit.index + openLen;
+    const closeIdx = findCloseIdx(s, innerStart, pair);
     if (closeIdx < 0) {
       nodes.push(s.slice(hit.index));
       break;
@@ -45,10 +71,9 @@ function parseToNodes(s, keyPrefix) {
     const innerChildren = parseToNodes(inner, `${keyPrefix}-${seq}`);
     seq += 1;
     const key = `${keyPrefix}-n${seq}`;
-    nodes.push(
-      createElement(pair.wrap, { key, style: pair.style }, innerChildren.length ? innerChildren : null),
-    );
-    i = closeIdx + pair.token.length;
+    const kids = innerChildren.length > 0 ? innerChildren : [""];
+    nodes.push(createElement(pair.wrap, { key, style: pair.style }, ...kids));
+    i = closeIdx + openLen;
   }
 
   return nodes;
@@ -60,7 +85,7 @@ function parseToNodes(s, keyPrefix) {
  */
 export function renderGigDescription(text) {
   if (text == null || text === "") return null;
-  const s = String(text);
+  const s = normalizeMarkupSource(text);
   const children = parseToNodes(s, "gd");
   if (children.length === 0) return null;
   if (children.length === 1 && typeof children[0] === "string") return children[0];

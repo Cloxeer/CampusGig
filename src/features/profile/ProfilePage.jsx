@@ -35,11 +35,18 @@ export default function ProfilePage({ currentUserId }) {
   const isOtherProfile = Boolean(routeUserId);
 
   const profileBackTarget = safeAppReturnTo(location.state);
-  const [repOpen, openRep, closeRep] = useModalParam("rep");
   const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
   const [searchParams] = useSearchParams();
 
-  const [pTab, setPTab] = useState(() => (routeUserId ? "reviews" : "activity"));
+  const [pTab, setPTab] = useState(() => {
+    if (routeUserId) return "reviews";
+    try {
+      if (new URLSearchParams(window.location.search).get("tab") === "leaderboard") return "leaderboard";
+    } catch {
+      /* ignore */
+    }
+    return "activity";
+  });
   const [loggingOut, setLoggingOut] = useState(false);
   const [targetReviewerId, setTargetReviewerId] = useState(null);
   const [deepLinkGigId, setDeepLinkGigId] = useState(null);
@@ -67,6 +74,25 @@ export default function ProfilePage({ currentUserId }) {
     if (deepLinkGigId && eligible.includes(deepLinkGigId)) return deepLinkGigId;
     return q.firstPendingGigId ?? null;
   }, [routeUserId, q.firstPendingGigId, q.eligiblePendingGigIds, deepLinkGigId]);
+
+  useEffect(() => {
+    if (searchParams.get("rep") && !isOtherProfile) {
+      navigate("/profile/rep", { replace: true, state: { returnTo: "/profile" } });
+    }
+  }, [searchParams, navigate, isOtherProfile]);
+
+  useEffect(() => {
+    if (routeUserId) return;
+    if (searchParams.get("tab") === "leaderboard") setPTab("leaderboard");
+  }, [searchParams, routeUserId]);
+
+  useEffect(() => {
+    if (routeUserId || pTab !== "leaderboard" || searchParams.get("tab") !== "leaderboard") return;
+    const id = requestAnimationFrame(() => {
+      document.getElementById("profile-leaderboard-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [routeUserId, pTab, searchParams]);
 
   useEffect(() => {
     if (!isOtherProfile || !routeUserId) return;
@@ -144,7 +170,6 @@ export default function ProfilePage({ currentUserId }) {
                 lvl={lvl}
                 rank={q.rank}
                 totalUsers={q.totalUsers}
-                openRep={openRep}
                 variant="other"
               />
             </div>
@@ -274,7 +299,13 @@ export default function ProfilePage({ currentUserId }) {
               isOwnProfile
             />
 
-            <ProfileRepCard repScore={repScore} lvl={lvl} rank={q.rank} totalUsers={q.totalUsers} openRep={openRep} />
+            <ProfileRepCard
+              repScore={repScore}
+              lvl={lvl}
+              rank={q.rank}
+              totalUsers={q.totalUsers}
+              onRepPath={() => navigate("/profile/rep", { state: { returnTo: "/profile" } })}
+            />
           </div>
 
           <ProfileTabBar variant="self" pTab={pTab} setPTab={setPTab} />
@@ -288,17 +319,19 @@ export default function ProfilePage({ currentUserId }) {
           )}
 
           {pTab === "leaderboard" && (
-            <ProfileLeaderboardTab
-              leaderboard={q.leaderboard}
-              totalUsers={q.totalUsers}
-              rank={q.rank}
-              profile={q.profile}
-              avatarUrl={q.avatarUrl}
-              fullName={fullName}
-              lvl={lvl}
-              repScore={repScore}
-              navigate={navigate}
-            />
+            <div id="profile-leaderboard-section">
+              <ProfileLeaderboardTab
+                leaderboard={q.leaderboard}
+                totalUsers={q.totalUsers}
+                rank={q.rank}
+                profile={q.profile}
+                avatarUrl={q.avatarUrl}
+                fullName={fullName}
+                lvl={lvl}
+                repScore={repScore}
+                navigate={navigate}
+              />
+            </div>
           )}
 
           <div style={{ height: 16 }} />
@@ -315,9 +348,6 @@ export default function ProfilePage({ currentUserId }) {
         avgRating={avgRatingSelfDisplay}
         currentUserId={currentUserId}
         targetReviewerId={targetReviewerId}
-        repOpen={repOpen}
-        closeRep={closeRep}
-        repScore={repScore}
         onReviewerPress={(reviewerId) => {
           setTargetReviewerId(null);
           navigate(`/profile/${reviewerId}`, { state: { returnTo: "/profile" } });

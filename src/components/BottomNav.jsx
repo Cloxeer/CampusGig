@@ -40,7 +40,7 @@ export default function BottomNav({ unreadCount = 0 }) {
       </button>
 
       <button
-        className={`ni ${pathname === "/profile" ? "on" : ""}`}
+        className={`ni ${pathname === "/profile" || pathname === "/profile/rep" ? "on" : ""}`}
         onClick={() => navigate("/profile")}
       >
         <User size={18} />

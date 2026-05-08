@@ -92,7 +92,7 @@ export function useProfilePageQueries(routeUserId) {
     const hasExpiredReviewOpportunity = op?.hasExpiredReviewOpportunity ?? false;
     const myReviewsToThem = op?.myReviewsToThem ?? [];
     const userActivity = op?.userActivity ?? { postedGigs: [], completedGigs: [] };
-    const gigStats = op?.gigStats ?? { completed: 0, posted: 0 };
+    const gigStats = op?.gigStats ?? { completed: 0, posted: 0, posterCompleted: 0 };
     const rank = op?.rank ?? null;
     const totalUsers = op?.totalUsers ?? 0;
 
@@ -119,7 +119,7 @@ export function useProfilePageQueries(routeUserId) {
   }
 
   const reviews = reviewsData?.reviews || [];
-  const gigStats = gigStatsData || { completed: 0, posted: 0 };
+  const gigStats = gigStatsData || { completed: 0, posted: 0, posterCompleted: 0 };
   const rank = rankData?.rank || null;
   const totalUsers = totalUsersData?.total || 0;
   const leaderboard = leaderboardData?.leaderboard || [];

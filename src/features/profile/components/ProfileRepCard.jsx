@@ -1,16 +1,27 @@
 import { Award } from "lucide-react";
 
 /** @param {"self"|"other"} variant */
-export default function ProfileRepCard({ repScore, lvl, rank, totalUsers, openRep, variant = "self" }) {
+export default function ProfileRepCard({ repScore, lvl, rank, totalUsers, onRepPath, variant = "self" }) {
   const interactive = variant === "self";
   return (
     <div
       className="rep-card"
-      style={{ marginBottom: 16, cursor: interactive ? "pointer" : undefined }}
-      onClick={interactive ? () => openRep() : undefined}
-      role={interactive ? "button" : undefined}
+      style={{ marginBottom: 16, cursor: interactive && onRepPath ? "pointer" : undefined }}
+      onClick={interactive && onRepPath ? () => onRepPath() : undefined}
+      role={interactive && onRepPath ? "button" : undefined}
+      tabIndex={interactive && onRepPath ? 0 : undefined}
+      onKeyDown={
+        interactive && onRepPath
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onRepPath();
+              }
+            }
+          : undefined
+      }
     >
-      <div className="rc-ey">{interactive ? "Rep Score · tap for details" : "Rep Score"}</div>
+      <div className="rc-ey">{interactive ? "Rep path · tap to open" : "Rep Score"}</div>
       <div className="rc-row">
         <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
           <span className="rc-score">{repScore}</span>

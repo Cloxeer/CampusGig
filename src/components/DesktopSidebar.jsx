@@ -6,8 +6,8 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  function Item({ to, icon: Icon, label, dot }) {
-    const on = pathname === to;
+  function Item({ to, icon: Icon, label, dot, active }) {
+    const on = typeof active === "boolean" ? active : pathname === to;
     return (
       <div className="dsi-wrap">
         <button
@@ -34,7 +34,7 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
         <Item to="/" icon={Home} label="Home" />
         <Item to="/explore" icon={Search} label="Explore" />
         <Item to="/alerts" icon={Bell} label="Alerts" dot={unreadCount > 0} />
-        <Item to="/profile" icon={User} label="Profile" />
+        <Item to="/profile" icon={User} label="Profile" active={pathname === "/profile" || pathname === "/profile/rep"} />
       </nav>
       <div className="dsk-post">
         <button type="button" className="dsk-post-btn" onClick={() => navigate("/post")}>

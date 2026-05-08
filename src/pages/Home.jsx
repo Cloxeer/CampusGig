@@ -5,11 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
 import { getLevel, useTimer } from "../utils/helpers";
-import { useModalParam } from "../hooks/useModalParam";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
-import RepDetailModal from "../components/modals/RepDetailModal";
 
 const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
 
@@ -61,8 +59,6 @@ export default function Home({ currentUserId }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [repOpen, openRep, closeRep] = useModalParam("rep");
-
   const [tab, setTab] = useState("Recent");
   const tick = useTimer();
 
@@ -83,6 +79,12 @@ export default function Home({ currentUserId }) {
   const gigs = useMemo(() => (gigsData?.gigs || []).map(normalizeGig), [gigsData]);
   /** Full-page skeleton only when we have never loaded the profile (no cache). Cached profile + loading gigs still shows the header/rep card. */
   const showFullSkeleton = profilePending;
+
+  useEffect(() => {
+    if (searchParams.get("rep")) {
+      navigate("/profile/rep", { replace: true, state: { returnTo: "/" } });
+    }
+  }, [searchParams, navigate]);
 
   useEffect(() => {
     const legacy = searchParams.get("gig");
@@ -134,8 +136,20 @@ export default function Home({ currentUserId }) {
 
       <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
         <div style={{ margin: "14px 16px 0" }}>
-          <div className="rep-card" style={{ cursor: "pointer" }} onClick={() => openRep()}>
-            <div className="rc-ey">Rep Score · tap for details</div>
+          <div
+            className="rep-card"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/profile/rep", { state: { returnTo: "/" } })}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate("/profile/rep", { state: { returnTo: "/" } });
+              }
+            }}
+          >
+            <div className="rc-ey">Rep path · tap to open</div>
             <div className="rc-row">
               <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
                 <span className="rc-score">{repScore}</span>
@@ -208,7 +222,6 @@ export default function Home({ currentUserId }) {
         <div style={{ height: 16 }} />
       </div>
 
-      {repOpen && <RepDetailModal onClose={closeRep} />}
     </div>
   );
 }
