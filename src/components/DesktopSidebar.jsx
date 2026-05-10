@@ -28,7 +28,7 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
     <aside className="desktop-sidebar" aria-label="Primary">
       <div className="dsk-brand">
         <LogoMark size={28} />
-        <span className="dsk-brand-title">GetCampusGig</span>
+        <span className="dsk-brand-title">GetCampusGig.com</span>
       </div>
       <nav className="dsk-nav" aria-label="Main navigation">
         <Item to="/" icon={Home} label="Home" />
