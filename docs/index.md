@@ -12,6 +12,11 @@ CORE RULES AND CONSTRAINTS
 
 - System Invariants → ./core/invariants.md
 
+GROWTH
+
+- NMSU launch (now) — liquidity, posters, tabling → ./launch-plan-nmsu.md
+- Multi-campus expansion (later) — ambassadors, local sponsors, pay model → ./expansion-plan-multi-campus.md
+
 SYSTEMS
 
 - Authentication & Profiles → ./systems/auth.md

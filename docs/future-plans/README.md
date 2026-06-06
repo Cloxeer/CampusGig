@@ -52,6 +52,19 @@ OPERATIONAL / SCALE
 
 ================================================================================
 
+MONETIZATION / PARTNERS (IDEAS — NOT BUILT)
+
+  • Local “Deals” / sponsorships tab — campus businesses offer discounts to
+    active students; no payment processing in v1. See launch playbook Phase 3:
+    ../launch-plan-nmsu.md
+
+  • Ship only after ~100 signups and ~30 completed gigs (liquidity first).
+
+  • Multi-campus expansion, ambassador pay, sponsor revenue split:
+    ../expansion-plan-multi-campus.md
+
+================================================================================
+
 GAPS TO WATCH
 
   • Rep gating can feel elitist — tune copy and thresholds for a campus.
