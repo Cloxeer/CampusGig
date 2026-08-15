@@ -150,7 +150,7 @@ export default function Splash() {
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
             <div className="sdot" />
             <span style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--fg3)" }}>
-              student-to-student · Main Campus @nmsu.edu
+              post it or pick it up · NMSU Las Cruces
             </span>
           </div>
 
@@ -209,7 +209,7 @@ export default function Splash() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, paddingTop: 2 }}>
           <Lock size={11} color="var(--fg4)" />
           <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--fg4)" }}>
-            Las Cruces Main Campus @nmsu.edu only · GO aggies
+            Anyone can post · only verified NMSU students work gigs · GO aggies
           </span>
         </div>
       </div>

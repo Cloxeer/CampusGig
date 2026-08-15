@@ -12,15 +12,9 @@
 -- run Aug 14, 2026 (notably: reviews.rating is INTEGER, price is
 -- plain NUMERIC, created_at/updated_at are nullable).
 --
--- This file reflects ONLY objects confirmed applied to the live DB
--- (migrations 20260814000000/00001/00002/00004/00005/00006 + the
--- 00008 client-signup repair). Deliberately EXCLUDED because they
--- were written but NOT confirmed run:
---   • Content-bounds CHECKs (migration 20260814000003) — title/
---     description/notes/price/review-text length + range guards.
---   • trg_stamp_gig_audience on INSERT *OR UPDATE* (00007) — the
---     live trigger fires on INSERT only.
--- Add them here once you confirm those migrations ran.
+-- This file reflects objects applied to the live DB — migrations
+-- 20260814000000 through 00008 (content bounds 00003 + audience-lock
+-- 00007 included; both applied Aug 15, 2026).
 --
 -- RPC pattern (advisor 0029): privileged SECURITY DEFINER bodies
 -- live in the unexposed `private` schema; `public.<name>` are thin
@@ -322,12 +316,16 @@ CREATE TABLE IF NOT EXISTS public.gigs (
   poster_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   taker_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
   category_id INTEGER NOT NULL REFERENCES public.categories(id),
-  title TEXT NOT NULL,
-  description TEXT,
-  price NUMERIC DEFAULT 0,
+  title TEXT NOT NULL
+    CONSTRAINT gigs_title_len CHECK (char_length(title) BETWEEN 1 AND 120),
+  description TEXT
+    CONSTRAINT gigs_description_len CHECK (description IS NULL OR char_length(description) <= 5000),
+  price NUMERIC DEFAULT 0
+    CONSTRAINT gigs_price_bounds CHECK (price >= 0 AND price <= 10000),
   location VARCHAR(255),
   estimated_time VARCHAR(100),
-  notes TEXT,
+  notes TEXT
+    CONSTRAINT gigs_notes_len CHECK (notes IS NULL OR char_length(notes) <= 2000),
   expires_at TIMESTAMPTZ,
   status VARCHAR(20) DEFAULT 'open'
     CONSTRAINT valid_status CHECK (status IN ('open', 'requested', 'active', 'completed', 'cancelled')),
@@ -340,7 +338,7 @@ CREATE TABLE IF NOT EXISTS public.gigs (
 );
 
 COMMENT ON COLUMN public.gigs.audience IS
-  'Who may see this gig: everyone (client-posted) | students_only (student-posted). Stamped from poster type at insert.';
+  'Who may see this gig: everyone (client-posted) | students_only (student-posted). Stamped from poster type; re-stamped on every write.';
 
 CREATE INDEX IF NOT EXISTS idx_gigs_poster ON public.gigs(poster_id);
 CREATE INDEX IF NOT EXISTS idx_gigs_taker ON public.gigs(taker_id);
@@ -460,7 +458,8 @@ CREATE TABLE IF NOT EXISTS public.reviews (
   reviewee_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   rating INTEGER NOT NULL
     CONSTRAINT valid_rating CHECK (rating >= 1 AND rating <= 5),
-  text TEXT,
+  text TEXT
+    CONSTRAINT reviews_text_len CHECK (text IS NULL OR char_length(text) <= 2000),
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT no_self_review CHECK (reviewer_id <> reviewee_id),
@@ -1165,8 +1164,10 @@ CREATE TRIGGER trg_after_review_delete AFTER DELETE ON public.reviews FOR EACH R
 CREATE TRIGGER trg_private_contact_email_nmsu
   BEFORE INSERT OR UPDATE OF email ON public.user_private_contact
   FOR EACH ROW EXECUTE FUNCTION public.enforce_private_contact_email_nmsu();
+-- INSERT OR UPDATE: audience is re-derived on every write so a poster can
+-- never flip it post-hoc (e.g. a student exposing a students_only gig).
 CREATE TRIGGER trg_stamp_gig_audience
-  BEFORE INSERT ON public.gigs
+  BEFORE INSERT OR UPDATE ON public.gigs
   FOR EACH ROW EXECUTE FUNCTION public.stamp_gig_audience();
 CREATE TRIGGER trg_gig_poster_email_confirmed
   BEFORE INSERT ON public.gigs
