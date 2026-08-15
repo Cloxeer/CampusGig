@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, Navigate, Outlet, useParams, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
+import { LogIn } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
@@ -41,6 +42,56 @@ function ProfileByIdRoute({ currentUserId }) {
 function UsersToProfileRedirect() {
   const { userId } = useParams();
   return <Navigate to={`/profile/${userId}`} replace />;
+}
+
+/** Anon hit an auth-required action (posting). Prompt sign-in → welcome. */
+function AnonAuthGate() {
+  const navigate = useNavigate();
+  return (
+    <div className="page fadein">
+      <div className="scroll scroll--nav-pad" style={{ padding: "56px 20px" }}>
+        <div
+          style={{
+            maxWidth: 360,
+            margin: "0 auto",
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: "var(--bg3)",
+              border: "1px solid var(--bd)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 4px",
+              color: "var(--fg2)",
+            }}
+          >
+            <LogIn size={24} />
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.03em" }}>
+            Sign in to post a gig
+          </div>
+          <div style={{ fontSize: 14, color: "var(--fg3)", lineHeight: 1.6 }}>
+            Posting needs a free account. Browsing stays open — no account needed to look around.
+          </div>
+          <button className="btn bp bfull blg" style={{ marginTop: 6 }} onClick={() => navigate("/welcome")}>
+            Continue to sign in
+          </button>
+          <button className="btn bo bfull" onClick={() => navigate("/")}>
+            Keep browsing
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function NavLayout({ unreadCount }) {
@@ -157,6 +208,11 @@ export default function App() {
   async function checkProfile() {
     if (profileCheckRef.current) return;
     profileCheckRef.current = true;
+    // Show the loading screen (not the onboarding form) while we verify whether
+    // this signed-in user has a profile. Without this, a fresh SIGNED_IN after
+    // authLoading has gone false briefly renders <Onboarding> — the contact form
+    // flash — until this async check resolves hasProfile.
+    setAuthLoading(true);
 
     try {
       const result = await queryClient.fetchQuery({
@@ -190,11 +246,19 @@ export default function App() {
       <div className="shell shell--session">
         <div className="shell-view">
           <Routes>
-            {/* Public, read-only surfaces — outsider gigs only (enforced by RLS). */}
-            <Route path="/" element={<Home currentUserId={null} />} />
+            {/* Anon gets the full nav. Home + Explore are freely browsable
+                (read-only, outsider gigs only — enforced by RLS). Auth-required
+                tabs send them to the welcome/sign-in screen. */}
+            <Route element={<NavLayout unreadCount={0} />}>
+              <Route path="/" element={<Home currentUserId={null} />} />
+              <Route path="/explore" element={<Explore currentUserId={null} />} />
+              <Route path="/post" element={<AnonAuthGate />} />
+              <Route path="/alerts" element={<Navigate to="/welcome" replace />} />
+              <Route path="/profile" element={<Navigate to="/welcome" replace />} />
+              <Route path="/profile/rep" element={<ProfileRep />} />
+            </Route>
+            {/* Full-screen (no-nav) public surfaces + sign-in / marketing routes. */}
             <Route path="/gig/:gigId" element={<OpenGig currentUserId={null} />} />
-            <Route path="/profile/rep" element={<ProfileRep />} />
-            {/* Sign-in / marketing routes. */}
             <Route path="/welcome" element={<Splash />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/magic" element={<MagicLink />} />

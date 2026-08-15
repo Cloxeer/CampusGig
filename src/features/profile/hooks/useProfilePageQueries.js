@@ -45,7 +45,7 @@ export function useProfilePageQueries(routeUserId) {
 
   const { data: rankData } = useQuery({
     queryKey: queryKeys.campusRank,
-    queryFn: () => getCampusRank(profile?.rep_score || 0),
+    queryFn: () => getCampusRank(profile?.rep_score || 0, profile?.created_at),
     enabled: !isOtherProfile && !!profile,
     staleTime: STATS_STALE_TIME,
   });

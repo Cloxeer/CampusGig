@@ -81,7 +81,7 @@ export async function getUserProfilePageData(userId) {
     getCompletedGigsBetweenUsers(userId),
     getUserActivity(userId),
     getUserGigStats(userId),
-    getCampusRank(p.rep_score || 0),
+    getCampusRank(p.rep_score || 0, p.created_at),
     getTotalUsers(),
     getMyReviewsToUserByGig(userId),
   ]);

@@ -16,6 +16,10 @@ export default function ProfileHeaderSection({
   hasPendingReview = false,
   myReviewsToThemLength = 0,
 }) {
+  const joinedLabel = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    : null;
+
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
       <UserAvatar
@@ -27,11 +31,16 @@ export default function ProfileHeaderSection({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.03em", marginBottom: 2 }}>{fullName}</div>
         {isOwnProfile ? (
-          <div style={{ fontSize: 11, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 2 }}>
             {profile.email}
           </div>
         ) : null}
-        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: isOwnProfile ? 0 : 4 }}>
+        {joinedLabel && (
+          <div style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)", marginBottom: 6, marginTop: isOwnProfile ? 0 : 2 }}>
+            Joined {joinedLabel}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
           <LevelBadge label={lvl.label} />
         </div>
       </div>

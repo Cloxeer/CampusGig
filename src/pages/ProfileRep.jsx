@@ -179,8 +179,8 @@ export default function ProfileRep() {
   const pageReady = !(profilePending && !profile);
 
   const { data: rankData } = useQuery({
-    queryKey: ["campusRank", repScore],
-    queryFn: () => getCampusRank(repScore),
+    queryKey: ["campusRank", repScore, profile?.created_at],
+    queryFn: () => getCampusRank(repScore, profile?.created_at),
     enabled: !!profile,
   });
 

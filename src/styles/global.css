@@ -493,6 +493,10 @@ body {
   font-size: 14px;
   cursor: pointer;
   border: none;
+  /* Bare .btn (menu items, icon buttons) sets no color, so iOS Safari falls back
+     to its system-blue button tint. Inherit the surrounding text color instead;
+     color-modifier classes (.bp/.bo/.bgreen/…) still override this. */
+  color: inherit;
   line-height: 1;
   letter-spacing: -.01em;
   transition: all .12s;

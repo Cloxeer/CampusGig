@@ -45,13 +45,29 @@ export async function getUserGigStats(userId) {
   return fetchGigStats(userId);
 }
 
-export async function getCampusRank(repScore) {
-  const { count, error } = await supabase
+export async function getCampusRank(repScore, createdAt) {
+  // Primary: how many users outrank me on Rep.
+  const higher = await supabase
     .from("users")
     .select("id", { count: "exact", head: true })
     .gt("rep_score", repScore);
 
-  return { rank: (count || 0) + 1, error };
+  // Tiebreak (mirrors the leaderboard's `rep DESC, created_at ASC`): among users
+  // tied on Rep, earlier joiners rank ahead. This keeps every rank distinct, so a
+  // wall of 0-Rep users no longer collapses onto the same number.
+  let tiedAhead = { count: 0, error: null };
+  if (createdAt) {
+    tiedAhead = await supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("rep_score", repScore)
+      .lt("created_at", createdAt);
+  }
+
+  return {
+    rank: (higher.count || 0) + (tiedAhead.count || 0) + 1,
+    error: higher.error || tiedAhead.error,
+  };
 }
 
 export async function getTotalUsers() {
@@ -150,7 +166,10 @@ export async function getLeaderboard(limit = 10) {
   const { data, error } = await supabase
     .from("users")
     .select("id, first_name, last_name, avatar_color, avatar_url, rep_score")
+    // Same total order the campus-rank stat uses: Rep desc, then earlier joiners
+    // first — so tied users get a deterministic, consistent position.
     .order("rep_score", { ascending: false })
+    .order("created_at", { ascending: true })
     .limit(limit);
 
   const leaderboard = (data || []).map((u, i) => ({
