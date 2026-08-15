@@ -8,7 +8,7 @@ WHAT IT IS
 
   My face, my rep, my stats, my reviews summary.
   Tabs: Activity (things I did / gigs / reviews I got) and Leaderboard.
-  Activity rows navigate to `/gigdetails/:gigId` (full page, `returnTo: /profile`) or to reviewer profile.
+  Activity rows navigate to `/gig/:gigId` (full page, `returnTo: /profile`) or to reviewer profile.
   On another student’s profile (`/profile/:userId`), activity gig rows open `/gig/:gigId` (browse / request) with `returnTo` that profile.
 
 ================================================================================
@@ -26,10 +26,10 @@ TLA+ IN CAVEMAN
   INIT: load profile + activity + reviews + board
 
   tap_activity_row:
-    if gig → navigate /gigdetails/:id state.returnTo=/profile
+    if gig → navigate /gig/:id state.returnTo=/profile
     if reviewer → navigate /profile/:reviewerId
 
-  tap_rep_card → open RepDetailModal (query param rep)
+  tap_rep_card → navigate /profile/rep (ProfileRep page)
 
   tap_reviews → open ReviewSheetModal (query param reviews)
 
@@ -46,11 +46,11 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  ProfilePage + getMyActivity + navigate to `/gigdetails/:id` for owned gig drill-in (AlertDetailModal with `asPage` on that route).
+  ProfilePage + getMyActivity + navigate to `/gig/:id` (OpenGig → GigDetailView) for owned gig drill-in.
 
 ================================================================================
 
 GAPS TO WATCH
 
 - Leaderboard pagination: top 100 only — fine until huge campus.
-- After gig actions on `/gigdetails/:id`, returning to `/profile` remounts the page and refetches activity/reviews as queries run again.
+- After gig actions on `/gig/:id`, returning to `/profile` remounts the page and refetches activity/reviews as queries run again.

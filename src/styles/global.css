@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+/* Fonts are self-hosted via @fontsource (imported in main.jsx) — never load
+   fonts from Google's CDN; it sends every visitor's IP to Google. */
 
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -30,7 +31,7 @@
   --err-bg: #fef2f2;
   --r: 8px;
   --rlg: 12px;
-  --font: 'Geist', system-ui, sans-serif;
+  --font: 'Geist Sans', 'Geist', system-ui, sans-serif;
   --mono: 'Geist Mono', monospace;
   /* Layout — desktop */
   --bp-desktop: 900px;
@@ -72,6 +73,20 @@ body {
   font-size: 14px;
   line-height: 1.5;
 }
+/* Hide scrollbars app-wide (mobile-first shell — scrollbars read as noise) and,
+   crucially, kill the scrollbar that flashed for a single frame during route
+   swaps, whichever container briefly overflowed. Scrolling still works
+   everywhere; the intentional desktop list scrollbar re-enables itself via the
+   more specific `.scroll--fine-scrollbar` rule below. */
+* {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* legacy Edge/IE */
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;              /* Chrome/Safari */
+}
 #root {
   min-height: 100dvh;
   display: flex;
@@ -91,7 +106,11 @@ body {
   margin: 0 auto;
   background: var(--bg);
   position: relative;
-  overflow-x: hidden;
+  /* `clip` (not `hidden`): hidden computes overflow-y:auto, turning the shell into
+     the sticky containing block — which never scrolls on mobile (the window does),
+     so every .topbar's position:sticky silently failed. clip clips without
+     creating a scroll container. */
+  overflow-x: clip;
   box-shadow: 0 0 0 0.5px var(--bd), 0 8px 40px rgba(0,0,0,.1);
 }
 .shell--session {
@@ -399,7 +418,7 @@ body {
     min-height: 100dvh;
   }
 }
-/* Gig details `/gigdetails/:id`: `.page` sits under `.gig-detail-surface--page`, not `.shell-view`. */
+/* Gig detail `/gig/:id`: `.page` sits under `.gig-detail-surface--page`, not `.shell-view`. */
 .shell--session .shell-view > .gig-detail-surface--page > .page {
   flex: 1 1 auto;
   min-height: 0;
@@ -629,6 +648,260 @@ body {
 .ct { font-size: 12px; color: var(--fg3); line-height: 1.55; }
 .ct strong { color: var(--fg); font-weight: 600; }
 
+/* ── GIG DETAIL (/gig/:id) ─────────────────────────────────── */
+.gig-detail-header-block {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--bd);
+}
+.gig-detail-cat-pill {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--fg3);
+}
+.gig-detail-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--fg);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.gig-detail-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gig-detail-price {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fg);
+  font-family: var(--mono);
+  letter-spacing: -.04em;
+}
+.gig-detail-inline-status {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--green-d);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gig-detail-info-rows {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gig-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.gig-detail-row__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r);
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--fg3);
+}
+.gig-detail-row__icon--err { color: var(--err); }
+.gig-detail-row__body { flex: 1; min-width: 0; }
+.gig-detail-row__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg3);
+  font-family: var(--mono);
+  margin-bottom: 1px;
+}
+.gig-detail-row__val {
+  font-size: 14px;
+  color: var(--fg);
+  font-weight: 400;
+}
+.gig-detail-row__val--err {
+  color: var(--err);
+  font-weight: 600;
+}
+.gig-detail-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg3);
+  font-family: var(--mono);
+  margin-bottom: 8px;
+}
+.gig-detail-people {
+  padding: 0 20px 16px;
+}
+.gig-detail-people-grid {
+  display: flex;
+  gap: 8px;
+}
+.gig-detail-person-card {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 12px 10px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.gig-detail-person-card__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gig-detail-person-card__role {
+  font-size: 10px;
+  color: var(--fg3);
+  font-family: var(--mono);
+}
+.gig-detail-person-card__link {
+  font-size: 10px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.gig-detail-poster-row {
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.gig-detail-poster-row__name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.gig-detail-empty-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  font-size: 12px;
+  color: var(--fg3);
+  font-family: var(--mono);
+  text-align: center;
+}
+.gig-detail-lock-wrap {
+  padding: 0 20px 16px;
+}
+.gig-detail-lock-callout {
+  background: var(--amber-bg);
+  border-color: var(--amber-bd);
+  color: var(--amber);
+}
+.gig-detail-contacts {
+  padding: 0 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gig-detail-contact-list {
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.gig-detail-contact-row {
+  padding: 10px 12px;
+  border-top: 1px solid var(--bd);
+}
+.gig-detail-contact-row:first-child { border-top: none; }
+.gig-detail-contact-row__label {
+  font-size: 10px;
+  color: var(--fg4);
+  font-family: var(--mono);
+}
+.gig-detail-contact-row__val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.gig-detail-actions {
+  padding: 0 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gig-detail-actions__checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 0;
+  font-size: 12px;
+  color: var(--fg3);
+  font-family: var(--mono);
+}
+.gig-detail-actions__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--mono);
+}
+.gig-detail-actions__status--amber {
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-bd);
+  color: var(--amber);
+}
+.gig-detail-actions__status--green {
+  background: var(--green-bg);
+  border: 1px solid var(--green-bd);
+  color: var(--green-d);
+  font-weight: 600;
+}
+.gig-detail-actions__error {
+  font-size: 12px;
+  color: var(--err);
+  font-family: var(--mono);
+  text-align: center;
+}
+.gig-detail-poster-hint {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--fg3);
+  line-height: 1.45;
+  background: var(--bg2);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+}
+.gig-detail-error-panel {
+  padding: 48px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+  color: var(--fg3);
+  font-family: var(--mono);
+}
+
 /* ── TOPBAR ────────────────────────────────────────────────── */
 .topbar {
   position: sticky;
@@ -730,6 +1003,19 @@ body {
   gap: 4px;
   padding: 14px 6px;
   background: var(--bg);
+  /* `backwards` (not forwards): holds the hidden state before the delayed start,
+     then fully releases the transform after — no lingering containing block. */
+  animation: splash-stat-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.splash-stat:nth-child(1) { animation-delay: 0.08s; }
+.splash-stat:nth-child(2) { animation-delay: 0.2s; }
+.splash-stat:nth-child(3) { animation-delay: 0.32s; }
+@keyframes splash-stat-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-stat { animation: none; }
 }
 .splash-stat-val {
   font-size: 20px;
@@ -789,6 +1075,7 @@ body {
 .rc-footer { margin-top: 10px; font-size: 11px; color: #52525b; font-family: var(--mono); }
 .rc-footer .accent { color: var(--green); }
 
+/* ── GUEST (logged-out) CTA card ───────────────────────────── */
 /* ── TABS ──────────────────────────────────────────────────── */
 .tabs {
   display: flex;
@@ -1097,6 +1384,74 @@ body {
 }
 
 /* ── ALERTS ────────────────────────────────────────────────── */
+/* Date-bucket section header (shared: Alerts + Profile activity) */
+.date-hd {
+  margin: 14px 16px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+.date-hd--flush { margin-left: 0; margin-right: 0; }
+
+/* "Older" — collapsed history section. Header matches .date-hd typography exactly
+   (one coherent system); chevron rotates and the body animates open/closed. */
+.older-hd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 16px 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.older-hd--flush { margin-left: 0; margin-right: 0; }
+.older-hd__label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--fg4);
+  transition: color .15s;
+}
+.older-hd__chev {
+  color: var(--fg4);
+  transition: transform .25s ease, color .15s;
+}
+.older-hd:hover .older-hd__label,
+.older-hd:hover .older-hd__chev { color: var(--fg2); }
+.older-hd__chev--open { transform: rotate(180deg); }
+.older-hd__clear {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--err);
+  background: none;
+  border: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.older-hd__clear:hover { background: var(--err-bg); }
+.older-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.older-body > div {
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s .32s;
+}
+.older-body--open { grid-template-rows: 1fr; }
+.older-body--open > div { visibility: visible; transition: visibility 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .older-body, .older-hd__chev { transition: none !important; }
+  .older-body > div { transition: none !important; }
+}
+
 .alert-row {
   display: flex;
   align-items: flex-start;
@@ -1157,6 +1512,337 @@ body {
   transition: all .1s;
 }
 .ptab.on { color: var(--fg); border-bottom-color: var(--fg); }
+
+/* Account-type picker cards (signup step 1) */
+.auth-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 18px 16px;
+  background: var(--bg2, #fff);
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.auth-choice:hover {
+  border-color: var(--bd2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+.auth-choice:active { transform: scale(0.99); }
+.auth-choice:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.auth-choice__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  color: var(--fg2);
+}
+.auth-choice__icon--student {
+  background: var(--green-bg);
+  border-color: var(--green-bd);
+  color: var(--green-d);
+}
+.auth-choice__body { flex: 1; min-width: 0; }
+.auth-choice__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--fg);
+  margin-bottom: 2px;
+}
+.auth-choice__desc {
+  font-size: 12.5px;
+  color: var(--fg3);
+  line-height: 1.5;
+}
+.auth-choice__chev {
+  color: var(--fg4);
+  flex-shrink: 0;
+}
+
+/* Auth sign-in method segmented control */
+.auth-seg {
+  position: relative;
+  display: flex;
+  padding: 4px;
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  gap: 0;
+}
+.auth-seg-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: var(--ink);
+  border-radius: 9px;
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+.auth-seg-indicator[data-active="passcode"] {
+  transform: translateX(100%);
+}
+.auth-seg-btn {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg3);
+  cursor: pointer;
+  border-radius: 9px;
+  transition: color 0.15s ease;
+}
+.auth-seg-btn.on {
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-seg-indicator {
+    transition: none;
+  }
+}
+
+/* 6-digit passcode digit boxes */
+.passcode-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.passcode-boxes {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+.passcode-box {
+  flex: 1 1 0;
+  max-width: 52px;
+  height: 52px;
+  border: 1.5px solid var(--bd);
+  border-radius: var(--r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+.passcode-box.filled {
+  border-color: var(--bd2);
+  background: var(--bg3);
+}
+.passcode-box.active {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.07);
+}
+.passcode-hidden-inp {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: text;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+}
+.passcode-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--fg4);
+  font-family: var(--mono);
+  padding: 0 2px;
+}
+.passcode-meta-count {
+  color: var(--fg3);
+  font-weight: 500;
+}
+.passcode-meta-hint {
+  color: var(--fg4);
+}
+
+/* Settings easy-access passcode card */
+.settings-passcode-card {
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  padding: 16px;
+}
+.settings-passcode-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.settings-passcode-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.settings-passcode-card__icon--on {
+  background: var(--green-bg);
+  border: 1px solid var(--green-bd);
+}
+.settings-passcode-card__icon--off {
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+}
+.settings-passcode-card__title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.settings-passcode-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+.settings-passcode-card__badge {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  line-height: 1;
+}
+.settings-passcode-card__badge--on {
+  background: var(--green-bg);
+  color: var(--green-d);
+  border: 1px solid var(--green-bd);
+}
+.settings-passcode-card__badge--off {
+  background: var(--bg3);
+  color: var(--fg3);
+  border: 1px solid var(--bd);
+}
+.settings-passcode-card__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg3);
+  line-height: 1.5;
+}
+.settings-passcode-card__masked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: var(--bg3);
+  border-radius: var(--r);
+  border: 1px solid var(--bd);
+}
+.settings-passcode-card__dots {
+  font-family: var(--mono);
+  font-size: 20px;
+  letter-spacing: 0.45em;
+  color: var(--fg2);
+  line-height: 1;
+}
+.settings-passcode-card__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg3);
+  border-radius: var(--r);
+  border: 1px solid var(--bd);
+}
+.settings-passcode-card__note p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg3);
+  line-height: 1.5;
+}
+.passcode-setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.passcode-setup-form .field {
+  margin: 0;
+  gap: 8px;
+}
+.passcode-setup-form__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.passcode-setup-form__actions .btn {
+  height: 44px;
+  border-radius: 12px;
+}
+.passcode-setup-form__error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--r);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #dc2626;
+  line-height: 1.5;
+}
+
+.auth-inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: var(--fg);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Editable field */
 .editable-field {
@@ -1348,6 +2034,160 @@ body {
   background: var(--bg2);
 }
 
+/* Passcode modals — wider, hero layout */
+.modal-center-card--passcode,
+.modal-center-card--passcode-prompt {
+  max-width: min(400px, calc(100vw - 32px));
+}
+.modal-center-close--float {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+}
+.passcode-modal-hero {
+  text-align: center;
+  padding: 28px 24px 8px;
+  flex-shrink: 0;
+}
+.passcode-modal-hero--prompt {
+  padding-bottom: 4px;
+}
+.passcode-modal-hero__icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+}
+.passcode-modal-hero__icon--prompt {
+  background: linear-gradient(145deg, var(--green-bg) 0%, var(--bg3) 100%);
+  border-color: var(--green-bd);
+  color: var(--green-d);
+}
+.passcode-modal-hero__title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--fg);
+  line-height: 1.2;
+}
+.passcode-modal-hero__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg3);
+  line-height: 1.55;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.passcode-modal-hero__subtitle strong {
+  color: var(--fg2);
+  font-weight: 600;
+}
+.passcode-modal-body {
+  padding: 8px 24px 20px;
+}
+.passcode-modal-body--prompt {
+  padding-top: 4px;
+  padding-bottom: 16px;
+}
+.passcode-modal-body .passcode-setup-form {
+  gap: 18px;
+}
+.passcode-modal-ft {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 24px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.passcode-modal-ft__primary,
+.passcode-modal-ft__secondary {
+  height: 46px;
+  border-radius: 12px;
+  gap: 8px;
+}
+.passcode-modal-ft__text {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--fg3);
+  padding: 6px 0 2px;
+  text-align: center;
+  transition: color 0.12s ease;
+}
+.passcode-modal-ft__text:hover {
+  color: var(--fg2);
+}
+.passcode-modal-ft__note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg4);
+  font-family: var(--mono);
+  margin-top: 2px;
+}
+.passcode-prompt-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.passcode-prompt-benefit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  font-size: 13px;
+  color: var(--fg2);
+  line-height: 1.4;
+  text-align: left;
+}
+.passcode-prompt-benefit__num {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.passcode-prompt-benefit strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.settings-passcode-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-passcode-card__btn {
+  height: 44px;
+  border-radius: 12px;
+  gap: 8px;
+}
+.settings-passcode-card__btn--secondary {
+  font-size: 13px;
+}
+
 /* Reviews */
 .rev-row {
   padding: 14px 20px;
@@ -1453,17 +2293,22 @@ body {
 .cat.on .clbl { color: var(--ink-fg); }
 
 /* ── ANIMATIONS ────────────────────────────────────────────── */
+/* NO fill-mode `forwards` here: the end state equals the element's natural
+   state, so `forwards` buys nothing — but it permanently retains a transform
+   (even identity), which turns the element into the containing block for every
+   position:fixed descendant and breaks viewport centering of modals/overlays
+   on window-scrolled (mobile) pages. */
 @keyframes fadein {
   from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
-.fadein { animation: fadein .18s ease forwards; }
+.fadein { animation: fadein .18s ease; }
 
 @keyframes slidein {
   from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
-.slidein { animation: slidein .22s ease forwards; }
+.slidein { animation: slidein .22s ease; }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
@@ -1797,4 +2642,67 @@ body {
   .discount-card__action.bo {
     flex: 1 1 auto;
   }
+}
+
+/* ── Avatar zoom (Instagram-style photo viewer) ─────────────────────── */
+/* Fade opacity only — no transform / no animation-fill-mode:forwards, which
+   would turn this into a containing block and trap the fixed children. */
+.avatar-zoom-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: avatarZoomFade 0.18s ease;
+}
+@keyframes avatarZoomFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* The gesture stage fills the screen so the whole circle has room to grow /
+   pan; it stays transparent so the dimmed backdrop shows through. */
+.avatar-zoom-stage {
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.avatar-zoom-stage:active {
+  cursor: grabbing;
+}
+/* The circular photo IS the scaled object — pinch enlarges the entire circle
+   as one unit (never the photo inside a fixed mask). */
+.avatar-zoom-img {
+  width: min(80vw, 80vh, 460px);
+  height: min(80vw, 80vh, 460px);
+  border-radius: 50%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+.avatar-zoom-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.avatar-zoom-close:hover {
+  background: rgba(255, 255, 255, 0.26);
 }

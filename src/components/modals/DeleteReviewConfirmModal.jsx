@@ -2,9 +2,6 @@ import { useState } from "react";
 import { X, Loader, Trash2 } from "lucide-react";
 import { deleteMyReview } from "../../lib/profile";
 
-/**
- * Same shell as ReportReviewModal (modal-center-root / hd / body / ft).
- */
 export default function DeleteReviewConfirmModal({ reviewId, gigTitle, onClose, onDeleted }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);

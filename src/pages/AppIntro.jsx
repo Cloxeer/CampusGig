@@ -119,7 +119,7 @@ export default function AppIntro() {
   }
 
   const EMAIL_ALERTS_HINT =
-    "Transactional emails to your @nmsu.edu for important gig alerts and reviews (account-wide). Turn off anytime.";
+    "Transactional emails to your inbox for important gig alerts and reviews (account-wide). Turn off anytime.";
 
   const IconCmp = isEmailSlide ? Mail : CONTENT_SLIDES[slide].icon;
   const title = isEmailSlide ? "Email alerts" : CONTENT_SLIDES[slide].title;

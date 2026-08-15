@@ -28,7 +28,7 @@ TLA+ IN CAVEMAN
 
   pull_refresh / remount → reload gig_list
 
-  actions inside modal: request / cancel request — must obey RPC + RLS rules
+  actions on `/gig/:id` page: request / cancel request — must obey RPC + RLS rules
 
 ================================================================================
 
@@ -42,12 +42,12 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  Home.jsx + navigate to `/gig/:id` (OpenGig + GigDetailModal asPage) + normalizeGig / getOpenGigs.
+  Home.jsx + navigate to `/gig/:id` (OpenGig → GigDetailView full page) + normalizeGig / getOpenGigs.
   User avatar in header uses UserAvatar.
 
 ================================================================================
 
 GAPS TO WATCH
 
-- Stale list after action: modal close should refresh or subscribe — check UX.
+- Stale list after action: returning from `/gig/:id` should refresh or subscribe — check UX.
 - Big lists: pagination not always on small apps — watch perf at scale.

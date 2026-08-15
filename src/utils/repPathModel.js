@@ -170,7 +170,7 @@ export function buildRepPathSections({ score }) {
 
 export const REP_PATH_EARN_ROWS = [
   { text: "Post a gig", pts: "+2", tone: "green", icon: "plus" },
-  { text: "Mark your gig done (poster)", pts: "+8", tone: "green", icon: "check" },
-  { text: "Complete a gig you took (taker)", pts: "+10", tone: "green", icon: "award" },
-  { text: "Receive a review", pts: "+1 per star (1–5)", tone: "amber", icon: "star" },
+  { text: "Mark your gig done", pts: "+8", tone: "green", icon: "check" },
+  { text: "Complete a taken gig", pts: "+10", tone: "green", icon: "award" },
+  { text: "Receive a review", pts: "+1 per ★", tone: "amber", icon: "star" },
 ];

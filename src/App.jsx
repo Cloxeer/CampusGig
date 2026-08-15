@@ -12,7 +12,6 @@ import Home from "./pages/Home";
 import Explore from "./pages/Explore";
 import PostGig from "./pages/PostGig";
 import Alerts from "./pages/Alerts";
-import GigDetails from "./pages/GigDetails";
 import OpenGig from "./pages/OpenGig";
 import Profile from "./pages/Profile";
 import ProfileRep from "./pages/ProfileRep";
@@ -188,15 +187,23 @@ export default function App() {
 
   if (!session) {
     return (
-      <div className="shell">
-        <Routes>
-          <Route path="/welcome" element={<Splash />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/magic" element={<MagicLink />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="*" element={<Navigate to="/welcome" replace />} />
-        </Routes>
+      <div className="shell shell--session">
+        <div className="shell-view">
+          <Routes>
+            {/* Public, read-only surfaces — outsider gigs only (enforced by RLS). */}
+            <Route path="/" element={<Home currentUserId={null} />} />
+            <Route path="/gig/:gigId" element={<OpenGig currentUserId={null} />} />
+            <Route path="/profile/rep" element={<ProfileRep />} />
+            {/* Sign-in / marketing routes. */}
+            <Route path="/welcome" element={<Splash />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/magic" element={<MagicLink />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+        <DesktopFooter />
       </div>
     );
   }
@@ -262,7 +269,6 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/asnmsu/discounts" element={<AsnmsuDiscounts />} />
           <Route path="/app-intro" element={<AppIntro />} />
-          <Route path="/gigdetails/:gigId" element={<GigDetails currentUserId={currentUserId} />} />
           <Route path="/gig/:gigId" element={<OpenGig currentUserId={currentUserId} />} />
           <Route path="/users/:userId" element={<UsersToProfileRedirect />} />
           <Route path="/terms" element={<Terms />} />

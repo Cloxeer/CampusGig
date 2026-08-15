@@ -2,23 +2,24 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Search, Handshake, Star, ArrowLeft, ArrowRight, LogIn, Briefcase, Users, CheckCircle } from "lucide-react";
 import Logo, { LogoMark } from "../components/Logo";
-import { getPublicStats } from "../lib/profile";
+import { getPublicStats, getCachedPublicStats, subscribePublicStats } from "../lib/profile";
+import { useCountUp } from "../hooks/useCountUp";
 
 const SLIDES = [
   {
     icon: <Search size={28} />,
-    title: "Browse campus gigs",
-    body: "See tasks posted by NMSU students — food runs, errands, notes, and more.",
+    title: "Browse open gigs",
+    body: "See tasks and jobs posted across campus — by local clients and fellow students alike.",
   },
   {
     icon: <Handshake size={28} />,
-    title: "Request or post your own",
-    body: "Found a gig you want? Request it. Got a task? Post it. Only verified NMSU students can participate.",
+    title: "Post work, or take it on",
+    body: "Anyone can post a task. Verified NMSU students pick it up and get it done — on their own schedule.",
   },
   {
     icon: <Star size={28} />,
     title: "Build your reputation",
-    body: "Complete gigs, earn rep points, and climb the leaderboard. Your campus reputation follows you.",
+    body: "Finish jobs, earn rep, and climb the leaderboard. Your campus reputation follows you.",
   },
 ];
 
@@ -26,10 +27,29 @@ export default function Splash() {
   const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [slide, setSlide] = useState(0);
-  const [stats, setStats] = useState({ totalPostings: 0, completed: 0, accounts: 0 });
+  /* Instant paint from last-known numbers; then a fresh read + a live
+     subscription so open pages tick in real time as gigs/accounts land. */
+  const [stats, setStats] = useState(
+    () => getCachedPublicStats() || { totalPostings: 0, completed: 0, accounts: 0 }
+  );
+  /* Staggered odometer sweeps — each stat lands a beat after the previous.
+     Live updates sweep from the current value, not from zero. */
+  const totalPostings = useCountUp(stats.totalPostings, { delay: 120 });
+  const completed = useCountUp(stats.completed, { delay: 260 });
+  const accounts = useCountUp(stats.accounts, { delay: 400 });
 
   useEffect(() => {
-    getPublicStats().then(setStats);
+    let alive = true;
+    getPublicStats().then((v) => {
+      if (alive) setStats(v);
+    });
+    const unsubscribe = subscribePublicStats((v) => {
+      if (alive) setStats(v);
+    });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
   }, []);
 
   if (showTutorial) {
@@ -95,9 +115,12 @@ export default function Splash() {
           <button
             className="btn bg-btn bfull"
             style={{ color: "var(--fg3)", fontSize: 13 }}
-            onClick={() => { setShowTutorial(false); setSlide(0); }}
+            onClick={() => {
+              if (slide > 0) setSlide(slide - 1);
+              else setShowTutorial(false);
+            }}
           >
-            <ArrowLeft size={13} /> Back
+            <ArrowLeft size={13} /> {slide > 0 ? "Back" : "Back to welcome"}
           </button>
         </div>
       </div>
@@ -107,6 +130,15 @@ export default function Splash() {
   return (
     <div className="splash fadein">
       <div className="splash-body">
+        <button
+          type="button"
+          className="btn bg-btn bico"
+          onClick={() => navigate("/")}
+          aria-label="Back to home"
+          style={{ position: "absolute", top: 14, left: 14, zIndex: 2 }}
+        >
+          <ArrowLeft size={15} />
+        </button>
         <div className="sgrid" />
         <div className="sfade" />
         <div className="scontent shell-prose">
@@ -144,17 +176,17 @@ export default function Splash() {
           <div className="splash-stats">
             <div className="splash-stat">
               <Briefcase size={14} color="var(--fg3)" />
-              <span className="splash-stat-val">{stats.totalPostings}</span>
+              <span className="splash-stat-val">{totalPostings}</span>
               <span className="splash-stat-lbl">Total postings</span>
             </div>
             <div className="splash-stat">
               <CheckCircle size={14} color="var(--green-d)" />
-              <span className="splash-stat-val">{stats.completed}</span>
+              <span className="splash-stat-val">{completed}</span>
               <span className="splash-stat-lbl">Completed</span>
             </div>
             <div className="splash-stat">
               <Users size={14} color="var(--fg3)" />
-              <span className="splash-stat-val">{stats.accounts}</span>
+              <span className="splash-stat-val">{accounts}</span>
               <span className="splash-stat-lbl">Accounts</span>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { useEmailAlertsToggle } from "./hooks/useEmailAlertsToggle";
 import { useDeleteAccountModal } from "./hooks/useDeleteAccountModal";
 import SettingsScreenHeader from "./sections/SettingsScreenHeader";
 import SettingsSignedInEmailCard from "./sections/SettingsSignedInEmailCard";
+import SettingsPasscodeCard from "./sections/SettingsPasscodeCard";
 import SettingsNameCard from "./sections/SettingsNameCard";
 import SettingsEditContactsNavRow from "./sections/SettingsEditContactsNavRow";
 import SettingsAlertsCard from "./sections/SettingsAlertsCard";
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
 
       <div className="scroll scroll--settings-pad scroll--fine-scrollbar" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <SettingsSignedInEmailCard email={email} isPending={isPending} />
+        <SettingsPasscodeCard profile={profile} isPending={isPending} />
         <SettingsNameCard
           firstName={nameEditor.firstName}
           setFirstName={nameEditor.setFirstName}

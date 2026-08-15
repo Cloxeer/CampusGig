@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { markAllNotificationsRead } from "../../lib/profile";
-import { patchAllReadInCache, invalidateUnreadCount } from "./alertsMutations";
+import { markAllNotificationsRead } from "../../../lib/profile";
+import { patchAllReadInCache, invalidateUnreadCount } from "../alertsMutations";
 
 export function useAlertsMarkAllReadOnMount() {
   useEffect(() => {

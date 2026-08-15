@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Search, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getMyProfile, getOpenGigs, getAvatarUrl, normalizeGig } from "../lib/profile";
+import { getMyProfile, getAvatarUrl } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
 import { getLevel, useTimer } from "../utils/helpers";
+import { useOpenGigsQuery } from "../hooks/useOpenGigsQuery";
+import { useLegacyGigRedirect } from "../hooks/useLegacyGigRedirect";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
@@ -62,23 +64,20 @@ export default function Home({ currentUserId }) {
   const [tab, setTab] = useState("Recent");
   const tick = useTimer();
 
+  const isAuthed = Boolean(currentUserId);
+
   const { data: profileData, isPending: profilePending } = useQuery({
     queryKey: queryKeys.myProfile,
     queryFn: getMyProfile,
+    enabled: isAuthed,
   });
 
-  const { data: gigsData, isPending: gigsPending } = useQuery({
-    queryKey: queryKeys.openGigs,
-    queryFn: getOpenGigs,
-    staleTime: 30_000,
-    refetchOnWindowFocus: "always",
-  });
+  const { gigs, isPending: gigsPending } = useOpenGigsQuery();
 
   const profile = profileData?.profile || null;
   const avatarUrl = profile?.avatar_url ? getAvatarUrl(profile.avatar_url) : null;
-  const gigs = useMemo(() => (gigsData?.gigs || []).map(normalizeGig), [gigsData]);
-  /** Full-page skeleton only when we have never loaded the profile (no cache). Cached profile + loading gigs still shows the header/rep card. */
-  const showFullSkeleton = profilePending;
+  /** Full-page skeleton only when we have never loaded the profile (no cache). Anon visitors have no profile, so skip straight to the feed. */
+  const showFullSkeleton = isAuthed && profilePending;
 
   useEffect(() => {
     if (searchParams.get("rep")) {
@@ -86,15 +85,7 @@ export default function Home({ currentUserId }) {
     }
   }, [searchParams, navigate]);
 
-  useEffect(() => {
-    const legacy = searchParams.get("gig");
-    if (!legacy) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete("gig");
-    const qs = next.toString();
-    const returnPath = `${location.pathname}${qs ? `?${qs}` : ""}` || "/";
-    navigate(`/gig/${legacy}`, { replace: true, state: { returnTo: returnPath } });
-  }, [searchParams, navigate, location.pathname]);
+  useLegacyGigRedirect("/");
 
   const repScore = profile?.rep_score || 0;
   const lvl = getLevel(repScore);
@@ -122,19 +113,28 @@ export default function Home({ currentUserId }) {
           <Logo />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <button className="btn bg-btn bico" onClick={() => navigate("/explore")}>
-            <Search size={15} />
-          </button>
-          <div onClick={() => navigate("/profile")} style={{ cursor: "pointer" }}>
-            <UserAvatar
-              user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile?.avatar_color, first_name: profile?.first_name, last_name: profile?.last_name }}
-              size="sm"
-            />
-          </div>
+          {isAuthed ? (
+            <>
+              <button className="btn bg-btn bico" onClick={() => navigate("/explore")}>
+                <Search size={15} />
+              </button>
+              <div onClick={() => navigate("/profile")} style={{ cursor: "pointer" }}>
+                <UserAvatar
+                  user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile?.avatar_color, first_name: profile?.first_name, last_name: profile?.last_name }}
+                  size="sm"
+                />
+              </div>
+            </>
+          ) : (
+            <button className="btn bp" style={{ fontSize: 13, padding: "6px 14px" }} onClick={() => navigate("/welcome")}>
+              Welcome
+            </button>
+          )}
         </div>
       </div>
 
       <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+        {isAuthed ? (
         <div style={{ margin: "14px 16px 0" }}>
           <div
             className="rep-card"
@@ -180,6 +180,41 @@ export default function Home({ currentUserId }) {
             </div>
           </div>
         </div>
+        ) : (
+        <div style={{ margin: "14px 16px 0" }}>
+          <div
+            className="rep-card"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/profile/rep", { state: { returnTo: "/" } })}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate("/profile/rep", { state: { returnTo: "/" } });
+              }
+            }}
+          >
+            <div className="rc-ey">Rep path · tap to explore</div>
+            <div style={{ fontSize: 19, fontWeight: 700, color: "var(--green)", letterSpacing: "-.025em", margin: "4px 0 7px", lineHeight: 1.18 }}>
+              Post a task — a verified student gets it done.
+            </div>
+            <div style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55, marginBottom: 16 }}>
+              Anyone can post work. Verified NMSU students take it on and earn rep on every job.
+            </div>
+            <div className="rc-track">
+              <div className="rc-fill" style={{ width: "12%", background: "var(--green)" }} />
+            </div>
+            <div className="rc-labels">
+              {["New", "Reliable", "Trusted", "Legend"].map((l) => (
+                <span key={l} className="rc-lbl">
+                  {l}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        )}
 
         <div style={{ padding: "0 16px" }}>
           <div className="tabs" style={{ margin: "14px -16px 0", padding: "0 16px" }}>

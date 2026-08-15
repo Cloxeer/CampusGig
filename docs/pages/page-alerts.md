@@ -8,7 +8,7 @@ WHAT IT IS
 
   Inbox of notifications from OTHER people’s actions on YOUR stuff.
   Examples: someone requested your gig, accepted, rejected, completed, reviewed you.
-  Tap row → detail modal that shows gig context when relevant.
+  Tap row → navigate to `/gig/:id` (gig context) or the reviewer's profile when relevant.
 
 ================================================================================
 
@@ -28,7 +28,7 @@ TLA+ IN CAVEMAN
 
   realtime → INSERT on notifications for me → bump unread in App + refresh list
 
-  tap_row → open AlertDetailModal with notification or gig id
+  tap_row → navigate /gig/:id (with notification state) or /profile/:reviewerId
 
   swipe_delete (if implemented) → delete row
 
@@ -44,7 +44,7 @@ HOW IT MUST BEHAVE
 
 HOW IT BEHAVES TODAY (CODE)
 
-  Alerts.jsx + getProfilesByIds for avatars + AlertDetailModal.
+  AlertsPage.jsx + getProfilesByIds for avatars + useAlertsActions navigates to `/gig/:id` or a profile.
   currentUserId passed from App.
 
 ================================================================================

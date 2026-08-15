@@ -1,30 +1,13 @@
 import { useState, useLayoutEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader, Camera } from "lucide-react";
+import { Loader } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile, updateMyProfile, uploadAvatar, getAvatarUrl } from "../lib/profile";
 import { queryClient, queryKeys } from "../lib/queryClient";
-import ContactFields, { normalizeContactFavoriteKeys } from "../components/ContactFields";
-import { nanpDigitsFromInput, phoneFromStored } from "../utils/phoneNanp";
-
-const EMPTY = {
-  phone: "",
-  venmo: "",
-  cashapp: "",
-  paypal: "",
-  snapchat: "",
-  instagram: "",
-  discord: "",
-  zelle: "",
-  apple_pay: "",
-  google_pay: "",
-  contact_favorite_keys: [],
-};
-
-function trimOrNull(s) {
-  const t = s != null ? String(s).trim() : "";
-  return t === "" ? null : t;
-}
+import { normalizeContactFavoriteKeys } from "../components/ContactFields";
+import ProfileContactForm from "../components/ProfileContactForm";
+import { phoneFromStored } from "../utils/phoneNanp";
+import { EMPTY_CONTACT_PROFILE, validateNanpPhone, profileContactsToApi, mapContactError } from "../utils/profileForm";
 
 const EDIT_PROFILE_RETURN_PATHS = new Set(["/profile", "/settings"]);
 
@@ -36,7 +19,7 @@ function resolveEditProfileReturnTo(state) {
 
 function profileRowToForm(p) {
   return {
-    ...EMPTY,
+    ...EMPTY_CONTACT_PROFILE,
     venmo: p.venmo || "",
     cashapp: p.cashapp || "",
     paypal: p.paypal || "",
@@ -55,12 +38,11 @@ export default function EditProfile() {
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = resolveEditProfileReturnTo(location.state);
-  const fileInputRef = useRef(null);
   const hydratedRef = useRef(!!queryClient.getQueryData(queryKeys.myProfile)?.profile);
 
   const [profile, setProfile] = useState(() => {
     const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
-    return p ? profileRowToForm(p) : EMPTY;
+    return p ? profileRowToForm(p) : { ...EMPTY_CONTACT_PROFILE, contact_favorite_keys: [] };
   });
   const [emailDisplay, setEmailDisplay] = useState(() => {
     const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
@@ -121,35 +103,17 @@ export default function EditProfile() {
     });
   }
 
-  function handlePhotoSelect(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image must be under 5 MB.");
-      return;
-    }
-
+  function handleAvatarSelect(file) {
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
-    setError("");
   }
 
   const handleSave = async () => {
     setError("");
 
-    const phoneDigits = nanpDigitsFromInput(profile.phone);
-    if (!phoneDigits) {
-      setError("Phone number is required.");
-      return;
-    }
-    const nationalLen = phoneDigits[0] === "1" ? phoneDigits.length - 1 : phoneDigits.length;
-    if (nationalLen !== 10) {
-      setError("Enter a valid 10-digit US phone number.");
+    const phoneCheck = validateNanpPhone(profile.phone);
+    if (!phoneCheck.ok) {
+      setError(phoneCheck.error);
       return;
     }
 
@@ -167,20 +131,12 @@ export default function EditProfile() {
 
       const { error: updateError } = await updateMyProfile({
         phone: profile.phone.trim(),
-        venmo: trimOrNull(profile.venmo),
-        cashapp: trimOrNull(profile.cashapp),
-        paypal: trimOrNull(profile.paypal),
-        snapchat: trimOrNull(profile.snapchat),
-        instagram: trimOrNull(profile.instagram),
-        discord: trimOrNull(profile.discord),
-        zelle: trimOrNull(profile.zelle),
-        apple_pay: trimOrNull(profile.apple_pay),
-        google_pay: trimOrNull(profile.google_pay),
+        ...profileContactsToApi(profile),
         contact_favorite_keys: normalizeContactFavoriteKeys(profile.contact_favorite_keys),
       });
 
       if (updateError) {
-        setError(updateError.message);
+        setError(mapContactError(updateError));
         setSaving(false);
         return;
       }
@@ -225,90 +181,19 @@ export default function EditProfile() {
       </div>
 
       <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <div style={{ position: "relative", cursor: "pointer" }} onClick={() => fileInputRef.current?.click()}>
-            {displayUrl ? (
-              <img
-                src={displayUrl}
-                alt="Profile"
-                style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  border: "2px solid var(--bd)",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  background: avatarColor,
-                  color: "white",
-                  fontSize: 26,
-                  fontWeight: 700,
-                  fontFamily: "var(--mono)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "2px solid var(--bd)",
-                }}
-              >
-                {initials}
-              </div>
-            )}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "var(--ink)",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "2px solid var(--bg)",
-              }}
-            >
-              <Camera size={13} />
-            </div>
-          </div>
-          <button className="btn bg-btn bsm" onClick={() => fileInputRef.current?.click()}>
-            {displayUrl ? "Change photo" : "Add photo"}
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoSelect} />
-        </div>
-
-        <ContactFields
+        <ProfileContactForm
           profile={profile}
           onFieldChange={onFieldChange}
-          emailDisplay={emailDisplay}
-          phoneMode="formatted"
-          phoneRequired
-          favoriteKeys={profile.contact_favorite_keys || []}
           onFavoriteToggle={onFavoriteToggle}
+          onAvatarSelect={handleAvatarSelect}
+          emailDisplay={emailDisplay}
+          error={error}
+          onError={setError}
+          avatarDisplayUrl={displayUrl}
+          avatarFallback={{ initials, color: avatarColor }}
+          phoneRequired
+          showFavorites
         />
-
-        {error && (
-          <div
-            style={{
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              borderRadius: "var(--r)",
-              padding: "10px 12px",
-              fontSize: 13,
-              color: "#dc2626",
-              lineHeight: 1.5,
-            }}
-          >
-            {error}
-          </div>
-        )}
 
         <button
           className="btn bp bfull blg"

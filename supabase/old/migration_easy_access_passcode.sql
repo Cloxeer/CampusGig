@@ -1,0 +1,2 @@
+-- Superseded by migration_easy_access_passcode_one_shot.sql (full one-shot with RPC + hash table).
+-- Kept for reference; run the one-shot file in Supabase SQL Editor instead.

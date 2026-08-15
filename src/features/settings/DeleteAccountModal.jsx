@@ -39,11 +39,11 @@ export default function DeleteAccountModal({
             until after the 15-day grace period.
           </p>
           <p style={{ margin: "0 0 10px" }}>
-            <strong>How to cancel:</strong> This will sign you out. After you sign in again with your @nmsu.edu magic link, a
+            <strong>How to cancel:</strong> This will sign you out. After you sign in again with your magic link, a
             fresh sign-in clears the scheduled deletion.
           </p>
           <p style={{ margin: 0 }}>
-            <strong>Graduated / lost email:</strong> If you can no longer receive a magic link at @nmsu.edu, we cannot verify
+            <strong>Lost email access:</strong> If you can no longer receive a magic link at your email, we cannot verify
             ownership — treat deletion as final.
           </p>
         </div>

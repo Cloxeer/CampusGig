@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Check, Star, Award, Trophy, Lock, Crown } from "lucide-react";
+import Lenis from "lenis";
+import { ArrowLeft, Plus, Check, Star, Award, Trophy, Lock, Crown, GraduationCap, ChevronDown } from "lucide-react";
 import { getMyProfile, getCampusRank, getAvatarUrl } from "../lib/profile";
 import UserAvatar from "../components/UserAvatar";
 import { queryKeys } from "../lib/queryClient";
@@ -143,8 +145,14 @@ export default function ProfileRep() {
 
   const [sectionConnectors, setSectionConnectors] = useState({});
   const [markerHintSectionId, setMarkerHintSectionId] = useState(null);
+  /** Climb-up additions: draw-in animation + floating return chip while climbing. */
+  const [drawn, setDrawn] = useState(false);
+  const [showChip, setShowChip] = useState(false);
   const sectionRefs = useRef(new Map());
   const nodeRefs = useRef(new Map());
+  const scrollRef = useRef(null);
+  const infoRef = useRef(null);
+  const didAutoScrollRef = useRef(false);
 
   useEffect(() => {
     function onDocPointerDown(e) {
@@ -163,7 +171,12 @@ export default function ProfileRep() {
   });
 
   const profile = profileData?.profile ?? null;
+  const isGuest = !profile;
   const repScore = profile?.rep_score ?? 0;
+  /** True once the main view (not the skeleton) is mounted — effects that touch the
+      path DOM must key on this: for guests `sections` never changes identity, so
+      deps of [sections] alone would leave them stuck against the skeleton DOM. */
+  const pageReady = !(profilePending && !profile);
 
   const { data: rankData } = useQuery({
     queryKey: ["campusRank", repScore],
@@ -172,10 +185,14 @@ export default function ProfileRep() {
   });
 
   const sections = useMemo(() => buildRepPathSections({ score: repScore }), [repScore]);
+  /** Visual climb-up order: Legend at the top (the summit), first steps at the bottom. */
+  const climbSections = useMemo(() => sections.slice().reverse(), [sections]);
 
   useLayoutEffect(() => {
     function recomputeConnectors() {
       const next = {};
+      /* Global draw order along the climb: counts from the path start (bottom) upward. */
+      let seqCounter = 0;
 
       for (const sec of sections) {
         const colEl = sectionRefs.current.get(sec.id);
@@ -216,6 +233,7 @@ export default function ProfileRep() {
             id: `${prev.id}->${curr.id}`,
             d: geometry.d,
             progress,
+            seq: seqCounter++,
           });
 
           if (!progressMarker && progress > 0 && progress < 1) {
@@ -273,7 +291,131 @@ export default function ProfileRep() {
       observers.forEach((ro) => ro.disconnect());
       window.removeEventListener("resize", recomputeConnectors);
     };
-  }, [sections, repScore]);
+  }, [sections, repScore, pageReady]);
+
+  /* Lenis smooth scrolling. Mobile: the WINDOW scrolls (`.scroll` grows freely);
+     desktop ≥900px: `.scroll` is the real scroller. Detect which and bind Lenis there. */
+  const lenisRef = useRef(null);
+  useEffect(() => {
+    if (!pageReady) return undefined;
+    const wrapper = scrollRef.current;
+    if (!wrapper) return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+
+    const wrapperScrolls = wrapper.scrollHeight > wrapper.clientHeight + 1;
+    const lenis = wrapperScrolls
+      ? new Lenis({ wrapper, content: wrapper.firstElementChild || wrapper, duration: 1.1, smoothWheel: true })
+      : new Lenis({ duration: 1.1, smoothWheel: true });
+    lenisRef.current = lenis;
+    let raf = requestAnimationFrame(function loop(time) {
+      lenis.raf(time);
+      raf = requestAnimationFrame(loop);
+    });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      lenis.destroy();
+      lenisRef.current = null;
+    };
+  }, [pageReady]);
+
+  /* Smart open: the PATH is the first thing you see — land on the climber's current
+     node (next to clear; the "1" start for new users), path above, base-camp info
+     peeking below. The floating chip covers getting back down to the info. */
+  useEffect(() => {
+    if (didAutoScrollRef.current) return;
+    if (!Object.keys(sectionConnectors).length) return;
+    const wrapper = scrollRef.current;
+    if (!wrapper) return;
+
+    let targetEl = null;
+    outer: for (const sec of sections) {
+      for (const node of sec.nodes) {
+        if (!node.locked && !node.done) {
+          targetEl = nodeRefs.current.get(`${sec.id}::${node.id}`);
+          break outer;
+        }
+      }
+    }
+
+    const wrapperScrolls = wrapper.scrollHeight > wrapper.clientHeight + 1;
+    let top;
+    if (targetEl) {
+      const nr = targetEl.getBoundingClientRect();
+      if (wrapperScrolls) {
+        const wr = wrapper.getBoundingClientRect();
+        top = wrapper.scrollTop + (nr.top - wr.top) - wr.height * 0.45;
+      } else {
+        top = window.scrollY + nr.top - window.innerHeight * 0.45;
+      }
+    } else {
+      top = wrapperScrolls ? wrapper.scrollHeight : document.documentElement.scrollHeight;
+    }
+    /* Through Lenis when active — a raw scrollTop write would be snapped back to
+       Lenis's internal position on its next raf. */
+    if (lenisRef.current) lenisRef.current.scrollTo(top, { immediate: true });
+    else if (wrapperScrolls) wrapper.scrollTop = top;
+    else window.scrollTo(0, top);
+    didAutoScrollRef.current = true;
+  }, [sectionConnectors, sections]);
+
+  /* Trigger the connector draw-in once geometry exists (skipped for reduced motion via CSS delays being harmless). */
+  useEffect(() => {
+    if (drawn) return undefined;
+    if (!Object.keys(sectionConnectors).length) return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDrawn(true);
+      return undefined;
+    }
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
+    return () => cancelAnimationFrame(raf);
+  }, [sectionConnectors, drawn]);
+
+  /* Show the floating return chip while the bottom info block is out of view.
+     Viewport root works for both scroll modes (IO clips by scroll ancestors). */
+  useEffect(() => {
+    const info = infoRef.current;
+    if (!info) return undefined;
+    const io = new IntersectionObserver(
+      ([entry]) => setShowChip(!entry.isIntersecting),
+      { threshold: 0.05 }
+    );
+    io.observe(info);
+    return () => io.disconnect();
+  }, [pageReady]);
+
+  /* Chip tap: glide back down to the info block at the base of the climb. */
+  function scrollToInfo() {
+    const el = infoRef.current;
+    if (!el) return;
+    if (lenisRef.current) lenisRef.current.scrollTo(el, { offset: -64 });
+    else el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* Reveal segments as they scroll into view (opacity only — transforms would skew connector geometry). */
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return undefined;
+    const els = Array.from(root.querySelectorAll(".rep-path-segment"));
+    if (!els.length) return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      els.forEach((el) => el.classList.add("is-in"));
+      return undefined;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -6% 0px", threshold: 0.08 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [sections, pageReady]);
 
   const lvl = getLevel(repScore);
   const rank = rankData?.rank;
@@ -282,7 +424,7 @@ export default function ProfileRep() {
 
   function goBack() {
     const r = safeAppReturnTo(location.state);
-    navigate(r || "/profile");
+    navigate(r || (isGuest ? "/" : "/profile"));
   }
 
   if (profilePending && !profile) {
@@ -310,10 +452,6 @@ export default function ProfileRep() {
         </div>
       </div>
     );
-  }
-
-  if (!profile) {
-    return null;
   }
 
   const toNext = lvl.toNext;
@@ -350,58 +488,17 @@ export default function ProfileRep() {
         </div>
       </header>
 
-      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+      <div className="scroll scroll--nav-pad scroll--fine-scrollbar" ref={scrollRef}>
         <div className="rep-path__inner">
-          <div className="rep-path-hero">
-            <UserAvatar
-              user={{
-                resolvedAvatarUrl: heroAvatarUrl,
-                avatar_color: profile?.avatar_color,
-                first_name: profile?.first_name,
-                last_name: profile?.last_name,
-              }}
-              size={58}
-              style={{ border: "2px solid #3f3f46", background: "var(--rp-zinc-800)", margin: "0 auto 8px" }}
-            />
-            <div className="rep-path-name">{fullName}</div>
-            <div className="rep-path-campus">NMSU · Las Cruces</div>
-            <div
-              className="rep-path-badge"
-              style={{
-                background: lvl.bg,
-                color: lvl.color,
-                borderColor: lvl.border,
-              }}
-            >
-              <Award size={13} aria-hidden />
-              {lvl.label}
-            </div>
-            <div className="rep-path-score">{repScore}</div>
-            <div className="rep-path-score-lbl">Rep score</div>
-            <div className="rep-path-prog">
-              <div className="rep-path-prog__meta">
-                <span>
-                  {lvl.label} · {repScore} pts
-                </span>
-                <span>{nextLabel ? `${toNext} to ${nextLabel}` : "Max level"}</span>
-              </div>
-              <div className="rep-path-prog__track">
-                <div className="rep-path-prog__fill" style={{ width: `${progPct}%`, background: lvl.color }} />
-              </div>
-            </div>
-          </div>
-
           <div className="rep-path-body">
-            {sections.map((sec) => {
+            {/* Climb-up: Legend renders first (summit, under the hero); the banner sits BELOW its
+                column so you meet each tier's sign as you enter it from the bottom. */}
+            {climbSections.map((sec) => {
               const connectorData = sectionConnectors[sec.id];
               const markerPt = sec.unlocked && connectorData?.progressMarker ? connectorData.progressMarker : null;
 
               return (
                 <section key={sec.id} aria-labelledby={`rep-sec-${sec.id}`}>
-                  <div id={`rep-sec-${sec.id}`} className={`rep-path-banner rep-path-banner--${sec.bannerTone}`}>
-                    <span className="rep-path-banner__label">{sec.label}</span>
-                    <span className="rep-path-banner__range">{sec.range}</span>
-                  </div>
                   <div
                     className="rep-path-col"
                     ref={(el) => {
@@ -419,20 +516,39 @@ export default function ProfileRep() {
                       >
                         {connectorData.paths.map((path) => (
                           <g key={path.id}>
-                            <path d={path.d} className="rep-path-svg__path rep-path-svg__path--todo" />
+                            {/* Paint-in: each segment draws itself in climb order (seq counts from the path start). */}
+                            <path
+                              d={path.d}
+                              className="rep-path-svg__path rep-path-svg__path--todo"
+                              pathLength="1"
+                              style={{
+                                strokeDasharray: "1 1",
+                                strokeDashoffset: drawn ? 0 : 1,
+                                transition: `stroke-dashoffset 0.4s ease-out ${path.seq * 0.07}s`,
+                              }}
+                            />
                             {path.progress > 0 ? (
                               <path
                                 d={path.d}
                                 className="rep-path-svg__path rep-path-svg__path--done"
                                 pathLength="1"
-                                strokeDasharray={`${clamp01(path.progress)} 1`}
+                                strokeDasharray={drawn ? `${clamp01(path.progress)} 1` : "0 1"}
+                                style={{
+                                  transition: `stroke-dasharray 0.45s ease-out ${path.seq * 0.07 + 0.12}s`,
+                                }}
                               />
                             ) : null}
                           </g>
                         ))}
                         {markerPt ? (
                           <g className="rep-path-marker-svg" pointerEvents="none">
-                            <circle cx={markerPt.x} cy={markerPt.y} r={6} className="rep-path-marker-svg__dot" />
+                            <circle
+                              cx={markerPt.x}
+                              cy={markerPt.y}
+                              r={6}
+                              className="rep-path-marker-svg__dot"
+                              style={{ opacity: drawn ? 1 : 0, transition: "opacity 0.4s ease 1.1s" }}
+                            />
                           </g>
                         ) : null}
                       </svg>
@@ -469,7 +585,7 @@ export default function ProfileRep() {
                       </>
                     ) : null}
 
-                    {sec.nodes.map((node) => {
+                    {sec.nodes.slice().reverse().map((node) => {
                       const key = `${sec.id}::${node.id}`;
 
                       return (
@@ -487,9 +603,73 @@ export default function ProfileRep() {
                       );
                     })}
                   </div>
+                  <div id={`rep-sec-${sec.id}`} className={`rep-path-banner rep-path-banner--${sec.bannerTone}`}>
+                    <span className="rep-path-banner__label">{sec.label}</span>
+                    <span className="rep-path-banner__range">{sec.range}</span>
+                  </div>
                 </section>
               );
             })}
+
+            {/* Base camp: all rider info lives at the bottom, where the journey starts. */}
+            <div className="rep-path-info" ref={infoRef}>
+            <div className="rep-path-hero">
+              {isGuest ? (
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    border: "2px solid #3f3f46",
+                    background: "var(--rp-zinc-800)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 6px",
+                    color: "var(--green)",
+                  }}
+                >
+                  <GraduationCap size={20} strokeWidth={2} aria-hidden />
+                </div>
+              ) : (
+                <UserAvatar
+                  user={{
+                    resolvedAvatarUrl: heroAvatarUrl,
+                    avatar_color: profile?.avatar_color,
+                    first_name: profile?.first_name,
+                    last_name: profile?.last_name,
+                  }}
+                  size={44}
+                  style={{ border: "2px solid var(--bd)", margin: "0 auto 6px" }}
+                />
+              )}
+              <div className="rep-path-name">{isGuest ? "The Rep path" : fullName}</div>
+              <div className="rep-path-campus">NMSU · Las Cruces</div>
+              <div
+                className="rep-path-badge"
+                style={{
+                  background: lvl.bg,
+                  color: lvl.color,
+                  borderColor: lvl.border,
+                }}
+              >
+                <Award size={13} aria-hidden />
+                {lvl.label}
+              </div>
+              <div className="rep-path-score">{repScore}</div>
+              <div className="rep-path-score-lbl">Rep score</div>
+              <div className="rep-path-prog">
+                <div className="rep-path-prog__meta">
+                  <span>
+                    {lvl.label} · {repScore} pts
+                  </span>
+                  <span>{nextLabel ? `${toNext} to ${nextLabel}` : "Max level"}</span>
+                </div>
+                <div className="rep-path-prog__track">
+                  <div className="rep-path-prog__fill" style={{ width: `${progPct}%`, background: lvl.color }} />
+                </div>
+              </div>
+            </div>
 
             <div className="rep-path-stats">
               <div className="rep-path-stat">
@@ -528,9 +708,56 @@ export default function ProfileRep() {
                 );
               })}
             </div>
+
+            {isGuest ? (
+              <div style={{ margin: "12px 14px 0" }}>
+                <button
+                  type="button"
+                  className="btn bp bfull blg"
+                  onClick={() => navigate("/welcome")}
+                >
+                  No rep? Get started
+                </button>
+              </div>
+            ) : null}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Floating return chip — hovers while climbing; tap to glide back to base camp.
+          Portaled to <body>: the page's fadein transform makes .page the containing
+          block for position:fixed, which would pin the chip to the page, not the viewport. */}
+      {createPortal(
+      <button
+        type="button"
+        className={`rep-path-return-chip${showChip ? "" : " rep-path-return-chip--hidden"}`}
+        onClick={scrollToInfo}
+        aria-label="Jump back down to your stats"
+        aria-hidden={!showChip}
+        tabIndex={showChip ? 0 : -1}
+      >
+        {isGuest ? (
+          <span className="rep-path-return-chip__avatar">
+            <GraduationCap size={14} strokeWidth={2} aria-hidden />
+          </span>
+        ) : (
+          <UserAvatar
+            user={{
+              resolvedAvatarUrl: heroAvatarUrl,
+              avatar_color: profile?.avatar_color,
+              first_name: profile?.first_name,
+              last_name: profile?.last_name,
+            }}
+            size={24}
+          />
+        )}
+        <span className="rep-path-return-chip__pts">{repScore} pts</span>
+        {rank ? <span className="rep-path-return-chip__rank">#{rank}</span> : null}
+        <ChevronDown size={14} aria-hidden />
+      </button>,
+      document.body
+      )}
     </div>
   );
 }

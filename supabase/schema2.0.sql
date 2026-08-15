@@ -1,12 +1,49 @@
 -- ============================================================
--- CampusGig Schema 2.0 (canonical baseline)
--- Consolidates core schema + production migrations into one file.
+-- CampusGig Schema 2.0 (canonical baseline — TWO-SIDED pivot)
+-- Updated Aug 14, 2026. Consolidates core schema + all production
+-- confirmed-live migrations into one idempotent file.
+--
+-- Model: ANYONE (students + outside clients) may POST gigs;
+-- only VERIFIED NMSU students may WORK them. "Verified student"
+-- is DERIVED server-side from the confirmed auth email domain
+-- (trigger stamp_user_account_type) — never client-declared.
+--
+-- Column types/nullability below match the live-DB introspection
+-- run Aug 14, 2026 (notably: reviews.rating is INTEGER, price is
+-- plain NUMERIC, created_at/updated_at are nullable).
+--
+-- This file reflects ONLY objects confirmed applied to the live DB
+-- (migrations 20260814000000/00001/00002/00004/00005/00006 + the
+-- 00008 client-signup repair). Deliberately EXCLUDED because they
+-- were written but NOT confirmed run:
+--   • Content-bounds CHECKs (migration 20260814000003) — title/
+--     description/notes/price/review-text length + range guards.
+--   • trg_stamp_gig_audience on INSERT *OR UPDATE* (00007) — the
+--     live trigger fires on INSERT only.
+-- Add them here once you confirm those migrations ran.
+--
+-- RPC pattern (advisor 0029): privileged SECURITY DEFINER bodies
+-- live in the unexposed `private` schema; `public.<name>` are thin
+-- SECURITY INVOKER wrappers. NEVER `CREATE OR REPLACE public.<rpc>
+-- ... SECURITY DEFINER` — that clobbers the wrapper. Edit the
+-- `private.` body instead. NEVER expose `private` to PostgREST.
 -- ============================================================
 
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- ============================================================
+-- Private schema (SECURITY DEFINER bodies; NOT exposed by PostgREST)
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS private;
+COMMENT ON SCHEMA private IS
+  'CampusGig: private SECURITY DEFINER bodies. NEVER add to PostgREST exposed schemas.';
+-- USAGE alone exposes nothing executable; per-function EXECUTE is granted
+-- explicitly below. anon needs USAGE for private.is_verified_student in RLS.
+GRANT USAGE ON SCHEMA private TO anon, authenticated, service_role;
 
 -- ============================================================
 -- Users (public profile only)
@@ -17,22 +54,45 @@ CREATE TABLE IF NOT EXISTS public.users (
   last_name VARCHAR(50) NOT NULL,
   avatar_color VARCHAR(20) DEFAULT '#6366f1',
   avatar_url TEXT,
-  rep_score INTEGER NOT NULL DEFAULT 0,
+  rep_score INTEGER DEFAULT 0,
   email_alerts_enabled BOOLEAN NOT NULL DEFAULT true,
   app_intro_completed_at TIMESTAMPTZ NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  has_easy_access_passcode BOOLEAN NOT NULL DEFAULT false,
+  easy_access_passcode_set_at TIMESTAMPTZ NULL,
+  easy_access_passcode_prompt_dismissed_at TIMESTAMPTZ NULL,
+  is_verified_student BOOLEAN NOT NULL DEFAULT false,
+  account_type VARCHAR(20) NOT NULL DEFAULT 'client'
+    CONSTRAINT users_account_type_valid CHECK (account_type IN ('student', 'client')),
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+COMMENT ON COLUMN public.users.is_verified_student IS
+  'TRUE only when the auth email is a confirmed @nmsu.edu address. Set by trigger; never trust client input.';
+COMMENT ON COLUMN public.users.account_type IS
+  'Derived label: student | client. Authoritative source is is_verified_student.';
+
+CREATE INDEX IF NOT EXISTS idx_users_account_type ON public.users(account_type);
+
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.users TO anon;
+
 DROP POLICY IF EXISTS "Authenticated can view public user directory" ON public.users;
 DROP POLICY IF EXISTS "Users can view all users" ON public.users;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.users;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 DROP POLICY IF EXISTS "Users can delete own profile" ON public.users;
+DROP POLICY IF EXISTS "Anon can count users" ON public.users;               -- full-row leak; removed
+DROP POLICY IF EXISTS "Anon can view posters of open outsider gigs" ON public.users;
 
 CREATE POLICY "Authenticated can view public user directory"
   ON public.users FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Anon can view posters of open outsider gigs"
+  ON public.users FOR SELECT TO anon
+  USING (EXISTS (
+    SELECT 1 FROM public.gigs g
+    WHERE g.poster_id = users.id AND g.audience = 'everyone' AND g.status = 'open'
+  ));
 CREATE POLICY "Users can insert own profile"
   ON public.users FOR INSERT TO authenticated
   WITH CHECK ((SELECT auth.uid()) = id);
@@ -42,6 +102,77 @@ CREATE POLICY "Users can update own profile"
 CREATE POLICY "Users can delete own profile"
   ON public.users FOR DELETE TO authenticated
   USING ((SELECT auth.uid()) = id);
+
+-- Account type is DERIVED from auth.users on every write (unspoofable).
+CREATE OR REPLACE FUNCTION public.stamp_user_account_type()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+  v_student BOOLEAN;
+BEGIN
+  SELECT (a.email ~* '@nmsu\.edu$' AND a.email_confirmed_at IS NOT NULL)
+    INTO v_student
+  FROM auth.users a
+  WHERE a.id = NEW.id;
+
+  v_student := COALESCE(v_student, false);
+  NEW.is_verified_student := v_student;
+  NEW.account_type := CASE WHEN v_student THEN 'student' ELSE 'client' END;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.stamp_user_account_type() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS trg_stamp_user_account_type ON public.users;
+CREATE TRIGGER trg_stamp_user_account_type
+  BEFORE INSERT OR UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.stamp_user_account_type();
+
+-- Non-recursive verified-student check for RLS (DEFINER bypasses users RLS,
+-- so the gigs policy never cycles back through the users anon policy).
+CREATE OR REPLACE FUNCTION private.is_verified_student(uid uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$ SELECT EXISTS (SELECT 1 FROM public.users WHERE id = uid AND is_verified_student); $$;
+REVOKE ALL ON FUNCTION private.is_verified_student(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_verified_student(uuid) TO anon, authenticated, service_role;
+
+-- NOTE: the legacy @nmsu.edu-only wall on auth.users is GONE (dropped by
+-- migrations 20260814000000/00006/00008). Outsiders (clients) can sign up;
+-- student status is enforced by derivation, not by blocking. Do NOT
+-- reintroduce an auth.users email guard — any custom trigger on auth.users
+-- that throws makes client signup fail with "Database error saving new user".
+-- Self-heal: drop every remaining NON-INTERNAL auth.users trigger + its
+-- app-owned function (the design relies on none; profiles are created
+-- client-side). See migration 20260814000008.
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT t.tgname, p.proname AS func_name, n.nspname AS func_schema,
+           pg_get_function_identity_arguments(p.oid) AS func_args
+    FROM pg_trigger t
+    JOIN pg_class c       ON c.oid  = t.tgrelid
+    JOIN pg_namespace cn  ON cn.oid = c.relnamespace
+    JOIN pg_proc p        ON p.oid  = t.tgfoid
+    JOIN pg_namespace n   ON n.oid  = p.pronamespace
+    WHERE cn.nspname = 'auth' AND c.relname = 'users' AND NOT t.tgisinternal
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON auth.users', r.tgname);
+    IF r.func_schema NOT IN ('auth','storage','extensions','graphql','realtime','pgbouncer') THEN
+      EXECUTE format('DROP FUNCTION IF EXISTS %I.%I(%s) CASCADE',
+                     r.func_schema, r.func_name, r.func_args);
+    END IF;
+  END LOOP;
+END;
+$$;
 
 -- ============================================================
 -- User private contact (PII)
@@ -60,9 +191,10 @@ CREATE TABLE IF NOT EXISTS public.user_private_contact (
   apple_pay VARCHAR(255),
   google_pay VARCHAR(255),
   contact_favorite_keys JSONB NOT NULL DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT user_private_contact_email_nmsu CHECK (email ~* '@nmsu\.edu$')
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- The old table-level CHECK (email ~* '@nmsu\.edu$') was DROPPED for the
+-- two-sided pivot; the trigger below enforces .edu for students only.
 
 CREATE UNIQUE INDEX IF NOT EXISTS user_private_contact_email_key ON public.user_private_contact (email);
 CREATE UNIQUE INDEX IF NOT EXISTS user_private_contact_phone_key ON public.user_private_contact (phone);
@@ -103,6 +235,59 @@ CREATE POLICY "Users update own private contact"
   USING ((SELECT auth.uid()) = user_id)
   WITH CHECK ((SELECT auth.uid()) = user_id);
 
+-- Students: @nmsu.edu required. Clients: any well-formed email.
+CREATE OR REPLACE FUNCTION public.enforce_private_contact_email_nmsu()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_student BOOLEAN;
+BEGIN
+  SELECT u.is_verified_student INTO v_student
+  FROM public.users u WHERE u.id = NEW.user_id;
+
+  IF COALESCE(v_student, false) THEN
+    IF NEW.email IS NULL OR NEW.email !~* '@nmsu\.edu$' THEN
+      RAISE EXCEPTION 'School email must be an @nmsu.edu address';
+    END IF;
+  ELSE
+    IF NEW.email IS NULL OR NEW.email !~* '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' THEN
+      RAISE EXCEPTION 'Please enter a valid email address';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ============================================================
+-- Easy access passcode (bcrypt hash; owner-only RLS)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.user_easy_access_passcode (
+  user_id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  passcode_hash TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE public.user_easy_access_passcode ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Owner can read own passcode record" ON public.user_easy_access_passcode;
+DROP POLICY IF EXISTS "Owner can insert own passcode record" ON public.user_easy_access_passcode;
+DROP POLICY IF EXISTS "Owner can update own passcode record" ON public.user_easy_access_passcode;
+DROP POLICY IF EXISTS "Owner can delete own passcode record" ON public.user_easy_access_passcode;
+CREATE POLICY "Owner can read own passcode record"
+  ON public.user_easy_access_passcode FOR SELECT TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Owner can insert own passcode record"
+  ON public.user_easy_access_passcode FOR INSERT TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Owner can update own passcode record"
+  ON public.user_easy_access_passcode FOR UPDATE TO authenticated
+  USING ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Owner can delete own passcode record"
+  ON public.user_easy_access_passcode FOR DELETE TO authenticated
+  USING ((SELECT auth.uid()) = user_id);
+
 -- ============================================================
 -- Categories
 -- ============================================================
@@ -112,9 +297,13 @@ CREATE TABLE IF NOT EXISTS public.categories (
   icon_name VARCHAR(50) NOT NULL
 );
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.categories TO anon;
 DROP POLICY IF EXISTS "Anyone can read categories" ON public.categories;
+DROP POLICY IF EXISTS "Anon can read categories" ON public.categories;
 CREATE POLICY "Anyone can read categories"
   ON public.categories FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Anon can read categories"
+  ON public.categories FOR SELECT TO anon USING (true);
 
 INSERT INTO public.categories (label, icon_name) VALUES
   ('Food', 'Utensils'),
@@ -135,18 +324,23 @@ CREATE TABLE IF NOT EXISTS public.gigs (
   category_id INTEGER NOT NULL REFERENCES public.categories(id),
   title TEXT NOT NULL,
   description TEXT,
-  price NUMERIC(10,2) DEFAULT 0,
+  price NUMERIC DEFAULT 0,
   location VARCHAR(255),
   estimated_time VARCHAR(100),
   notes TEXT,
   expires_at TIMESTAMPTZ,
   status VARCHAR(20) DEFAULT 'open'
     CONSTRAINT valid_status CHECK (status IN ('open', 'requested', 'active', 'completed', 'cancelled')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  audience VARCHAR(20) NOT NULL DEFAULT 'students_only'
+    CONSTRAINT gigs_audience_valid CHECK (audience IN ('everyone', 'students_only')),
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMPTZ,
   CONSTRAINT expires_after_created CHECK (expires_at IS NULL OR expires_at > created_at)
 );
+
+COMMENT ON COLUMN public.gigs.audience IS
+  'Who may see this gig: everyone (client-posted) | students_only (student-posted). Stamped from poster type at insert.';
 
 CREATE INDEX IF NOT EXISTS idx_gigs_poster ON public.gigs(poster_id);
 CREATE INDEX IF NOT EXISTS idx_gigs_taker ON public.gigs(taker_id);
@@ -154,15 +348,28 @@ CREATE INDEX IF NOT EXISTS idx_gigs_status ON public.gigs(status);
 CREATE INDEX IF NOT EXISTS idx_gigs_category ON public.gigs(category_id);
 CREATE INDEX IF NOT EXISTS idx_gigs_created ON public.gigs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_gigs_open_expires ON public.gigs(expires_at) WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS idx_gigs_audience ON public.gigs(audience);
 
 ALTER TABLE public.gigs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Anyone can view open gigs" ON public.gigs;
+GRANT SELECT ON public.gigs TO anon;
+
+DROP POLICY IF EXISTS "Anyone can view open gigs" ON public.gigs;           -- pre-pivot
+DROP POLICY IF EXISTS "Anon can count gigs" ON public.gigs;                 -- full-row leak; removed
+DROP POLICY IF EXISTS "Audience-scoped gig visibility" ON public.gigs;
 DROP POLICY IF EXISTS "Users can post gigs" ON public.gigs;
 DROP POLICY IF EXISTS "Poster can update own gigs" ON public.gigs;
 DROP POLICY IF EXISTS "Poster can delete own gigs" ON public.gigs;
 
-CREATE POLICY "Anyone can view open gigs"
-  ON public.gigs FOR SELECT TO authenticated USING (true);
+-- Safety boundary (enforced in DB, never UI-only):
+--   student-posted → verified students only; client-posted → everyone while
+--   OPEN (incl. logged-out); a poster always sees their own gigs.
+CREATE POLICY "Audience-scoped gig visibility"
+  ON public.gigs FOR SELECT TO anon, authenticated
+  USING (
+    (audience = 'everyone' AND status = 'open')
+    OR poster_id = (SELECT auth.uid())
+    OR private.is_verified_student((SELECT auth.uid()))
+  );
 CREATE POLICY "Users can post gigs"
   ON public.gigs FOR INSERT TO authenticated
   WITH CHECK ((SELECT auth.uid()) = poster_id);
@@ -173,13 +380,49 @@ CREATE POLICY "Poster can delete own gigs"
   ON public.gigs FOR DELETE TO authenticated
   USING ((SELECT auth.uid()) = poster_id);
 
+-- Audience is derived from the poster's account type at insert time.
+CREATE OR REPLACE FUNCTION public.stamp_gig_audience()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_student BOOLEAN;
+BEGIN
+  SELECT is_verified_student INTO v_student FROM public.users WHERE id = NEW.poster_id;
+  NEW.audience := CASE WHEN COALESCE(v_student, false) THEN 'students_only' ELSE 'everyone' END;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.stamp_gig_audience() FROM PUBLIC, anon, authenticated;
+
+-- Posting requires a confirmed email (protects the student worker).
+CREATE OR REPLACE FUNCTION public.enforce_gig_poster_email_confirmed()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+  v_confirmed TIMESTAMPTZ;
+BEGIN
+  SELECT a.email_confirmed_at INTO v_confirmed
+  FROM auth.users a WHERE a.id = NEW.poster_id;
+  IF v_confirmed IS NULL THEN
+    RAISE EXCEPTION 'Please verify your email before posting a gig.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.enforce_gig_poster_email_confirmed() FROM PUBLIC, anon, authenticated;
+
 CREATE TABLE IF NOT EXISTS public.gig_requests (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   gig_id UUID NOT NULL REFERENCES public.gigs(id) ON DELETE CASCADE,
   requester_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   status VARCHAR(20) DEFAULT 'pending'
     CONSTRAINT valid_request_status CHECK (status IN ('pending', 'accepted', 'rejected')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(gig_id, requester_id)
 );
 
@@ -203,6 +446,10 @@ CREATE POLICY "Poster can update request status"
   ON public.gig_requests FOR UPDATE TO authenticated
   USING (gig_id IN (SELECT id FROM public.gigs WHERE poster_id = (SELECT auth.uid())));
 
+-- No INSERT policy/grant: requests are created ONLY via the request_gig RPC
+-- (the single chokepoint where the verified-student gate lives).
+REVOKE INSERT ON TABLE public.gig_requests FROM authenticated, anon;
+
 -- ============================================================
 -- Reviews
 -- ============================================================
@@ -211,11 +458,11 @@ CREATE TABLE IF NOT EXISTS public.reviews (
   gig_id UUID NOT NULL REFERENCES public.gigs(id) ON DELETE CASCADE,
   reviewer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   reviewee_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  rating NUMERIC(2,1) NOT NULL
-    CONSTRAINT valid_rating CHECK (rating >= 1 AND rating <= 5 AND (rating * 2) = ROUND(rating * 2)),
+  rating INTEGER NOT NULL
+    CONSTRAINT valid_rating CHECK (rating >= 1 AND rating <= 5),
   text TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT no_self_review CHECK (reviewer_id <> reviewee_id),
   CONSTRAINT reviews_gig_reviewer_unique UNIQUE (gig_id, reviewer_id)
 );
@@ -225,13 +472,22 @@ CREATE INDEX IF NOT EXISTS idx_reviews_gig ON public.reviews(gig_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_reviewer ON public.reviews(reviewer_id);
 
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.reviews TO anon;
+
 DROP POLICY IF EXISTS "Anyone can read reviews" ON public.reviews;
+DROP POLICY IF EXISTS "Anon can view reviews of open outsider posters" ON public.reviews;
 DROP POLICY IF EXISTS "Users can insert own reviews" ON public.reviews;
 DROP POLICY IF EXISTS "Reviewers can update own reviews" ON public.reviews;
 DROP POLICY IF EXISTS "Reviewers can delete own reviews" ON public.reviews;
 
 CREATE POLICY "Anyone can read reviews"
   ON public.reviews FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Anon can view reviews of open outsider posters"
+  ON public.reviews FOR SELECT TO anon
+  USING (EXISTS (
+    SELECT 1 FROM public.gigs g
+    WHERE g.poster_id = reviews.reviewee_id AND g.audience = 'everyone' AND g.status = 'open'
+  ));
 CREATE POLICY "Users can insert own reviews"
   ON public.reviews FOR INSERT TO authenticated
   WITH CHECK (reviewer_id = (SELECT auth.uid()));
@@ -254,7 +510,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   body TEXT,
   metadata JSONB DEFAULT '{}',
   read BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
@@ -330,7 +586,66 @@ CREATE POLICY reports_select_own ON public.reports
   FOR SELECT TO authenticated USING (reporter_id = (SELECT auth.uid()));
 
 -- ============================================================
--- Account deletion queue
+-- Public stats (trigger-maintained singleton row + realtime)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.public_stats (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  total_postings BIGINT NOT NULL DEFAULT 0,
+  completed BIGINT NOT NULL DEFAULT 0,
+  accounts BIGINT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.public_stats ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.public_stats TO anon, authenticated;
+
+DROP POLICY IF EXISTS "Anyone can read public stats" ON public.public_stats;
+CREATE POLICY "Anyone can read public stats"
+  ON public.public_stats FOR SELECT TO anon, authenticated USING (true);
+-- No INSERT/UPDATE policies: only the trigger-maintained refresh writes it.
+
+CREATE OR REPLACE FUNCTION private.refresh_public_stats() RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  INSERT INTO public.public_stats (id, total_postings, completed, accounts, updated_at)
+  VALUES (
+    true,
+    (SELECT count(*) FROM public.gigs),
+    (SELECT count(*) FROM public.gigs WHERE status = 'completed'),
+    (SELECT count(*) FROM public.users),
+    now()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    total_postings = EXCLUDED.total_postings,
+    completed = EXCLUDED.completed,
+    accounts = EXCLUDED.accounts,
+    updated_at = EXCLUDED.updated_at;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.refresh_public_stats() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION private.trg_refresh_public_stats() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  PERFORM private.refresh_public_stats();
+  RETURN NULL;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.trg_refresh_public_stats() FROM PUBLIC, anon, authenticated;
+
+SELECT private.refresh_public_stats();
+
+-- Publish row changes over Supabase Realtime (welcome page live counters).
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.public_stats;
+EXCEPTION WHEN duplicate_object THEN
+  NULL; -- already published
+END;
+$$;
+
+-- ============================================================
+-- Account deletion queue (15-day grace, purged by pg_cron worker)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.account_deletion_requests (
   user_id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
@@ -342,13 +657,15 @@ CREATE TABLE IF NOT EXISTS public.account_deletion_requests (
 CREATE INDEX IF NOT EXISTS idx_account_deletion_grace ON public.account_deletion_requests (grace_ends_at)
   WHERE status = 'pending';
 ALTER TABLE public.account_deletion_requests ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.account_deletion_requests TO authenticated;
 DROP POLICY IF EXISTS "Users read own deletion request" ON public.account_deletion_requests;
 CREATE POLICY "Users read own deletion request"
   ON public.account_deletion_requests FOR SELECT TO authenticated
   USING ((SELECT auth.uid()) = user_id);
+-- No INSERT/UPDATE policies: writes happen only through the RPCs below.
 
 -- ============================================================
--- Functions/triggers
+-- Functions/triggers (shared helpers)
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.update_updated_at()
 RETURNS TRIGGER
@@ -357,19 +674,6 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.enforce_private_contact_email_nmsu()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  IF NEW.email IS NOT NULL AND NEW.email !~* '@nmsu\.edu$' THEN
-    RAISE EXCEPTION 'School email must be an @nmsu.edu address';
-  END IF;
   RETURN NEW;
 END;
 $$;
@@ -582,12 +886,19 @@ AS $$
   FROM public.users u WHERE u.id = uid;
 $$;
 
--- Request/accept/reject/complete RPCs are sourced from security hardening.
-CREATE OR REPLACE FUNCTION public.request_gig(p_gig_id UUID) RETURNS UUID
+-- ============================================================
+-- Gig lifecycle RPCs — DEFINER bodies in `private`,
+-- INVOKER wrappers in `public` (advisor 0029 pattern)
+-- ============================================================
+CREATE OR REPLACE FUNCTION private.request_gig(p_gig_id UUID) RETURNS UUID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE uid UUID := auth.uid(); g RECORD; rid UUID;
 BEGIN
   IF uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  -- The two-sided gate: only verified NMSU students may work gigs.
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = uid AND is_verified_student) THEN
+    RAISE EXCEPTION 'Only verified NMSU students can take on gigs';
+  END IF;
   SELECT * INTO g FROM public.gigs WHERE id = p_gig_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Gig not found'; END IF;
   IF g.poster_id = uid THEN RAISE EXCEPTION 'You cannot request your own gig'; END IF;
@@ -599,7 +910,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.accept_gig_request(p_request_id UUID) RETURNS void
+CREATE OR REPLACE FUNCTION private.accept_gig_request(p_request_id UUID) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE uid UUID := auth.uid(); r RECORD; g RECORD;
 BEGIN
@@ -616,7 +927,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.reject_gig_request(p_request_id UUID) RETURNS void
+CREATE OR REPLACE FUNCTION private.reject_gig_request(p_request_id UUID) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE uid UUID := auth.uid(); r RECORD; g RECORD; pending_left INT;
 BEGIN
@@ -634,7 +945,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.complete_gig(p_gig_id UUID) RETURNS void
+CREATE OR REPLACE FUNCTION private.complete_gig(p_gig_id UUID) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE uid UUID := auth.uid(); g RECORD;
 BEGIN
@@ -647,28 +958,180 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.request_account_deletion() RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+-- Public INVOKER wrappers (what the app calls via supabase.rpc).
+-- Argument names must stay p_gig_id / p_request_id — supabase-js sends by name.
+CREATE OR REPLACE FUNCTION public.request_gig(p_gig_id UUID) RETURNS UUID
+LANGUAGE sql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+  SELECT private.request_gig(p_gig_id);
+$$;
+CREATE OR REPLACE FUNCTION public.accept_gig_request(p_request_id UUID) RETURNS void
+LANGUAGE sql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+  SELECT private.accept_gig_request(p_request_id);
+$$;
+CREATE OR REPLACE FUNCTION public.reject_gig_request(p_request_id UUID) RETURNS void
+LANGUAGE sql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+  SELECT private.reject_gig_request(p_request_id);
+$$;
+CREATE OR REPLACE FUNCTION public.complete_gig(p_gig_id UUID) RETURNS void
+LANGUAGE sql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+  SELECT private.complete_gig(p_gig_id);
+$$;
+
+COMMENT ON FUNCTION public.request_gig(UUID) IS
+  'INVOKER wrapper → private.request_gig(uuid). Body lives in private schema to satisfy advisor 0029.';
+COMMENT ON FUNCTION public.accept_gig_request(UUID) IS
+  'INVOKER wrapper → private.accept_gig_request(uuid). Body lives in private schema to satisfy advisor 0029.';
+COMMENT ON FUNCTION public.reject_gig_request(UUID) IS
+  'INVOKER wrapper → private.reject_gig_request(uuid). Body lives in private schema to satisfy advisor 0029.';
+COMMENT ON FUNCTION public.complete_gig(UUID) IS
+  'INVOKER wrapper → private.complete_gig(uuid). Body lives in private schema to satisfy advisor 0029.';
+
+-- ============================================================
+-- Public stats RPC (DEFINER body in private → INVOKER wrapper)
+-- Reads the trigger-maintained public_stats row (no per-visitor counting).
+-- ============================================================
+CREATE OR REPLACE FUNCTION private.get_public_stats()
+RETURNS TABLE (total_postings bigint, completed bigint, accounts bigint)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT s.total_postings, s.completed, s.accounts
+  FROM public.public_stats s
+  WHERE s.id;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_public_stats()
+RETURNS TABLE (total_postings bigint, completed bigint, accounts bigint)
+LANGUAGE sql
+SECURITY INVOKER
+STABLE
+SET search_path = public, pg_temp
+AS $$ SELECT * FROM private.get_public_stats(); $$;
+COMMENT ON FUNCTION public.get_public_stats() IS
+  'INVOKER wrapper → private.get_public_stats(). Body in private schema to satisfy advisor 0029.';
+
+-- ============================================================
+-- Passcode RPC (INVOKER; RLS covers the owner-only writes)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.set_easy_access_passcode_record(p_passcode TEXT)
+RETURNS void
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, extensions AS $$
+DECLARE
+  uid UUID := auth.uid();
+  trimmed TEXT;
+  trivial TEXT[] := ARRAY[
+    '000000', '111111', '222222', '333333', '444444', '555555',
+    '666666', '777777', '888888', '999999', '123456', '654321',
+    '012345', '543210', '121212', '101010'
+  ];
+BEGIN
+  IF uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  trimmed := trim(p_passcode);
+  IF trimmed !~ '^\d{6}$' THEN RAISE EXCEPTION 'Passcode must be exactly 6 digits'; END IF;
+  IF trimmed = ANY (trivial) THEN RAISE EXCEPTION 'Choose a less obvious passcode'; END IF;
+  INSERT INTO public.user_easy_access_passcode (user_id, passcode_hash, updated_at)
+  VALUES (uid, crypt(trimmed, gen_salt('bf', 10)), CURRENT_TIMESTAMP)
+  ON CONFLICT (user_id) DO UPDATE
+    SET passcode_hash = EXCLUDED.passcode_hash, updated_at = CURRENT_TIMESTAMP;
+  UPDATE public.users
+  SET has_easy_access_passcode = true, easy_access_passcode_set_at = CURRENT_TIMESTAMP
+  WHERE id = uid;
+END;
+$$;
+
+-- ============================================================
+-- Account deletion RPCs (DEFINER bodies in private → INVOKER wrappers)
+-- ============================================================
+CREATE OR REPLACE FUNCTION private.request_account_deletion() RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE uid UUID := auth.uid();
 BEGIN
   IF uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
   INSERT INTO public.account_deletion_requests (user_id, requested_at, grace_ends_at, status)
   VALUES (uid, now(), now() + interval '15 days', 'pending')
-  ON CONFLICT (user_id) DO UPDATE SET requested_at = EXCLUDED.requested_at, grace_ends_at = EXCLUDED.grace_ends_at, status = 'pending';
+  ON CONFLICT (user_id) DO UPDATE
+    SET requested_at = EXCLUDED.requested_at,
+        grace_ends_at = EXCLUDED.grace_ends_at,
+        status = 'pending';
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.cancel_pending_account_deletion() RETURNS boolean
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION private.cancel_pending_account_deletion() RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE uid UUID := auth.uid(); n INT;
 BEGIN
   IF uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
-  UPDATE public.account_deletion_requests SET status = 'cancelled' WHERE user_id = uid AND status = 'pending';
+  UPDATE public.account_deletion_requests
+    SET status = 'cancelled'
+    WHERE user_id = uid AND status = 'pending';
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n > 0;
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.request_account_deletion() RETURNS void
+LANGUAGE sql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+  SELECT private.request_account_deletion();
+$$;
+CREATE OR REPLACE FUNCTION public.cancel_pending_account_deletion() RETURNS boolean
+LANGUAGE sql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+  SELECT private.cancel_pending_account_deletion();
+$$;
+COMMENT ON FUNCTION public.request_account_deletion() IS
+  'INVOKER wrapper → private.request_account_deletion(). Body lives in private schema to satisfy advisor 0029.';
+COMMENT ON FUNCTION public.cancel_pending_account_deletion() IS
+  'INVOKER wrapper → private.cancel_pending_account_deletion(). Body lives in private schema to satisfy advisor 0029.';
+
+-- Deletion worker: purges accounts whose 15-day grace period has passed.
+-- Order: avatar files → public.users (FK cascades wipe PII, passcode,
+-- notifications, reviews, gig_requests, posted gigs, reports; taker_id on
+-- others' gigs → NULL) → auth.users (the login identity).
+CREATE OR REPLACE FUNCTION private.process_due_account_deletions()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, storage, pg_temp
+AS $$
+DECLARE
+  r RECORD;
+  n integer := 0;
+BEGIN
+  FOR r IN
+    SELECT user_id
+    FROM public.account_deletion_requests
+    WHERE status = 'pending' AND grace_ends_at <= now()
+  LOOP
+    DELETE FROM storage.objects
+      WHERE bucket_id = 'avatars'
+        AND (storage.foldername(name))[1] = r.user_id::text;
+    DELETE FROM public.users WHERE id = r.user_id;
+    DELETE FROM auth.users WHERE id = r.user_id;
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.process_due_account_deletions() FROM PUBLIC, anon, authenticated;
+
+-- Daily at 03:17 UTC (live as cron job #1). Unschedule-then-schedule keeps re-runs clean.
+DO $$
+BEGIN
+  PERFORM cron.unschedule('campusgig-process-account-deletions');
+EXCEPTION WHEN OTHERS THEN
+  NULL; -- job didn't exist yet
+END;
+$$;
+SELECT cron.schedule(
+  'campusgig-process-account-deletions',
+  '17 3 * * *',
+  $$SELECT private.process_due_account_deletions();$$
+);
+
+-- ============================================================
+-- Triggers
+-- ============================================================
 DROP TRIGGER IF EXISTS set_users_updated_at ON public.users;
 DROP TRIGGER IF EXISTS set_gigs_updated_at ON public.gigs;
 DROP TRIGGER IF EXISTS set_reviews_updated_at ON public.reviews;
@@ -682,6 +1145,10 @@ DROP TRIGGER IF EXISTS trg_after_review_insert ON public.reviews;
 DROP TRIGGER IF EXISTS trg_after_review_update ON public.reviews;
 DROP TRIGGER IF EXISTS trg_after_review_delete ON public.reviews;
 DROP TRIGGER IF EXISTS trg_private_contact_email_nmsu ON public.user_private_contact;
+DROP TRIGGER IF EXISTS trg_stamp_gig_audience ON public.gigs;
+DROP TRIGGER IF EXISTS trg_gig_poster_email_confirmed ON public.gigs;
+DROP TRIGGER IF EXISTS trg_public_stats_gigs ON public.gigs;
+DROP TRIGGER IF EXISTS trg_public_stats_users ON public.users;
 
 CREATE TRIGGER set_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 CREATE TRIGGER set_gigs_updated_at BEFORE UPDATE ON public.gigs FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
@@ -698,26 +1165,21 @@ CREATE TRIGGER trg_after_review_delete AFTER DELETE ON public.reviews FOR EACH R
 CREATE TRIGGER trg_private_contact_email_nmsu
   BEFORE INSERT OR UPDATE OF email ON public.user_private_contact
   FOR EACH ROW EXECUTE FUNCTION public.enforce_private_contact_email_nmsu();
+CREATE TRIGGER trg_stamp_gig_audience
+  BEFORE INSERT ON public.gigs
+  FOR EACH ROW EXECUTE FUNCTION public.stamp_gig_audience();
+CREATE TRIGGER trg_gig_poster_email_confirmed
+  BEFORE INSERT ON public.gigs
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_gig_poster_email_confirmed();
+-- Statement-level: public_stats updates only when the data does.
+CREATE TRIGGER trg_public_stats_gigs
+  AFTER INSERT OR DELETE OR UPDATE OF status ON public.gigs
+  FOR EACH STATEMENT EXECUTE FUNCTION private.trg_refresh_public_stats();
+CREATE TRIGGER trg_public_stats_users
+  AFTER INSERT OR DELETE ON public.users
+  FOR EACH STATEMENT EXECUTE FUNCTION private.trg_refresh_public_stats();
 
--- auth.users email domain guard (requires auth schema privileges)
-CREATE OR REPLACE FUNCTION public.enforce_auth_email_nmsu()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = auth
-AS $$
-BEGIN
-  IF NEW.email IS NOT NULL AND NEW.email !~* '@nmsu\.edu$' THEN
-    RAISE EXCEPTION 'Only @nmsu.edu email addresses are allowed';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-DROP TRIGGER IF EXISTS enforce_auth_email_nmsu_trigger ON auth.users;
-CREATE TRIGGER enforce_auth_email_nmsu_trigger
-  BEFORE INSERT OR UPDATE OF email ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.enforce_auth_email_nmsu();
+-- (trg_stamp_user_account_type is created next to its function above.)
 
 -- ============================================================
 -- Storage (avatars)
@@ -726,6 +1188,8 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES ('avatars', 'avatars', true, 5242880, ARRAY['image/jpeg','image/png','image/gif','image/webp'])
 ON CONFLICT (id) DO NOTHING;
 
+-- No broad public SELECT policy: bucket listing is blocked; public object
+-- URLs still resolve because the bucket itself is public.
 DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
 DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
 DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
@@ -741,21 +1205,43 @@ CREATE POLICY "Users can delete own avatar"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = (SELECT auth.uid())::text);
 
--- RPC privileges + direct insert hardening
+-- ============================================================
+-- Function privileges (REST-callable surface locked to authenticated)
+-- ============================================================
+-- Private bodies
+REVOKE ALL ON FUNCTION private.request_gig(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.accept_gig_request(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.reject_gig_request(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.complete_gig(UUID) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.request_account_deletion() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.cancel_pending_account_deletion() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.get_public_stats() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION private.request_gig(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.accept_gig_request(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.reject_gig_request(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.complete_gig(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.request_account_deletion() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.cancel_pending_account_deletion() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.get_public_stats() TO anon, authenticated, service_role;
+
+-- Public wrappers
 REVOKE ALL ON FUNCTION public.request_gig(UUID) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.accept_gig_request(UUID) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.reject_gig_request(UUID) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.complete_gig(UUID) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.request_account_deletion() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.cancel_pending_account_deletion() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.request_account_deletion() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.cancel_pending_account_deletion() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_public_stats() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.set_easy_access_passcode_record(TEXT) FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION public.request_gig(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.accept_gig_request(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.reject_gig_request(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.complete_gig(UUID) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.request_account_deletion() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.cancel_pending_account_deletion() TO authenticated;
-
-REVOKE INSERT ON TABLE public.gig_requests FROM authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.request_account_deletion() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.cancel_pending_account_deletion() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_public_stats() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.set_easy_access_passcode_record(TEXT) TO authenticated;
 
 COMMIT;

@@ -5,8 +5,8 @@ import {
   markNotificationRead,
   deleteNotification,
   acceptGigRequest,
-} from "../../lib/profile";
-import { GIG_NOTIF_TYPES, REVIEW_NOTIF_TYPES } from "./notificationTypes";
+} from "../../../lib/profile";
+import { GIG_NOTIF_TYPES, REVIEW_NOTIF_TYPES } from "../notificationTypes";
 import {
   patchAllReadInCache,
   invalidateUnreadCount,
@@ -16,7 +16,7 @@ import {
   markSingleReadInCache,
   invalidateNotificationsQuery,
   invalidateOpenGigsQuery,
-} from "./alertsMutations";
+} from "../alertsMutations";
 
 export function useAlertsActions() {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ export function useAlertsActions() {
         invalidateUnreadCount();
       }
       if (GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id) {
-        navigate(`/gigdetails/${n.metadata.gig_id}`, {
+        navigate(`/gig/${n.metadata.gig_id}`, {
           state: { source: "alerts", notification: n, returnTo: "/alerts" },
         });
         return;
@@ -73,7 +73,7 @@ export function useAlertsActions() {
       }
       const latest = items[0];
       if (latest.metadata?.gig_id) {
-        navigate(`/gigdetails/${latest.metadata.gig_id}`, {
+        navigate(`/gig/${latest.metadata.gig_id}`, {
           state: { source: "alerts", notification: latest, returnTo: "/alerts" },
         });
       }

@@ -2,40 +2,17 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Lock, AtSign, Phone, Mail, Star } from "lucide-react";
 import FavoriteHintBubble from "./FavoriteHintBubble";
 import { formatNanpDisplay, nanpDigitsFromInput } from "../utils/phoneNanp";
+import { isEduEmail } from "../lib/auth";
+import {
+  POPULAR_CONTACT_FIELDS as POPULAR,
+  MORE_CONTACT_FIELDS as MORE,
+  OPTIONAL_CONTACT_FIELD_BY_KEY as FIELD_BY_KEY,
+  FAVORABLE_CONTACT_KEYS,
+  normalizeContactFavoriteKeys,
+} from "../utils/contactFields";
 
-const POPULAR = [
-  { key: "venmo", label: "Venmo", prefix: "@", placeholder: "yourvenmo" },
-  { key: "cashapp", label: "Cash App", prefix: "$", placeholder: "yourcashtag" },
-  { key: "paypal", label: "PayPal", icon: "at", placeholder: "email or @handle" },
-];
-
-const MORE = [
-  { key: "snapchat", label: "Snapchat", prefix: "@", placeholder: "username" },
-  { key: "instagram", label: "Instagram", prefix: "@", placeholder: "username" },
-  { key: "discord", label: "Discord", prefix: "#", placeholder: "username or user#0000" },
-  { key: "zelle", label: "Zelle", prefix: "Z", placeholder: "email or phone for Zelle" },
-  { key: "apple_pay", label: "Apple Pay / Apple Cash", prefix: "A", placeholder: "phone or Apple ID email" },
-  { key: "google_pay", label: "Google Pay", prefix: "G", placeholder: "email or phone" },
-];
-
-const ALL_STAR_FIELDS = [...POPULAR, ...MORE];
-const FIELD_BY_KEY = Object.fromEntries(ALL_STAR_FIELDS.map((f) => [f.key, f]));
-
-/** Keys that can be starred and reordered for display to others. */
-export const FAVORABLE_CONTACT_KEYS = ALL_STAR_FIELDS.map((f) => f.key);
-
-const validFavoriteKey = new Set(FAVORABLE_CONTACT_KEYS);
-
-export function normalizeContactFavoriteKeys(arr) {
-  const seen = new Set();
-  const out = [];
-  for (const k of arr || []) {
-    if (!validFavoriteKey.has(k) || seen.has(k)) continue;
-    seen.add(k);
-    out.push(k);
-  }
-  return out;
-}
+// Re-exported for existing import paths (e.g. EditProfile uses `../components/ContactFields`).
+export { FAVORABLE_CONTACT_KEYS, normalizeContactFavoriteKeys };
 
 function FieldRow({ children, label, optional }) {
   return (
@@ -69,7 +46,7 @@ function StarToggle({ active, onClick, ariaLabel }) {
 function PopularFieldRow({ f, profile, set, favoriteKeys, requestFavoriteToggle }) {
   const isFav = favoriteKeys.includes(f.key);
   return (
-    <FieldRow key={f.key} label={f.label} optional>
+    <FieldRow key={f.key} label={f.formLabel || f.label} optional>
       <div className="ig">
         {f.prefix && f.icon !== "at" ? (
           <div className="iad" style={{ fontFamily: "var(--mono)", fontSize: 14, fontWeight: 500 }}>
@@ -100,7 +77,7 @@ function PopularFieldRow({ f, profile, set, favoriteKeys, requestFavoriteToggle 
 function MoreFieldRow({ f, profile, set, favoriteKeys, requestFavoriteToggle }) {
   const isFav = favoriteKeys.includes(f.key);
   return (
-    <FieldRow key={f.key} label={f.label} optional>
+    <FieldRow key={f.key} label={f.formLabel || f.label} optional>
       <div className="ig">
         <div
           className="iad"
@@ -272,7 +249,7 @@ export default function ContactFields({
       </div>
 
       {emailDisplay != null && emailDisplay !== "" && (
-        <FieldRow label="School email">
+        <FieldRow label={isEduEmail(emailDisplay) ? "School email" : "Email"}>
           <div className="ig" style={{ opacity: 0.92 }}>
             <div className="iad">
               <Mail size={13} />

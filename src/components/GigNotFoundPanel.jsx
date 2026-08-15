@@ -4,7 +4,7 @@ import ReportModal from "./modals/ReportModal";
 
 /**
  * Friendly empty state when a gig/project link has no backing row (deleted, expired listing, or bad link).
- * Used on `/gigdetails/:id` and browse modals after fetch settles with no gig.
+ * Used on `/gig/:id` after fetch settles with no gig.
  */
 export default function GigNotFoundPanel({ onBack, title = "Gig Details" }) {
   const [reportOpen, setReportOpen] = useState(false);

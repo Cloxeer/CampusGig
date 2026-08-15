@@ -10,8 +10,7 @@ import DeleteReviewConfirmModal from "../../components/modals/DeleteReviewConfir
 import { useProfilePageQueries } from "./hooks/useProfilePageQueries";
 import { useProfileMenu } from "./hooks/useProfileMenu";
 import { useProfileReviewsUrlSync } from "./hooks/useProfileReviewsUrlSync";
-import { buildProfileActivityItems } from "./mappers/buildProfileActivityItems";
-import { buildOtherUserActivityItems } from "./mappers/buildOtherUserActivityItems";
+import { buildActivityItems } from "./mappers/buildProfileActivityItems";
 import { refreshProfileData } from "./utils/refreshProfileData";
 import ProfilePageSkeleton from "./components/ProfilePageSkeleton";
 import ProfileNotFound from "./components/ProfileNotFound";
@@ -25,8 +24,17 @@ import ProfileActivityTab from "./components/ProfileActivityTab";
 import ProfileLeaderboardTab from "./components/ProfileLeaderboardTab";
 import ProfileModals from "./components/ProfileModals";
 import ProfileOtherReviewsTab from "./components/ProfileOtherReviewsTab";
-import ProfileOtherActivityTab from "./components/ProfileOtherActivityTab";
 import ReportModal from "../../components/modals/ReportModal";
+import { useLegacyGigRedirect } from "../../hooks/useLegacyGigRedirect";
+import { usePasscodeSetupPrompt } from "../auth/hooks/usePasscodeSetupPrompt";
+import PasscodeSetupPromptModal from "../../components/auth/PasscodeSetupPromptModal";
+import SetPasscodeModal from "../../components/auth/SetPasscodeModal";
+import { useToast } from "../../components/toast/ToastProvider";
+
+// Remembers the last self-profile tab (Activity vs Board) across navigations —
+// e.g. open a profile from the Board and come back to the Board, not Activity.
+const PROFILE_TAB_STORAGE_KEY = "cg:profile:selfTab";
+const SELF_TABS = new Set(["activity", "leaderboard"]);
 
 export default function ProfilePage({ currentUserId }) {
   const navigate = useNavigate();
@@ -42,6 +50,12 @@ export default function ProfilePage({ currentUserId }) {
     if (routeUserId) return "reviews";
     try {
       if (new URLSearchParams(window.location.search).get("tab") === "leaderboard") return "leaderboard";
+    } catch {
+      /* ignore */
+    }
+    try {
+      const saved = localStorage.getItem(PROFILE_TAB_STORAGE_KEY);
+      if (SELF_TABS.has(saved)) return saved;
     } catch {
       /* ignore */
     }
@@ -67,6 +81,12 @@ export default function ProfilePage({ currentUserId }) {
   });
 
   const q = useProfilePageQueries(routeUserId);
+  const { showToast } = useToast();
+
+  const passcodePrompt = usePasscodeSetupPrompt({
+    enabled: !routeUserId && !q.loading && !!q.profile,
+    profile: q.profile,
+  });
 
   const effectivePendingGigId = useMemo(() => {
     if (!routeUserId) return null;
@@ -86,6 +106,16 @@ export default function ProfilePage({ currentUserId }) {
     if (searchParams.get("tab") === "leaderboard") setPTab("leaderboard");
   }, [searchParams, routeUserId]);
 
+  // Remember the self-profile tab so returning to /profile restores it.
+  useEffect(() => {
+    if (routeUserId || !SELF_TABS.has(pTab)) return;
+    try {
+      localStorage.setItem(PROFILE_TAB_STORAGE_KEY, pTab);
+    } catch {
+      /* ignore */
+    }
+  }, [pTab, routeUserId]);
+
   useEffect(() => {
     if (routeUserId || pTab !== "leaderboard" || searchParams.get("tab") !== "leaderboard") return;
     const id = requestAnimationFrame(() => {
@@ -94,16 +124,10 @@ export default function ProfilePage({ currentUserId }) {
     return () => cancelAnimationFrame(id);
   }, [routeUserId, pTab, searchParams]);
 
-  useEffect(() => {
-    if (!isOtherProfile || !routeUserId) return;
-    const legacy = searchParams.get("gig");
-    if (!legacy || searchParams.get("reviews") === "1") return;
-    const next = new URLSearchParams(searchParams);
-    next.delete("gig");
-    const qs = next.toString();
-    const returnPath = `/profile/${routeUserId}${qs ? `?${qs}` : ""}`;
-    navigate(`/gig/${legacy}`, { replace: true, state: { returnTo: returnPath } });
-  }, [isOtherProfile, routeUserId, searchParams, navigate]);
+  useLegacyGigRedirect(routeUserId ? `/profile/${routeUserId}` : "/profile", {
+    enabled: isOtherProfile && Boolean(routeUserId),
+    skipWhenReviews: true,
+  });
 
   if (q.loading) {
     return <ProfilePageSkeleton variant={isOtherProfile ? "other" : "self"} />;
@@ -122,8 +146,8 @@ export default function ProfilePage({ currentUserId }) {
       ? (q.reviews.reduce((sum, r) => sum + r.rating, 0) / q.reviews.length).toFixed(1)
       : "0.0";
 
-  const activityItemsSelf = buildProfileActivityItems(q.activity);
-  const activityItemsOther = buildOtherUserActivityItems(q.userActivity);
+  const activityItemsSelf = buildActivityItems(q.activity, { perspective: "self" });
+  const activityItemsOther = buildActivityItems(q.userActivity, { perspective: "other" });
 
   async function handleLogout() {
     menu.setProfileMenuOpen(false);
@@ -194,10 +218,11 @@ export default function ProfilePage({ currentUserId }) {
             )}
 
             {pTab === "activity" && (
-              <ProfileOtherActivityTab
+              <ProfileActivityTab
                 activityItems={activityItemsOther}
                 navigate={navigate}
-                profileUserId={routeUserId}
+                returnToPath={`/profile/${routeUserId}`}
+                emptyMessage="No activity yet."
               />
             )}
 
@@ -228,7 +253,7 @@ export default function ProfilePage({ currentUserId }) {
               setReviewForm(null);
               refreshOtherProfile();
               if (effectivePendingGigId) {
-                queryClient.invalidateQueries({ queryKey: queryKeys.gigAlertDetail(effectivePendingGigId) });
+                queryClient.invalidateQueries({ queryKey: queryKeys.gigDetail(effectivePendingGigId) });
               }
               if (effectivePendingGigId && routeUserId) {
                 queryClient.invalidateQueries({
@@ -363,6 +388,23 @@ export default function ProfilePage({ currentUserId }) {
       {supportReportOpen && (
         <ReportModal subjectType="SupportReport" onClose={() => setSupportReportOpen(false)} />
       )}
+      {passcodePrompt.promptOpen ? (
+        <PasscodeSetupPromptModal
+          onClose={passcodePrompt.handleAskLater}
+          onSetPasscode={passcodePrompt.openSetPasscode}
+          onAskLater={passcodePrompt.handleAskLater}
+          onDontAskAgain={passcodePrompt.handleDontAskAgain}
+        />
+      ) : null}
+      {passcodePrompt.setPasscodeOpen ? (
+        <SetPasscodeModal
+          onClose={passcodePrompt.closeSetPasscode}
+          onSuccess={() => {
+            passcodePrompt.handlePasscodeSaved();
+            showToast({ title: "Passcode saved", body: "Sign in faster next time with your 6-digit code." });
+          }}
+        />
+      ) : null}
     </>
   );
 }

@@ -10,7 +10,7 @@ These invariants act as hard logic rails. Always align logic to these rules; nev
 ## Authentication & Access
 
 - **INV_AUTH_01:** Only users with a valid `.edu` email address may successfully authenticate.
-- **INV_AUTH_02:** The system strictly uses magic links. Password authentication is forbidden and completely removed.
+- **INV_AUTH_02:** Magic links are the primary sign-in method and always-available fallback. Users may optionally set a 6-digit easy access passcode (Supabase password) for faster sign-in; signup remains magic-link only.
 
 ## Gigs & Privacy
 

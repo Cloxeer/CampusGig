@@ -22,6 +22,7 @@ export default function ProfileHeaderSection({
         user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile.avatar_color, first_name: profile.first_name, last_name: profile.last_name }}
         size="xl"
         style={{ border: "2px solid var(--bd)" }}
+        zoomable
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.03em", marginBottom: 2 }}>{fullName}</div>

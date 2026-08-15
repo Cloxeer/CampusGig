@@ -8,6 +8,12 @@ Answers
 
 Use this router to navigate to domain-specific documentation quickly.
 
+ORIENTATION
+
+- Product overview & stack → ./first.md
+- AI code quality rules → ./cleancode.md
+- Cleanup audit (phased) → ./cleancode-audit.md
+
 CORE RULES AND CONSTRAINTS
 
 - System Invariants → ./core/invariants.md

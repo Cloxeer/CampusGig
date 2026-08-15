@@ -48,7 +48,7 @@ export default function SettingsAlertsCard({
         />
         <SettingsRowToggle
           icon={Mail}
-          label="Email to your @nmsu.edu"
+          label="Email notifications"
           hint="Transactional email for important gig and review notices (not marketing)."
           checked={emailAlerts}
           onChange={onEmailAlertsChange}
@@ -61,7 +61,7 @@ export default function SettingsAlertsCard({
         </p>
       ) : (
         <p style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)", lineHeight: 1.45, margin: 0 }}>
-          Gig activity and alert banners are stored on this device. Email follows your account and @nmsu.edu inbox.
+          Gig activity and alert banners are stored on this device. Email follows your account inbox.
         </p>
       )}
     </>

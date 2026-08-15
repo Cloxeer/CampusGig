@@ -41,7 +41,7 @@ export default function SettingsDangerZone({
                 Your data is set to be removed after{" "}
                 <strong style={{ fontFamily: "var(--mono)" }}>{graceEndsLabel}</strong> (about 15 days from when you
                 requested). <strong>To cancel:</strong> This will sign you out. After you sign in again with your{" "}
-                <strong>@nmsu.edu</strong> magic link, a fresh sign-in clears this schedule automatically. If you delete
+                magic link, a fresh sign-in clears this schedule automatically. If you delete
                 again later, you'll go through the full delete flow from scratch.
                 Stuck? Join our{" "}
                 <a

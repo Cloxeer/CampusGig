@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Shield, Loader } from "lucide-react";
-import { sendMagicLink, isEduEmail } from "../lib/auth";
+import { ArrowLeft, Mail, Shield, Loader, GraduationCap, Briefcase, ChevronRight } from "lucide-react";
+import { sendMagicLink, signInWithPasscode, isEduEmail } from "../lib/auth";
+import AuthSignInMethodToggle from "../components/auth/AuthSignInMethodToggle";
+import PasscodeInput from "../components/auth/PasscodeInput";
 
 function modeFromParams(searchParams) {
   return searchParams.get("mode") === "signup" ? "signup" : "login";
@@ -21,35 +23,84 @@ function magicLinkErrorMessage(mlError, authMode) {
   return mlError?.message || "Something went wrong. Please try again.";
 }
 
+/** Step 1 of signup: pick the account type. Clean, tappable cards. */
+function AccountTypePicker({ onPick }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <button type="button" className="auth-choice" onClick={() => onPick("student")}>
+        <span className="auth-choice__icon auth-choice__icon--student">
+          <GraduationCap size={22} strokeWidth={2} />
+        </span>
+        <span className="auth-choice__body">
+          <span className="auth-choice__title" style={{ display: "block" }}>
+            NMSU student
+          </span>
+          <span className="auth-choice__desc" style={{ display: "block" }}>
+            Verify with your @nmsu.edu email. Take on gigs, post your own, earn rep.
+          </span>
+        </span>
+        <ChevronRight size={18} className="auth-choice__chev" />
+      </button>
+
+      <button type="button" className="auth-choice" onClick={() => onPick("client")}>
+        <span className="auth-choice__icon">
+          <Briefcase size={20} strokeWidth={2} />
+        </span>
+        <span className="auth-choice__body">
+          <span className="auth-choice__title" style={{ display: "block" }}>
+            I&apos;m hiring
+          </span>
+          <span className="auth-choice__desc" style={{ display: "block" }}>
+            Post tasks for verified NMSU students to get done. Any email works.
+          </span>
+        </span>
+        <ChevronRight size={18} className="auth-choice__chev" />
+      </button>
+    </div>
+  );
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const authMode = modeFromParams(searchParams);
+  const [accountType, setAccountType] = useState(null); // signup: null → picker
+  const [signInMethod, setSignInMethod] = useState("magic");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [passcode, setPasscode] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
+  const isSignupPicker = authMode === "signup" && accountType === null;
+  const isStudentSignup = authMode === "signup" && accountType === "student";
+  const isClientSignup = authMode === "signup" && accountType === "client";
+  const isLoginPasscode = authMode === "login" && signInMethod === "passcode";
+
+  function validateSignupBasics() {
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last name are required.");
+      return false;
+    }
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
+      return false;
+    }
+    return true;
+  }
+
+  const handleStudentMagicSubmit = async () => {
     setError("");
     setLoading(true);
 
-    if (authMode === "signup") {
-      if (!firstName.trim() || !lastName.trim()) {
-        setError("First and last name are required.");
-        setLoading(false);
-        return;
-      }
-      if (!agreedToTerms) {
-        setError("You must agree to the Terms of Service and Privacy Policy to create an account.");
-        setLoading(false);
-        return;
-      }
+    if (authMode === "signup" && !validateSignupBasics()) {
+      setLoading(false);
+      return;
     }
 
-    if (!isEduEmail(email)) {
+    if (authMode === "signup" && !isEduEmail(email)) {
       setError(
         "Only NMSU Main Campus (Las Cruces) addresses ending in @nmsu.edu are allowed — not extension campus emails like @dacc.nmsu.edu or @global.nmsu.edu."
       );
@@ -60,7 +111,7 @@ export default function Auth() {
     const options =
       authMode === "signup"
         ? { firstName, lastName, shouldCreateUser: true }
-        : { shouldCreateUser: false };
+        : { shouldCreateUser: false, allowAnyEmail: true };
 
     const { error: mlError } = await sendMagicLink(email, options);
 
@@ -70,9 +121,78 @@ export default function Auth() {
       setError(magicLinkErrorMessage(mlError, authMode));
       return;
     }
-    
+
     navigate("/magic", { state: { email } });
   };
+
+  const handleClientSignupSubmit = async () => {
+    setError("");
+    setLoading(true);
+
+    if (!validateSignupBasics()) {
+      setLoading(false);
+      return;
+    }
+
+    if (isEduEmail(email)) {
+      setError('That\'s an NMSU student email — go back and choose "NMSU student" so you sign up verified.');
+      setLoading(false);
+      return;
+    }
+
+    const { error: signUpError } = await sendMagicLink(email, {
+      firstName,
+      lastName,
+      shouldCreateUser: true,
+      allowAnyEmail: true,
+    });
+
+    setLoading(false);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      return;
+    }
+
+    navigate("/magic", { state: { email } });
+  };
+
+  const handleLoginPasscodeSubmit = async () => {
+    setError("");
+    setLoading(true);
+
+    if (passcode.length !== 6) {
+      setError("Enter your 6-digit passcode.");
+      setLoading(false);
+      return;
+    }
+
+    const { error: signInError } = await signInWithPasscode(email, passcode);
+    setLoading(false);
+    if (signInError) setError(signInError.message);
+    // Session is picked up by App.jsx onAuthStateChange — no redirect needed.
+  };
+
+  const handleSubmit = () => {
+    if (isClientSignup) {
+      handleClientSignupSubmit();
+    } else if (isLoginPasscode) {
+      handleLoginPasscodeSubmit();
+    } else {
+      handleStudentMagicSubmit();
+    }
+  };
+
+  const title = authMode === "signup" ? "Create account" : "Welcome back";
+  const subtitle = isSignupPicker
+    ? "Two ways to join — pick yours."
+    : isStudentSignup
+      ? "Sign up with your Main Campus @nmsu.edu email. We'll send a magic link. Already joined? The link signs you in too."
+      : isClientSignup
+        ? "Post work for verified NMSU students. Use any email — we'll send you a sign-in link. No password needed."
+        : signInMethod === "passcode"
+          ? "Sign in with your email and 6-digit passcode — no inbox check needed."
+          : "Enter the email you joined with. We'll send a sign-in link.";
 
   return (
     <div className="page fadein">
@@ -80,178 +200,266 @@ export default function Auth() {
         <button
           className="btn bg-btn"
           style={{ padding: 0, gap: 4, marginBottom: 20 }}
-          onClick={() => navigate("/welcome")}
+          onClick={() => {
+            if (authMode === "signup" && accountType !== null) {
+              setAccountType(null);
+              setError("");
+            } else {
+              navigate("/welcome");
+            }
+          }}
         >
           <ArrowLeft size={13} /> Back
         </button>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.035em", marginBottom: 2 }}>
-          {authMode === "signup" ? "Create account" : "Welcome back"}
+          {title}
         </div>
-        <div style={{ fontSize: 13, color: "var(--fg3)" }}>
-          {authMode === "signup"
-            ? "Sign up with your Main Campus @nmsu.edu email. We'll send a magic link. Already joined? The link signs you in too."
-            : "Sign in with your Main Campus @nmsu.edu email. We'll send a magic link."}
-        </div>
+        <div style={{ fontSize: 13, color: "var(--fg3)" }}>{subtitle}</div>
       </div>
 
-      <form
-        className="scroll"
-        style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16 }}
-        onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
-      >
-        {authMode === "signup" && (
-          <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}>
-              <label className="lbl">First name</label>
-              <input
-                className="inp"
-                placeholder="First"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label className="lbl">Last name</label>
-              <input
-                className="inp"
-                placeholder="Last"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="field">
-          <label className="lbl">School email</label>
-          <div className="ig">
-            <div className="iad">
-              <Mail size={13} />
-            </div>
-            <input
-              className="ii"
-              placeholder="you@nmsu.edu"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="callout" style={{ marginTop: 4 }}>
-            <div className="ci">
-              <Shield size={13} />
-            </div>
-            <span className="ct">
-              <strong>Main Campus @nmsu.edu only (Las Cruces).</strong>{" "}
-              Login must be exactly <strong>@nmsu.edu</strong> — not{" "}
-              <strong>@dacc.nmsu.edu</strong>, <strong>@alamogordo.nmsu.edu</strong>,{" "}
-              <strong>@grants.nmsu.edu</strong>, <strong>@global.nmsu.edu</strong>, or other NMSU
-              extension domains.{" "}
-              {authMode === "signup"
-                ? "Off-campus and branch-campus emails cannot be used."
-                : "Enter the Main Campus @nmsu.edu email you signed up with."}
-            </span>
-          </div>
-        </div>
-
-        {authMode === "signup" && (
-          <label
+      {isSignupPicker ? (
+        <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <AccountTypePicker
+            onPick={(type) => {
+              setAccountType(type);
+              setError("");
+            }}
+          />
+          <button
+            type="button"
             style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
+              background: "none",
+              border: "none",
               cursor: "pointer",
-              WebkitTapHighlightColor: "transparent",
+              fontFamily: "var(--font)",
+              fontSize: 13,
+              color: "var(--fg3)",
+              textAlign: "center",
+              padding: "6px 0",
+            }}
+            onClick={() => {
+              setError("");
+              setSearchParams({});
             }}
           >
-            <input
-              type="checkbox"
-              checked={agreedToTerms}
-              onChange={(e) => setAgreedToTerms(e.target.checked)}
-              style={{
-                width: 16,
-                height: 16,
-                marginTop: 1,
-                accentColor: "var(--ink)",
-                cursor: "pointer",
-                flexShrink: 0,
+            Already have an account? Sign in
+          </button>
+        </div>
+      ) : (
+        <form
+          className="scroll"
+          style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 16 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+        >
+          {authMode === "login" && (
+            <AuthSignInMethodToggle
+              method={signInMethod}
+              onChange={(method) => {
+                setSignInMethod(method);
+                setError("");
               }}
             />
-            <span style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55 }}>
-              I agree to the{" "}
-              <Link
-                to="/terms"
-                style={{ color: "var(--fg)", fontWeight: 600, textDecoration: "underline" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                to="/privacy"
-                style={{ color: "var(--fg)", fontWeight: 600, textDecoration: "underline" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                Privacy Policy
-              </Link>
-            </span>
-          </label>
-        )}
+          )}
 
-        {error && (
-          <div
+          {authMode === "signup" && (
+            <div style={{ display: "flex", gap: 10 }}>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">First name</label>
+                <input
+                  className="inp"
+                  placeholder="First"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label className="lbl">Last name</label>
+                <input
+                  className="inp"
+                  placeholder="Last"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="field">
+            <label className="lbl">{isStudentSignup ? "School email" : "Email"}</label>
+            <div className="ig">
+              <div className="iad">
+                <Mail size={13} />
+              </div>
+              <input
+                className="ii"
+                placeholder={isStudentSignup ? "you@nmsu.edu" : isClientSignup ? "you@example.com" : "you@nmsu.edu or your email"}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            {isStudentSignup && (
+              <div className="callout" style={{ marginTop: 4 }}>
+                <div className="ci">
+                  <Shield size={13} />
+                </div>
+                <span className="ct">
+                  <strong>Main Campus @nmsu.edu only (Las Cruces).</strong>{" "}
+                  Login must be exactly <strong>@nmsu.edu</strong> — not{" "}
+                  <strong>@dacc.nmsu.edu</strong>, <strong>@alamogordo.nmsu.edu</strong>,{" "}
+                  <strong>@grants.nmsu.edu</strong>, <strong>@global.nmsu.edu</strong>, or other NMSU
+                  extension domains. Off-campus and branch-campus emails cannot be used.
+                </span>
+              </div>
+            )}
+            {isClientSignup && (
+              <div className="callout" style={{ marginTop: 4 }}>
+                <div className="ci">
+                  <Shield size={13} />
+                </div>
+                <span className="ct">
+                  <strong>Hiring account.</strong> You can post gigs for verified students — client
+                  accounts can&apos;t take on gigs. NMSU students should use the student option
+                  instead so they get verified.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {isLoginPasscode && (
+            <div className="field">
+              <label className="lbl">6-digit passcode</label>
+              <PasscodeInput
+                value={passcode}
+                onChange={setPasscode}
+                disabled={loading}
+                label="6-digit passcode for sign in"
+              />
+              <div className="hint" style={{ marginTop: 6, textAlign: "center" }}>
+                Set yours in Settings after joining. Forgot it?{" "}
+                <button
+                  type="button"
+                  className="auth-inline-link"
+                  onClick={() => {
+                    setSignInMethod("magic");
+                    setPasscode("");
+                    setError("");
+                  }}
+                >
+                  Use a magic link
+                </button>
+              </div>
+            </div>
+          )}
+
+          {authMode === "signup" && (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  marginTop: 1,
+                  accentColor: "var(--ink)",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55 }}>
+                I agree to the{" "}
+                <Link
+                  to="/terms"
+                  style={{ color: "var(--fg)", fontWeight: 600, textDecoration: "underline" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link
+                  to="/privacy"
+                  style={{ color: "var(--fg)", fontWeight: 600, textDecoration: "underline" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
+          )}
+
+          {error && (
+            <div
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "var(--r)",
+                padding: "10px 12px",
+                fontSize: 13,
+                color: "#dc2626",
+                lineHeight: 1.5,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn bp bfull blg"
+            disabled={loading}
+            style={{ opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? (
+              <Loader size={16} className="spin" />
+            ) : isClientSignup ? (
+              "Send sign-in link"
+            ) : isLoginPasscode ? (
+              "Sign in"
+            ) : (
+              "Send Magic Link"
+            )}
+          </button>
+
+          <div className="or-row">or</div>
+
+          <button
+            type="button"
             style={{
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              borderRadius: "var(--r)",
-              padding: "10px 12px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "var(--font)",
               fontSize: 13,
-              color: "#dc2626",
-              lineHeight: 1.5,
+              color: "var(--fg3)",
+              textAlign: "center",
+              padding: "6px 0",
+            }}
+            onClick={() => {
+              setError("");
+              setAccountType(null);
+              if (authMode === "signup") {
+                setSearchParams({});
+              } else {
+                setSearchParams({ mode: "signup" });
+              }
             }}
           >
-            {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          className="btn bp bfull blg"
-          disabled={loading}
-          style={{ opacity: loading ? 0.7 : 1 }}
-        >
-          {loading ? (
-            <Loader size={16} className="spin" />
-          ) : (
-            "Send Magic Link"
-          )}
-        </button>
-
-        <div className="or-row">or</div>
-
-        <button
-          type="button"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "var(--font)",
-            fontSize: 13,
-            color: "var(--fg3)",
-            textAlign: "center",
-            padding: "6px 0",
-          }}
-          onClick={() => {
-            setError("");
-            if (authMode === "signup") {
-              setSearchParams({});
-            } else {
-              setSearchParams({ mode: "signup" });
-            }
-          }}
-        >
-          {authMode === "signup" ? "Already have an account? Sign in" : "New here? Create account"}
-        </button>
-      </form>
+            {authMode === "signup" ? "Already have an account? Sign in" : "New here? Create account"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

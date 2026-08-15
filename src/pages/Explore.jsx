@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Search, X } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { getOpenGigs, normalizeGig } from "../lib/profile";
-import { queryKeys } from "../lib/queryClient";
+import { useOpenGigsQuery } from "../hooks/useOpenGigsQuery";
+import { useLegacyGigRedirect } from "../hooks/useLegacyGigRedirect";
 import { useTimer } from "../utils/helpers";
 import TopBar from "../components/TopBar";
 import GigCard from "../components/GigCard";
@@ -11,29 +10,13 @@ import GigCard from "../components/GigCard";
 export default function Explore({ currentUserId }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
 
   const [searchQ, setSearchQ] = useState("");
   const tick = useTimer();
 
-  const { data: gigsData, isPending: gigsPending } = useQuery({
-    queryKey: queryKeys.openGigs,
-    queryFn: getOpenGigs,
-    staleTime: 30_000,
-    refetchOnWindowFocus: "always",
-  });
+  const { gigs: allGigs, isPending: gigsPending } = useOpenGigsQuery();
 
-  const allGigs = useMemo(() => (gigsData?.gigs || []).map(normalizeGig), [gigsData]);
-
-  useEffect(() => {
-    const legacy = searchParams.get("gig");
-    if (!legacy) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete("gig");
-    const qs = next.toString();
-    const returnPath = `${location.pathname}${qs ? `?${qs}` : ""}` || "/explore";
-    navigate(`/gig/${legacy}`, { replace: true, state: { returnTo: returnPath } });
-  }, [searchParams, navigate, location.pathname]);
+  useLegacyGigRedirect("/explore");
 
   const searchResults = allGigs.filter((g) =>
     searchQ.trim() === ""

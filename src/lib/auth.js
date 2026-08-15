@@ -1,10 +1,15 @@
 import { supabase } from "./supabase";
+import { validatePasscode } from "../utils/passcodeValidation";
+import { passcodeToAuthPassword, mapPasscodeAuthError } from "../utils/passcodeAuth";
 
 // ──────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────
 
 const ALLOWED_DOMAINS = ["nmsu.edu"];
+
+/** Basic shape check for client (non-student) emails. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Returns true if the email is Main Campus @nmsu.edu only (exact domain; excludes *.nmsu.edu subdomains like dacc, alamogordo, grants, global). */
 export function isEduEmail(email) {
@@ -21,7 +26,8 @@ let lastMagicLinkAt = 0;
 const MAGIC_LINK_COOLDOWN_MS = 10_000;
 
 /**
- * Sends a magic link to the supplied .edu email.
+ * Sends a magic link. Student signup requires an exact @nmsu.edu email; pass
+ * allowAnyEmail (login flows) so client accounts can also sign in by link.
  * With shouldCreateUser true, existing users still receive a link and sign in — no duplicate-email error.
  *
  * @param {string} email
@@ -31,7 +37,7 @@ const MAGIC_LINK_COOLDOWN_MS = 10_000;
 export async function sendMagicLink(email, options = {}) {
   const trimmedEmail = email?.trim().toLowerCase();
 
-  if (!isEduEmail(trimmedEmail)) {
+  if (!options.allowAnyEmail && !isEduEmail(trimmedEmail)) {
     return {
       data: null,
       error: {
@@ -39,6 +45,10 @@ export async function sendMagicLink(email, options = {}) {
           "Only NMSU Main Campus (Las Cruces) @nmsu.edu addresses are allowed — not extension domains (e.g. dacc, alamogordo, grants, global).",
       },
     };
+  }
+
+  if (options.allowAnyEmail && !EMAIL_RE.test(trimmedEmail || "")) {
+    return { data: null, error: { message: "Enter a valid email address." } };
   }
 
   const now = Date.now();
@@ -71,6 +81,81 @@ export async function sendMagicLink(email, options = {}) {
   });
 
   return { data, error };
+}
+
+// ──────────────────────────────────────────────────
+// Easy Access Passcode (6-digit PIN via Supabase password)
+// ──────────────────────────────────────────────────
+
+export { validatePasscode };
+
+/**
+ * Sign in with email + 6-digit passcode. Available to every account type —
+ * the passcode is a quick-login convenience set up in Settings after joining.
+ * @param {string} email
+ * @param {string} pin
+ */
+export async function signInWithPasscode(email, pin) {
+  const trimmedEmail = email?.trim().toLowerCase();
+  const validation = validatePasscode(pin);
+
+  if (!EMAIL_RE.test(trimmedEmail || "")) {
+    return { data: null, error: { message: "Enter a valid email address." } };
+  }
+
+  if (!validation.valid) {
+    return { data: null, error: { message: validation.message } };
+  }
+
+  const trimmedPin = String(pin).trim();
+  const authPassword = passcodeToAuthPassword(trimmedPin);
+
+  let { data, error } = await supabase.auth.signInWithPassword({
+    email: trimmedEmail,
+    password: authPassword,
+  });
+
+  // Legacy accounts may have the raw 6-digit value stored before padding was added.
+  if (error?.code === "invalid_credentials") {
+    const legacy = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password: trimmedPin,
+    });
+    if (!legacy.error) {
+      return { data: legacy.data, error: null };
+    }
+  }
+
+  if (error) {
+    return { data: null, error: { message: mapPasscodeAuthError(error, "signin"), code: error.code } };
+  }
+
+  return { data, error: null };
+}
+
+/**
+ * Set or change the user's 6-digit passcode (requires active session).
+ * @param {string} pin
+ */
+export async function setPasscode(pin) {
+  const validation = validatePasscode(pin);
+  if (!validation.valid) {
+    return { data: null, error: { message: validation.message } };
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: passcodeToAuthPassword(pin),
+  });
+
+  if (error) {
+    return { data: null, error: { message: mapPasscodeAuthError(error, "set"), code: error.code } };
+  }
+
+  // Session hygiene: changing the passcode signs out every OTHER device, so a
+  // stolen/old session can't outlive a credential change. This device stays in.
+  await supabase.auth.signOut({ scope: "others" }).catch(() => {});
+
+  return { data, error: null };
 }
 
 // ──────────────────────────────────────────────────

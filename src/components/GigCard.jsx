@@ -1,5 +1,6 @@
 import { MapPin, Clock, Timer } from "lucide-react";
 import LevelBadge from "./LevelBadge";
+import StudentBadge from "./StudentBadge";
 import Stars from "./Stars";
 import UserAvatar from "./UserAvatar";
 import { elapsed, countdown } from "../utils/helpers";
@@ -77,8 +78,9 @@ export default function GigCard({ gig, onClick, tick }) {
           style={{ marginTop: 1 }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 12, color: "var(--fg3)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--fg3)" }}>
             {gig.poster}
+            {gig.posterIsStudent ? <StudentBadge size={12} /> : null}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
             <Stars rating={gig.posterAvgRating} size={9} />

@@ -28,10 +28,8 @@ export const queryKeys = {
   accountDeletion: ["accountDeletion"],
   /** Public `/profile/:userId` bundle (profile + reviews + activity + stats). */
   userProfilePage: (userId) => ["userProfilePage", userId],
-  /** Normalized gig for GigDetailModal (getGigById). */
-  gigById: (gigId) => ["gigById", gigId],
-  /** Full gig + requests for AlertDetailModal / gigdetails route (getGigDetail). */
-  gigAlertDetail: (gigId) => ["gigAlertDetail", gigId],
+  /** Full gig + requests for unified gig detail page (getGigDetail). */
+  gigDetail: (gigId) => ["gigDetail", gigId],
   /** Whether the current user already left a review for reviewee on this gig (getExistingReview). */
   existingReview: (gigId, revieweeId) => ["existingReview", gigId, revieweeId],
 };

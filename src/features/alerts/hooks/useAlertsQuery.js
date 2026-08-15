@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { queryKeys } from "../../lib/queryClient";
-import { fetchAlertsBundle } from "./alertsQuery";
+import { queryKeys } from "../../../lib/queryClient";
+import { fetchAlertsBundle } from "../alertsQuery";
 
 export function useAlertsQuery() {
   return useQuery({
