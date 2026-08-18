@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, Lock, HelpCircle, Gift } from "lucide-react";
+import { ArrowLeft, Check, Lock, HelpCircle, Gift, ArrowLeftRight } from "lucide-react";
 import RedeemModal from "../components/RedeemModal";
 import { COSMETICS, RARITIES, RARITY_ORDER, tierTagForLabel } from "../data/cosmetics";
 import { getLevel } from "../utils/helpers";
@@ -163,8 +163,24 @@ export default function Inventory() {
   /** Which slot's catalog is on screen — swapped via the segmented control. */
   const [view, setView] = useState("tag"); // tag | border
   const [redeemOpen, setRedeemOpen] = useState(false);
+  /** Transient "Trading — coming soon" hint shown when the (placeholder) trade
+   *  button is tapped. Auto-dismisses; closes on tap-outside. */
+  const [tradeHint, setTradeHint] = useState(false);
 
   useEffect(() => subscribeInventory(() => setInv(getInventory())), []);
+
+  useEffect(() => {
+    if (!tradeHint) return undefined;
+    const t = setTimeout(() => setTradeHint(false), 2400);
+    const onDoc = (e) => {
+      if (!(e.target instanceof Element) || !e.target.closest(".trade-wrap")) setTradeHint(false);
+    };
+    document.addEventListener("pointerdown", onDoc);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("pointerdown", onDoc);
+    };
+  }, [tradeHint]);
 
   /* Real profile photo in the preview (guests fall back to the "?" avatar). */
   const { data: profileData } = useQuery({ queryKey: queryKeys.myProfile, queryFn: getMyProfile });
@@ -191,20 +207,56 @@ export default function Inventory() {
 
   return (
     <div className="page fadein">
-      <header className="topbar">
-        <button type="button" className="btn bg-btn bico" onClick={goBack} aria-label="Go back">
+      {/* Grid keeps the title centered no matter how many buttons sit on the right. */}
+      <header className="topbar" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr" }}>
+        <button type="button" className="btn bg-btn bico" style={{ justifySelf: "start" }} onClick={goBack} aria-label="Go back">
           <ArrowLeft size={15} />
         </button>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.02em" }}>Inventory</div>
-        <button
-          type="button"
-          className="btn bg-btn bico"
-          onClick={() => setRedeemOpen(true)}
-          aria-label="Redeem a code"
-          title="Redeem a code"
-        >
-          <Gift size={16} />
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 2, justifySelf: "end" }}>
+          {/* Placeholder: trading isn't built yet — tap surfaces a "coming soon" hint. */}
+          <span className="trade-wrap" style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              className="btn bg-btn bico"
+              onClick={() => setTradeHint((v) => !v)}
+              aria-label="Trading — coming soon"
+              style={{ opacity: 0.6 }}
+            >
+              <ArrowLeftRight size={16} />
+            </button>
+            {tradeHint ? (
+              <span
+                role="status"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  whiteSpace: "nowrap",
+                  background: "var(--ink)",
+                  color: "var(--ink-fg)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "5px 9px",
+                  borderRadius: 8,
+                  boxShadow: "0 6px 20px rgba(0,0,0,.18)",
+                  zIndex: 30,
+                }}
+              >
+                Trading — coming soon
+              </span>
+            ) : null}
+          </span>
+          <button
+            type="button"
+            className="btn bg-btn bico"
+            onClick={() => setRedeemOpen(true)}
+            aria-label="Redeem a code"
+            title="Redeem a code"
+          >
+            <Gift size={16} />
+          </button>
+        </div>
       </header>
 
       {redeemOpen ? <RedeemModal onClose={() => setRedeemOpen(false)} /> : null}

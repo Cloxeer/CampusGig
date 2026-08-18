@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Loader, Gift, Check } from "lucide-react";
 import { COSMETICS, RARITIES } from "../data/cosmetics";
 import { redeemCode } from "../lib/redeem";
@@ -49,8 +49,31 @@ export default function RedeemModal({ onClose }) {
      never collides with the header above or the name below. */
   const isBorder = cosmetic?.type === "border";
 
+  /* Keep the modal inside the VISUAL viewport so the on-screen keyboard never
+     covers the code input or buttons. position:fixed uses the layout viewport,
+     which iOS does NOT shrink when the keyboard opens — so we pin the root to
+     window.visualViewport and let the card re-center in the visible strip. */
+  const rootRef = useRef(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const el = rootRef.current;
+    if (!vv || !el) return undefined;
+    const apply = () => {
+      el.style.top = `${vv.offsetTop}px`;
+      el.style.height = `${vv.height}px`;
+      el.style.bottom = "auto";
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+    };
+  }, []);
+
   return (
-    <div className="modal-center-root" onClick={onClose}>
+    <div className="modal-center-root" ref={rootRef} onClick={onClose}>
       <div className="modal-center-backdrop" aria-hidden />
       <div className="modal-center-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-center-hd">
