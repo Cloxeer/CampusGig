@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, Lock, HelpCircle } from "lucide-react";
+import { ArrowLeft, Check, Lock, HelpCircle, Gift } from "lucide-react";
+import RedeemModal from "../components/RedeemModal";
 import { COSMETICS, RARITIES, RARITY_ORDER, tierTagForLabel } from "../data/cosmetics";
 import { getLevel } from "../utils/helpers";
 import { getInventory, equipCosmetic, unequipType, subscribeInventory } from "../lib/cosmeticsInventory";
@@ -161,6 +162,7 @@ export default function Inventory() {
   const [inv, setInv] = useState(getInventory);
   /** Which slot's catalog is on screen — swapped via the segmented control. */
   const [view, setView] = useState("tag"); // tag | border
+  const [redeemOpen, setRedeemOpen] = useState(false);
 
   useEffect(() => subscribeInventory(() => setInv(getInventory())), []);
 
@@ -194,9 +196,18 @@ export default function Inventory() {
           <ArrowLeft size={15} />
         </button>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.02em" }}>Inventory</div>
-        {/* Spacer keeps the title centered now the preview toggle is gone. */}
-        <span aria-hidden style={{ width: 34 }} />
+        <button
+          type="button"
+          className="btn bg-btn bico"
+          onClick={() => setRedeemOpen(true)}
+          aria-label="Redeem a code"
+          title="Redeem a code"
+        >
+          <Gift size={16} />
+        </button>
       </header>
+
+      {redeemOpen ? <RedeemModal onClose={() => setRedeemOpen(false)} /> : null}
 
       <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
         <div className="invx-wrap">

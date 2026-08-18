@@ -509,13 +509,18 @@ body {
 .bo { background: transparent; color: var(--fg); border: 1px solid var(--bd); height: 40px; padding: 0 16px; }
 .bo:hover { background: var(--bg3); }
 .bg-btn { background: transparent; color: var(--fg3); height: 34px; padding: 0 10px; border: none; }
-.bg-btn:hover { background: var(--bg3); color: var(--fg); }
+/* Hover fill only on real hover devices. On iOS Safari :hover STICKS to the last
+   element you tapped, so a bare `.bg-btn:hover` left the settings-menu trigger
+   painted gray until you tapped elsewhere (the untapped backpack stayed white). */
+@media (hover: hover) and (pointer: fine) {
+  .bg-btn:hover { background: var(--bg3); color: var(--fg); }
+}
 .bgreen { background: var(--green-d); color: #fff; height: 40px; padding: 0 16px; }
 .bgreen:hover { opacity: .9; }
 .bfull { width: 100%; }
 .blg { height: 44px; font-size: 15px; font-weight: 600; }
 .bsm { height: 30px; font-size: 12px; padding: 0 10px; border-radius: 6px; }
-.bico { width: 34px; height: 34px; padding: 0; border-radius: var(--r); }
+.bico { width: 34px; height: 34px; padding: 0; border-radius: var(--r); -webkit-tap-highlight-color: transparent; }
 
 /* ── INPUTS ────────────────────────────────────────────────── */
 .field { display: flex; flex-direction: column; gap: 5px; }

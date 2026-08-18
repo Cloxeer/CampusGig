@@ -83,9 +83,27 @@ export async function hydrateInventory() {
 supabase.auth.getSession().then(({ data }) => {
   if (data?.session) hydrateInventory();
 });
-supabase.auth.onAuthStateChange((_event, session) => {
+supabase.auth.onAuthStateChange((event, session) => {
   if (session) hydrateInventory();
+  else if (event === "SIGNED_OUT") clearInventory(); // don't leak owned items to the next viewer
 });
+
+/**
+ * Wipe the local cache back to the starter default. Ownership is server truth
+ * (user_cosmetics); this cache is only a per-session mirror of it. Because the
+ * cache is a single localStorage key, it MUST be reset when a user signs out —
+ * otherwise the next viewer (a guest, or a different account) would keep reading
+ * the previous user's owned tags/borders, and for a guest hydrateInventory() is
+ * a no-op so it would never self-correct. Called on SIGNED_OUT and from signOut.
+ */
+export function clearInventory() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* blocked storage — best effort */
+  }
+  write(starterState());
+}
 
 /** Register a DROP the server already granted (chest reward): optimistic local
  *  reflect so the UI updates instantly; the server row is the source of truth. */
