@@ -23,11 +23,47 @@ import AsnmsuDiscounts from "./pages/AsnmsuDiscounts";
 import BottomNav from "./components/BottomNav";
 import DesktopSidebar from "./components/DesktopSidebar";
 import DesktopFooter from "./components/DesktopFooter";
+import AppSkeleton from "./components/AppSkeleton";
 import { supabase } from "./lib/supabase";
 import { getMyProfile, getUnreadNotificationCount, cancelPendingAccountDeletion } from "./lib/profile";
 import { queryClient, queryKeys } from "./lib/queryClient";
 
 const INDEXABLE_PATHS = new Set(["/", "/welcome", "/terms", "/privacy"]);
+
+/** Full-screen routes that DON'T resolve into the nav shell. On these the feed
+ *  skeleton would flash the wrong layout, so they keep a plain centered loader. */
+const FULLSCREEN_LOADING_PATHS = new Set([
+  "/welcome", "/auth", "/magic", "/terms", "/privacy", "/onboarding", "/app-intro",
+]);
+function isShellLoadingRoute() {
+  const p = window.location.pathname;
+  if (p.startsWith("/gig/")) return false;
+  return !FULLSCREEN_LOADING_PATHS.has(p);
+}
+
+/**
+ * The single loading state for every auth/profile gate. Reserves the real nav
+ * shell + Home skeleton so content drops into place instead of replacing a
+ * centered spinner (the big CLS win). On full-screen routes it falls back to a
+ * neutral centered loader so we don't flash a feed skeleton before a splash/gig.
+ */
+function AppLoading() {
+  if (!isShellLoadingRoute()) {
+    return (
+      <div className="shell" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Loading…</div>
+      </div>
+    );
+  }
+  return (
+    <div className="shell shell--session">
+      <div className="shell-view">
+        <AppSkeleton />
+      </div>
+      <DesktopFooter />
+    </div>
+  );
+}
 
 /** `/profile/:userId` — redirect to `/profile` when viewing your own id (bookmark parity). */
 function ProfileByIdRoute({ currentUserId }) {
@@ -235,11 +271,7 @@ export default function App() {
   }
 
   if (authLoading) {
-    return (
-      <div className="shell" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Loading…</div>
-      </div>
-    );
+    return <AppLoading />;
   }
 
   if (!session) {
@@ -298,11 +330,7 @@ export default function App() {
   }
 
   if (hasProfile && profilePending && !profileForIntro) {
-    return (
-      <div className="shell" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontSize: 14, color: "var(--fg3)", fontFamily: "var(--mono)" }}>Loading…</div>
-      </div>
-    );
+    return <AppLoading />;
   }
 
   if (needsAppIntro) {

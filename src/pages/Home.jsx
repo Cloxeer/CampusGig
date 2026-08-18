@@ -11,52 +11,9 @@ import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
 import ProfileRepCard from "../features/profile/components/ProfileRepCard";
+import AppSkeleton from "../components/AppSkeleton";
 
 const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
-
-function HomeSkeleton() {
-  return (
-    <div className="page fadein">
-      <div className="topbar">
-        <div className="tlogo">
-          <div className="skel" style={{ width: 26, height: 26, borderRadius: 6 }} />
-          <div className="skel" style={{ width: 90, height: 16 }} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div className="skel" style={{ width: 34, height: 34, borderRadius: "var(--r)" }} />
-          <div className="skel skel-circle" style={{ width: 30, height: 30 }} />
-        </div>
-      </div>
-      <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
-        <div style={{ margin: "14px 16px 0" }}>
-          <div className="rep-card" style={{ padding: 16 }}>
-            <div className="skel-rep" style={{ width: 140, height: 10, marginBottom: 10 }} />
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
-              <div className="skel-rep" style={{ width: 70, height: 28 }} />
-              <div className="skel-rep" style={{ width: 60, height: 22, borderRadius: 5 }} />
-            </div>
-            <div className="skel-rep" style={{ width: "100%", height: 2, marginBottom: 8 }} />
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              {[40, 50, 46, 44].map((w, i) => (
-                <div key={i} className="skel-rep" style={{ width: w, height: 9 }} />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: "14px 16px 0", display: "flex", gap: 8 }}>
-          {TABS.map((t) => (
-            <div key={t} className="skel" style={{ width: 52, height: 28, borderRadius: 6 }} />
-          ))}
-        </div>
-        <div className="gig-grid" style={{ padding: "18px 16px 0" }}>
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="skel" style={{ width: "100%", height: 88, borderRadius: "var(--rlg)" }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Home({ currentUserId }) {
   const navigate = useNavigate();
@@ -104,7 +61,7 @@ export default function Home({ currentUserId }) {
     return true;
   });
 
-  if (showFullSkeleton) return <HomeSkeleton />;
+  if (showFullSkeleton) return <AppSkeleton />;
 
   return (
     <div className="page fadein">

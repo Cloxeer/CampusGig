@@ -19,6 +19,10 @@ import "./inventory.css";
  * the swatch + a small label. Ownership is server-backed (see cosmeticsInventory).
  */
 
+/** One diameter for the live-preview avatar across every state (matches the
+ *  bare-fallback `.invx-preview__avatar` size in inventory.css). */
+const PREVIEW_AVATAR = 72;
+
 /** A border shown in the list = a mini avatar: THE SAME CosmeticRing everyone
  *  uses, wrapping a white "hole" where a photo would sit. Identical to the real
  *  avatar, just smaller. */
@@ -196,7 +200,9 @@ export default function Inventory() {
 
       <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
         <div className="invx-wrap">
-          {/* Live preview — how your equipped set looks. */}
+          {/* Live preview — how your equipped set looks. ONE diameter for every
+              path (signed-in photo, guest ring, bare fallback) so the hero never
+              changes size between states. */}
           <div className="invx-preview">
             {profile ? (
               /* Your actual photo, wearing the equipped ring (same logic as
@@ -208,12 +214,12 @@ export default function Inventory() {
                   first_name: profile.first_name,
                   last_name: profile.last_name,
                 }}
-                size={62}
+                size={PREVIEW_AVATAR}
                 withCosmetics
               />
             ) : equippedBorder ? (
               /* Guest (no photo): the same CosmeticRing wrapping the "?" chip. */
-              <CosmeticRing cosmetic={equippedBorder} size={72}>
+              <CosmeticRing cosmetic={equippedBorder} size={PREVIEW_AVATAR}>
                 <span className="invx-preview__ph">?</span>
               </CosmeticRing>
             ) : (

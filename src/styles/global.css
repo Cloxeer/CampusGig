@@ -391,7 +391,7 @@ body {
 }
 
 .page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -960,7 +960,7 @@ body {
   flex-shrink: 0;
 }
 /* ── SPLASH ────────────────────────────────────────────────── */
-.splash { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.splash { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
 .splash-body { flex: 1; padding: 0 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
 .sgrid {
   position: absolute;
@@ -1031,6 +1031,8 @@ body {
   letter-spacing: -.04em;
   color: var(--fg);
   line-height: 1;
+  /* Stable digit width so the live count-up can't jitter the number. */
+  font-variant-numeric: tabular-nums;
 }
 .splash-stat-lbl {
   font-size: 10px;
@@ -1168,8 +1170,8 @@ body {
 }
 .sheet::-webkit-scrollbar { display: none; }
 .sheet-full {
-  height: calc(100vh - 32px);
-  max-height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1215,8 +1217,8 @@ body {
 }
 .overlay.overlay--reviews .sheet.sheet-full {
   width: min(var(--shell-max-sm), 100%);
-  height: calc(100vh - 32px);
-  max-height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px);
 }
 .overlay.overlay--reviews .handle {
   display: block;

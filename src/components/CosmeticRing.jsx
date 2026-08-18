@@ -61,10 +61,22 @@ export default function CosmeticRing({ cosmetic, size, children, style }) {
         style={{
           position: "relative",
           zIndex: 1,
+          /* A single firm track so the content circle is an exact square in
+             EVERY engine. WebKit won't resolve an <img>'s `height:100%` against
+             a grid item sized only by a percentage chain — it falls back to the
+             image's intrinsic (often portrait) aspect and the photo turns oval,
+             leaking the ring disc out the sides. `aspect-ratio` + `min-*: 0`
+             give it a real, width-derived height so that can't happen. */
           display: "grid",
+          gridTemplateColumns: "1fr",
+          gridTemplateRows: "1fr",
           width: "100%",
           height: "100%",
+          aspectRatio: "1 / 1",
+          minWidth: 0,
+          minHeight: 0,
           borderRadius: "50%",
+          overflow: "hidden",
         }}
       >
         {children}

@@ -13,8 +13,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 22px 16px 20px;
+  /* The ring halo + art-frame borders (e.g. Founders Crimson clouds) overflow
+     the avatar's layout box by a halo's worth on every side. The generous gap +
+     vertical padding reserve room so they never touch the tag or the card edge,
+     at any viewport width. */
+  gap: 16px;
+  padding: 26px 16px 22px;
   margin-bottom: 20px;
   border-radius: 16px;
   background: var(--bg2, #fff);

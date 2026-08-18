@@ -73,6 +73,8 @@ export default function UserAvatar({ user, size = "md", style, zoomable = false,
           <img
             src={url}
             alt=""
+            width={px}
+            height={px}
             onClick={canZoom ? openZoom : undefined}
             onKeyDown={
               canZoom
@@ -90,8 +92,14 @@ export default function UserAvatar({ user, size = "md", style, zoomable = false,
             style={
               ring
                 ? {
+                    /* `aspect-ratio` + `min-*: 0` keep the photo a perfect
+                       circle in WebKit, where `height:100%` alone lets the img
+                       balloon to its intrinsic aspect (see CosmeticRing). */
                     width: "100%",
                     height: "100%",
+                    aspectRatio: "1 / 1",
+                    minWidth: 0,
+                    minHeight: 0,
                     borderRadius: "50%",
                     objectFit: "cover",
                     flexShrink: 0,
@@ -124,6 +132,9 @@ export default function UserAvatar({ user, size = "md", style, zoomable = false,
           ? {
               width: "100%",
               height: "100%",
+              aspectRatio: "1 / 1",
+              minWidth: 0,
+              minHeight: 0,
               borderRadius: "50%",
               background: color,
               color: "white",

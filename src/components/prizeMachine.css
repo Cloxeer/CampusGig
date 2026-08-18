@@ -44,6 +44,9 @@
   height: 100%;
   pointer-events: none;
   z-index: 3;
+  /* Own compositor layer: the per-frame particle repaint stays isolated and
+     never dirties the (cached) blurred backdrop beneath it. */
+  transform: translateZ(0);
 }
 
 /* Rarity box(es) — shuffle with the lamps, lock on the roll. Legendary stacks
@@ -531,6 +534,10 @@
   animation: pm-spin 26s linear infinite;
   -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.75) 30%, rgba(0, 0, 0, 0.35) 60%);
   mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.75) 30%, rgba(0, 0, 0, 0.35) 60%);
+  /* Rasterize the huge conic+mask ONCE and let the compositor spin the cached
+     layer, instead of re-painting it each frame. */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 @keyframes pm-spin {
@@ -939,4 +946,33 @@
   .pm-backdrop {
     animation: none;
   }
+}
+
+/* ===========================================================================
+   PERFORMANCE — zero visual change. Profiling showed the reveal is GPU-fill
+   bound on phones: the full-screen `backdrop-filter: blur(7px)` on .pm-backdrop
+   RE-BLURS every frame the page behind it moves, and the app has infinite CSS
+   loops (rep-path chest-swap + pulse) running the whole time. All of that page
+   is fully hidden behind the opaque blur while the modal is open, so blurring it
+   more than once is pure waste.
+
+   The modal is a portal on <body>, a SIBLING of #root — so freezing #root's CSS
+   animations makes the backdrop static and lets the browser blur it ONCE and
+   reuse the cached result, instead of re-blurring 60–120×/sec. This is the big
+   win on weak GPUs (older iPhones/iPods). It only pauses CSS @keyframes behind
+   the modal; the overlay's own animations (sunburst) and all Motion/rAF work
+   inside the modal are untouched, and everything resumes on close. Requires
+   :has() (Safari 15.4+/all modern engines); older engines simply skip the
+   optimization and render exactly as before.
+   =========================================================================== */
+body:has(.pm-overlay) #root,
+body:has(.pm-overlay) #root * {
+  animation-play-state: paused !important;
+}
+
+/* The topbar carries its own backdrop-filter; behind the modal's blur it is
+   invisible, so computing a second live blur every frame is wasted GPU work. */
+body:has(.pm-overlay) .topbar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
