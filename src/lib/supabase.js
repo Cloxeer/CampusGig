@@ -18,6 +18,11 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: "pkce",
+    // Magic links are frequently opened in a different browser/app than the one
+    // that requested them (email client webviews, desktop→browser handoff). PKCE
+    // stores a per-browser code_verifier, so those cross-context opens fail with
+    // "?code=… but still logged out". The implicit flow returns the session in the
+    // URL fragment and completes in any browser — the right trade-off for email links.
+    flowType: "implicit",
   },
 });
