@@ -99,18 +99,28 @@ export default function GigCard({ gig, onClick, tick }) {
             )}
           </div>
         </div>
-        <LevelBadge label={gig.levelLabel} userId={gig.posterId} equippedTagId={gig.posterEquippedTag} small />
-        <span
+        <div
           style={{
-            fontSize: 10,
-            color: "var(--fg4)",
-            fontFamily: "var(--mono)",
-            marginTop: 2,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 5,
+            flexShrink: 0,
+            maxWidth: "45%",
           }}
-          key={tick}
         >
-          {elapsed(gig.postedAt)}
-        </span>
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--fg4)",
+              fontFamily: "var(--mono)",
+            }}
+            key={tick}
+          >
+            {elapsed(gig.postedAt)}
+          </span>
+          <LevelBadge label={gig.levelLabel} userId={gig.posterId} equippedTagId={gig.posterEquippedTag} small />
+        </div>
       </div>
     </div>
   );
