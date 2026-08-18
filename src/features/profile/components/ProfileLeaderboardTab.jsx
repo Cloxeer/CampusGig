@@ -42,7 +42,7 @@ export default function ProfileLeaderboardTab({
         >
           <span className={`lb-rank ${p.rank <= 3 ? "top" : ""}`}>{p.rank}</span>
           <UserAvatar
-            user={{ resolvedAvatarUrl: p.avatarUrl, avatar_color: p.color, first_name: p.initials?.[0], last_name: p.initials?.[1] }}
+            user={{ id: p.userId, resolvedAvatarUrl: p.avatarUrl, avatar_color: p.color, first_name: p.initials?.[0], last_name: p.initials?.[1], equipped_border: p.equippedBorder }}
             size={32}
             withCosmetics={p.isYou}
           />
@@ -63,7 +63,7 @@ export default function ProfileLeaderboardTab({
                 gap: 6,
               }}
             >
-              <LevelBadge label={getLevel(p.rep).label} userId={p.userId} small />
+              <LevelBadge label={getLevel(p.rep).label} userId={p.userId} equippedTagId={p.equippedTag} small />
             </div>
           </div>
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg2)", fontFamily: "var(--mono)", flexShrink: 0 }}>

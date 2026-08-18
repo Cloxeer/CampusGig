@@ -11,7 +11,10 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
  * changes (bump it on breaking query changes). `maxAge` drops anything older than
  * 24h so a user returning days later doesn't hydrate very stale data.
  */
-export const PERSIST_BUSTER = "v1";
+/* v2: cached user/gig/leaderboard/review rows now carry equipped_tag +
+   equipped_border so other users' cosmetics render everywhere — old cached
+   rows lack those fields, so drop them and refetch. */
+export const PERSIST_BUSTER = "v2";
 export const PERSIST_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
 
 export const queryPersister = createSyncStoragePersister({

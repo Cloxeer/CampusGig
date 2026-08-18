@@ -4,14 +4,20 @@ import AvatarZoomModal from "./AvatarZoomModal";
 import CosmeticRing from "./CosmeticRing";
 import { COSMETICS } from "../data/cosmetics";
 import { getInventory, subscribeInventory } from "../lib/cosmeticsInventory";
+import { useRegisteredEquipped } from "../lib/equippedRegistry";
 import { isSelfId } from "../lib/selfUid";
 
 const SIZES = { xs: 22, sm: 30, md: 36, lg: 44, xl: 56 };
 
-function resolveEquippedBorder() {
-  const id = getInventory().equipped.border;
+/** A border cosmetic by id, or null. Shared by the self (local) and other-user
+ *  (server-provided) paths so a border looks identical whoever wears it. */
+function borderById(id) {
   if (!id) return null;
   return COSMETICS.find((c) => c.id === id && c.type === "border") || null;
+}
+
+function resolveEquippedBorder() {
+  return borderById(getInventory().equipped.border);
 }
 
 /** Live equipped-border cosmetic (local inventory) — only when enabled. */
@@ -29,14 +35,28 @@ function useEquippedBorder(enabled) {
 }
 
 /**
- * `withCosmetics` — pass ONLY when this avatar renders the CURRENT user; wraps
- * the photo in their equipped avatar-border ring (local inventory for now).
+ * The equipped border ring shows for EVERY user, not just you:
+ *   • you (self)  — read from the LOCAL inventory so equipping updates instantly
+ *                   (optimistic; it's written through to the server too).
+ *   • anyone else — read from the profile row's `equipped_border`, which the
+ *                   server exposes publicly. Callers must pass `user.equipped_border`
+ *                   for it to appear (the data layer selects that column).
+ *
+ * `withCosmetics` forces the self/local path (used by the Inventory preview and
+ * your own profile header, where the object isn't a full users row).
  */
 export default function UserAvatar({ user, size = "md", style, zoomable = false, withCosmetics = false }) {
   const [zoomOpen, setZoomOpen] = useState(false);
   /* Explicit opt-in OR auto-detected self (full user objects carry .id). */
   const isSelf = withCosmetics || isSelfId(user?.id);
-  const border = useEquippedBorder(isSelf);
+  const localBorder = useEquippedBorder(isSelf);
+  /* Others → the registry's freshest-known border for this user, falling back to
+     the value embedded in the row we were handed. Reading the registry keeps
+     this avatar in agreement with every other surface showing the same person. */
+  const registered = useRegisteredEquipped(isSelf ? null : user?.id);
+  const border = isSelf
+    ? localBorder
+    : borderById(registered?.border ?? user?.equipped_border);
   const ring = border?.ring || null;
 
   const px = typeof size === "number" ? size : (SIZES[size] || SIZES.md);

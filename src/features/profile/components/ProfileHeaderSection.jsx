@@ -23,7 +23,14 @@ export default function ProfileHeaderSection({
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
       <UserAvatar
-        user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile.avatar_color, first_name: profile.first_name, last_name: profile.last_name }}
+        user={{
+          id: profile?.id,
+          resolvedAvatarUrl: avatarUrl,
+          avatar_color: profile.avatar_color,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          equipped_border: profile.equipped_border,
+        }}
         size="xl"
         style={{ border: "2px solid var(--bd)" }}
         zoomable
@@ -37,7 +44,7 @@ export default function ProfileHeaderSection({
           </div>
         )}
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-          <LevelBadge label={lvl.label} userId={profile?.id} />
+          <LevelBadge label={lvl.label} userId={profile?.id} equippedTagId={profile?.equipped_tag} />
         </div>
       </div>
       {reviewsLoading ? (

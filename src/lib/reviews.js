@@ -1,4 +1,10 @@
 import { supabase } from "./supabase";
+import { noteEquippedFromRow } from "./equippedRegistry";
+
+/** Seed the shared equipped registry from a list of review rows' reviewers. */
+function noteReviewers(rows) {
+  for (const r of rows || []) noteEquippedFromRow(r.reviewer);
+}
 
 export async function getMyReviews() {
   const {
@@ -9,20 +15,22 @@ export async function getMyReviews() {
 
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name, avatar_color, avatar_url)")
+    .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(id, first_name, last_name, avatar_color, avatar_url, equipped_tag, equipped_border)")
     .eq("reviewee_id", user.id)
     .order("created_at", { ascending: false });
 
+  noteReviewers(data);
   return { reviews: data || [], error };
 }
 
 export async function getReviewsForUser(userId) {
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name, avatar_color, avatar_url)")
+    .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(id, first_name, last_name, avatar_color, avatar_url, equipped_tag, equipped_border)")
     .eq("reviewee_id", userId)
     .order("created_at", { ascending: false });
 
+  noteReviewers(data);
   return { reviews: data || [], error };
 }
 

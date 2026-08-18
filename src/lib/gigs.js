@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { getLevel } from "../utils/helpers";
 import { getAvatarUrl } from "./avatar";
 import { mergeUserPrivateContact, USER_PRIVATE_SELECT } from "./profileShared";
+import { noteEquippedFromRow } from "./equippedRegistry";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 /** Anti-spam cap on new gigs per poster per rolling hour. */
@@ -15,7 +16,7 @@ export async function getOpenGigs() {
     .select(`
       id, title, description, price, location, estimated_time, expires_at, notes, status, created_at,
       category:category_id(label, icon_name),
-      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, account_type)
+      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, account_type, equipped_tag, equipped_border)
     `)
     .eq("status", "open")
     .or(`expires_at.is.null,expires_at.gt."${nowIso}"`)
@@ -47,6 +48,9 @@ export async function getOpenGigs() {
     ...g,
     _reviewStats: posterReviewMap[g.poster?.id] || null,
   }));
+
+  /* Seed the shared registry from these fresh poster rows. */
+  for (const g of data) noteEquippedFromRow(g.poster);
 
   return { gigs: enriched, error };
 }
@@ -102,6 +106,10 @@ export function normalizeGig(g) {
     initials,
     color: poster.avatar_color || "#6366f1",
     avatarUrl: poster.avatar_url ? getAvatarUrl(poster.avatar_url) : null,
+    /* Equipped cosmetics so the poster's tag + border show on the gig card,
+       exactly as they do on the poster's own screen. */
+    posterEquippedTag: poster.equipped_tag || null,
+    posterEquippedBorder: poster.equipped_border || null,
     levelLabel: level.label,
     posterAvgRating,
     posterReviewCount,
@@ -286,19 +294,22 @@ export async function getGigDetail(gigId) {
     .select(`
       id, title, description, price, location, estimated_time, expires_at, status, created_at, updated_at, completed_at,
       category:category_id(label),
-      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, user_private_contact(${USER_PRIVATE_SELECT})),
-      taker:taker_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, user_private_contact(${USER_PRIVATE_SELECT}))
+      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, equipped_tag, equipped_border, user_private_contact(${USER_PRIVATE_SELECT})),
+      taker:taker_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, equipped_tag, equipped_border, user_private_contact(${USER_PRIVATE_SELECT}))
     `)
     .eq("id", gigId)
     .single();
 
   if (gigError || !gig) return { gig: null, requests: [], error: gigError };
 
+  noteEquippedFromRow(gig.poster);
+  noteEquippedFromRow(gig.taker);
+
   const { data: requests } = await supabase
     .from("gig_requests")
     .select(`
       id, requester_id, status, created_at,
-      requester:requester_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, user_private_contact(${USER_PRIVATE_SELECT}))
+      requester:requester_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, equipped_tag, equipped_border, user_private_contact(${USER_PRIVATE_SELECT}))
     `)
     .eq("gig_id", gigId)
     .order("created_at", { ascending: false });
@@ -312,6 +323,7 @@ export async function getGigDetail(gigId) {
     ...r,
     requester: mergeUserPrivateContact(r.requester),
   }));
+  for (const r of requests || []) noteEquippedFromRow(r.requester);
 
   return { gig: mergedGig, requests: mergedReqs, error: null };
 }

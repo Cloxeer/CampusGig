@@ -74,6 +74,7 @@ export default function GigCard({ gig, onClick, tick }) {
             avatar_color: gig.color,
             first_name: gig.initials?.[0],
             last_name: gig.initials?.[1],
+            equipped_border: gig.posterEquippedBorder,
           }}
           size="xs"
           style={{ marginTop: 1 }}
@@ -98,7 +99,7 @@ export default function GigCard({ gig, onClick, tick }) {
             )}
           </div>
         </div>
-        <LevelBadge label={gig.levelLabel} userId={gig.posterId} small />
+        <LevelBadge label={gig.levelLabel} userId={gig.posterId} equippedTagId={gig.posterEquippedTag} small />
         <span
           style={{
             fontSize: 10,

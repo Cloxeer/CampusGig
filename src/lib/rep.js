@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { getAvatarUrl } from "./avatar";
+import { noteEquipped } from "./equippedRegistry";
 
 /** Most recent items returned for profile activity lists. */
 const ACTIVITY_LIMIT = 10;
@@ -133,7 +134,7 @@ export async function getLeaderboard(limit = 10) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, first_name, last_name, avatar_color, avatar_url, rep_score")
+    .select("id, first_name, last_name, avatar_color, avatar_url, rep_score, equipped_tag, equipped_border")
     // Same total order the campus-rank stat uses: Rep desc, then earlier joiners
     // first — so tied users get a deterministic, consistent position.
     .order("rep_score", { ascending: false })
@@ -148,8 +149,15 @@ export async function getLeaderboard(limit = 10) {
     color: u.avatar_color || "#6366f1",
     avatarUrl: u.avatar_url ? getAvatarUrl(u.avatar_url) : null,
     rep: u.rep_score || 0,
+    /* Equipped cosmetics so each row shows the wearer's real tag + border. */
+    equippedTag: u.equipped_tag || null,
+    equippedBorder: u.equipped_border || null,
     isYou: user?.id === u.id,
   }));
+
+  /* Seed the shared registry from this fresh fetch so every surface showing
+     these users converges on the same tag/border. */
+  for (const u of data || []) noteEquipped(u.id, u.equipped_tag, u.equipped_border);
 
   return { leaderboard, error };
 }
@@ -173,7 +181,7 @@ export async function getMyActivity() {
       .limit(ACTIVITY_LIMIT),
     supabase
       .from("reviews")
-      .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(first_name, last_name, avatar_color, avatar_url)")
+      .select("id, rating, text, created_at, reviewer_id, reviewer:reviewer_id(id, first_name, last_name, avatar_color, avatar_url, equipped_tag, equipped_border)")
       .eq("reviewee_id", user.id)
       .order("created_at", { ascending: false })
       .limit(ACTIVITY_LIMIT),

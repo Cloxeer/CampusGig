@@ -8,6 +8,7 @@ import {
   getMyReviewsToUserByGig,
 } from "./reviews";
 import { getUserActivity, getUserGigStats, getCampusRank, getTotalUsers } from "./rep";
+import { noteEquippedFromRow } from "./equippedRegistry";
 import { toFriendlyError } from "../utils/dbErrors";
 
 export async function getMyProfile() {
@@ -33,6 +34,7 @@ export async function getProfileById(userId) {
     .eq("id", userId)
     .single();
 
+  noteEquippedFromRow(data);
   return { profile: mergeUserPrivateContact(data), error };
 }
 
@@ -40,12 +42,13 @@ export async function getProfilesByIds(userIds) {
   if (!userIds.length) return {};
   const { data } = await supabase
     .from("users")
-    .select("id, first_name, last_name, avatar_color, avatar_url")
+    .select("id, first_name, last_name, avatar_color, avatar_url, equipped_tag, equipped_border")
     .in("id", userIds);
 
   const map = {};
   for (const u of data || []) {
     map[u.id] = u;
+    noteEquippedFromRow(u);
   }
   return map;
 }
