@@ -1,171 +1,213 @@
 /**
- * Rep path: score-based checkpoints (1 → 300), Duolingo-style sections + gates at 50 / 150 / 300.
+ * Rep path 2.0 — endless, evenly-spaced "Candy Crush" progression.
+ *
+ * The climb never ends: stages are generated on the fly from the user's score.
+ * Every stage is the SAME size (50 rep) with the SAME spacing (a checkpoint every
+ * 10 rep), so each chest costs the same amount of work no matter how high you are.
+ *
+ *   • Each stage = 50 rep = 4 standard-chest checkpoints + 1 legendary-chest milestone.
+ *   • Every checkpoint carries a STANDARD chest; every stage milestone a LEGENDARY chest.
+ *   • Each stage has its own title (campus-journey themed; auto-generated past the list).
+ *   • Only the current stage + REVEAL_AHEAD stages are drawn; beyond that a single
+ *     locked "horizon" node shows a lock icon so the path visibly keeps going.
+ *
+ * Coarse trust tiers (New / Reliable / Trusted / Legend) still come from REP_LEVELS
+ * via getLevel() — this file only drives the game/checkpoint layer.
  */
 
-const GATE = { reliable: 50, trusted: 150, legend: 300 };
+import { tierTagForRep } from "../data/cosmetics";
 
-/** @param {{ target: number, title: string, blurb?: string }} c */
-function checkpoint(id, row, target, title, blurb) {
-  return {
-    id,
-    kind: "checkpoint",
-    row,
-    targetRep: target,
-    title,
-    subtitle: blurb || `${target} rep`,
-    done: false,
-    locked: true,
-    active: false,
-  };
-}
-
-function milestone(id, row, targetRep, title, subtitle, icon, variant) {
-  return {
-    id,
-    kind: "milestone",
-    row,
-    targetRep,
-    title,
-    subtitle,
-    icon,
-    variant,
-    done: false,
-    locked: true,
-    active: false,
-  };
-}
+const STAGE_SIZE = 50; // rep per stage
+const CHECKPOINT_STEP = 10; // rep between chests
+const CHECKPOINTS_PER_STAGE = 4; // standard chests before the stage's legendary
+/** Stages drawn ahead of the current one; the rest collapse into a locked horizon. */
+const REVEAL_AHEAD = 5;
 
 const ROW_CYCLE = ["center", "right", "left"];
+/** How many of the next stage's checkpoints peek out of the fog at the summit. */
+const FRONTIER_PEEK = 2;
+/** Short encouragements under each checkpoint (one per checkpoint slot in a stage). */
+const CHECKPOINT_WORDS = ["Warming up", "Finding a groove", "Locked in", "One to the drop"];
 
-function withRows(checkpoints) {
-  return checkpoints.map((c, i) => ({ ...c, row: ROW_CYCLE[i % ROW_CYCLE.length] }));
-}
-
-/** Campus-friendly section copy */
-const SECTION_BLUEPRINT = [
-  {
-    id: "new",
-    label: "The Quad · First steps",
-    range: "0 – 49 rep",
-    bannerTone: "neutral",
-    minGate: 0,
-    checkpoints: withRows([
-      { target: 1, title: "You showed up", blurb: "Your first rep — nice." },
-      { target: 10, title: "Double digits", blurb: "Early momentum counts." },
-      { target: 20, title: "Finding your rhythm", blurb: "Keep stacking small wins." },
-      { target: 30, title: "Campus is noticing", blurb: "You’re building trust." },
-      { target: 40, title: "Almost to blue", blurb: "One more push in this tier." },
-      { target: 49, title: "Top of the class (almost)", blurb: "Next stop: Reliable." },
-    ]),
-    milestone: milestone("m-reliable", "center", GATE.reliable, "Reach Reliable", "50 rep", "trophy", "reliable"),
-  },
-  {
-    id: "reliable",
-    label: "Honor roll energy · Reliable",
-    range: "50 – 149 rep",
-    bannerTone: "blue",
-    minGate: GATE.reliable,
-    checkpoints: withRows([
-      { target: 60, title: "Settling in", blurb: "You earned the blue badge." },
-      { target: 75, title: "Showing up for people", blurb: "Consistency is everything." },
-      { target: 90, title: "Mid-semester grind", blurb: "Keep the streak alive." },
-      { target: 105, title: "Trusted neighbor vibes", blurb: "Peers can count on you." },
-      { target: 120, title: "Campus regular", blurb: "You’re part of the fabric." },
-      { target: 135, title: "Almost green tier", blurb: "Trusted is in sight." },
-      { target: 149, title: "Reliable — maxed out", blurb: "Ready for the next chapter." },
-    ]),
-    milestone: milestone("m-trusted", "right", GATE.trusted, "Reach Trusted", "150 rep", "trophy", "trusted"),
-  },
-  {
-    id: "trusted",
-    label: "Go-to on campus · Trusted",
-    range: "150 – 299 rep",
-    bannerTone: "green",
-    minGate: GATE.trusted,
-    checkpoints: withRows([
-      { target: 165, title: "Green tier unlocked", blurb: "Serious campus cred." },
-      { target: 185, title: "Raising the bar", blurb: "Quality over quantity." },
-      { target: 205, title: "Main character semester", blurb: "You set the tone." },
-      { target: 225, title: "Community anchor", blurb: "People talk about you (in a good way)." },
-      { target: 250, title: "Halfway to purple", blurb: "Legend is on the horizon." },
-      { target: 275, title: "Finals-week focus", blurb: "Finish strong." },
-      { target: 299, title: "Trusted — peak", blurb: "Next up: Legend status." },
-    ]),
-    milestone: null,
-  },
-  {
-    id: "legend",
-    label: "Senior week forever · Legend",
-    range: "300+ rep",
-    bannerTone: "purple",
-    minGate: GATE.legend,
-    checkpoints: [],
-    milestone: milestone("m-champ", "center", GATE.legend, "Campus legend", "300 rep — welcome to the top", "crown", "champ"),
-  },
+/**
+ * Stage names, grouped in pairs by trust tier — each tier spans TWO stages and
+ * the tier's tag is earned at the end of the second (see TIER_TAGS):
+ *   1–2  New        · earn "New"          @100 rep
+ *   3–4  Reliable   · earn "Reliable"     @200 rep
+ *   5–6  Trusted    · earn "Trusted"      @300 rep
+ *   7–8  Legend     · earn "Legend"       @400 rep
+ *   9–10 Cosmic     · earn "Beyond Legend"@500 rep
+ * Past this list the climb continues with generated chapters (see stageMeta).
+ */
+const STAGE_TITLES = [
+  // New tier
+  { title: "Joined the Squad", blurb: "Where every gig starts." },
+  { title: "First Name Basis", blurb: "People are learning your name." },
+  // Reliable tier
+  { title: "Regular Rotation", blurb: "You show up, every time." },
+  { title: "The Reliable One", blurb: "Dependable, on the clock." },
+  // Trusted tier
+  { title: "Word of Mouth", blurb: "Your name gets passed around." },
+  { title: "Trusted Hands", blurb: "People request you by name." },
+  // Legend tier
+  { title: "Big Rep Energy", blurb: "A campus heavyweight." },
+  { title: "Campus Legend", blurb: "Everyone knows the name." },
+  // Cosmic tier
+  { title: "Off the Charts", blurb: "Past what anyone's done." },
+  { title: "Beyond Legend", blurb: "The ceiling — then past it." },
 ];
 
-function buildRawNodes(blueprint) {
-  const out = [];
-  for (const cp of blueprint.checkpoints) {
-    out.push(
-      checkpoint(`cp-${blueprint.id}-${cp.target}`, cp.row, cp.target, cp.title, cp.blurb || `${cp.target} rep`)
-    );
+function stageMeta(index) {
+  if (index < STAGE_TITLES.length) return STAGE_TITLES[index];
+  const chapter = index - STAGE_TITLES.length + 1;
+  return { title: `Uncharted · Chapter ${chapter}`, blurb: "The climb never ends." };
+}
+
+/** A standard-chest checkpoint node. `slot` is its 1-based position within the stage. */
+function makeCheckpoint(stageIndex, target, slot) {
+  return {
+    id: `cp-${stageIndex}-${target}`,
+    kind: "checkpoint",
+    chest: "standard",
+    targetRep: target,
+    title: `${target} rep`,
+    subtitle: target === 1 ? "You showed up" : CHECKPOINT_WORDS[(slot - 1) % CHECKPOINT_WORDS.length],
+    done: false,
+    locked: true,
+    active: false,
+  };
+}
+
+/**
+ * The stage's capstone. Two kinds, driven by TIER_TAGS (single source of truth):
+ *   • End of a tier band (100/200/300/400/500 rep) → a TIER chest that grants
+ *     that tier's tag (New/Reliable/Trusted/Legend/Beyond Legend).
+ *   • Every other milestone (the halfway 50/150/… and everything past the
+ *     ladder) → a Legendary prize chest.
+ */
+function makeMilestone(stageIndex, target) {
+  const tierTag = tierTagForRep(target);
+  return {
+    id: `ms-${stageIndex}-${target}`,
+    kind: "milestone",
+    chest: tierTag ? "tier" : "legendary",
+    rewardTagId: tierTag ? tierTag.id : null,
+    targetRep: target,
+    title: tierTag ? `“${tierTag.name}” tag` : "Legendary chest",
+    subtitle: tierTag ? `${tierTag.tier} tier reward` : `Stage ${stageIndex + 1} reward`,
+    icon: "crown",
+    variant: tierTag ? tierTag.rarity : "prize",
+    done: false,
+    locked: true,
+    active: false,
+  };
+}
+
+/** Build one stage's raw nodes (rows + gating applied afterward). */
+function buildStageNodes(stageIndex) {
+  const start = stageIndex * STAGE_SIZE;
+  const nodes = [];
+  // Instant first win: stage 1 opens with a "1 rep" checkpoint so a brand-new
+  // user lights a node (and earns a chest) with their very first action.
+  if (stageIndex === 0) {
+    nodes.push(makeCheckpoint(stageIndex, 1, 0));
   }
-  if (blueprint.milestone) out.push(blueprint.milestone);
-  return out;
+  for (let slot = 1; slot <= CHECKPOINTS_PER_STAGE; slot += 1) {
+    nodes.push(makeCheckpoint(stageIndex, start + slot * CHECKPOINT_STEP, slot));
+  }
+  nodes.push(makeMilestone(stageIndex, start + STAGE_SIZE));
+  return nodes.map((n, k) => ({ ...n, row: ROW_CYCLE[k % ROW_CYCLE.length] }));
+}
+
+/** Apply done/active/locked to a stage's nodes based on the user's score. */
+function gateStage(stageIndex, score) {
+  const start = stageIndex * STAGE_SIZE;
+  const meta = stageMeta(stageIndex);
+  const rawNodes = buildStageNodes(stageIndex);
+  const unlocked = score >= start;
+
+  const base = {
+    id: `stage-${stageIndex + 1}`,
+    stageNumber: stageIndex + 1,
+    label: meta.title,
+    range: `${start + 1} – ${start + STAGE_SIZE} rep`,
+    /* One brand: every stage banner is CampusGig green (frontier stays neutral). */
+    bannerTone: "green",
+    minGate: start,
+  };
+
+  if (!unlocked) {
+    return {
+      ...base,
+      unlocked: false,
+      nodes: rawNodes.map((n) => ({ ...n, done: false, locked: true, active: false })),
+    };
+  }
+
+  const cps = rawNodes.filter((n) => n.kind === "checkpoint");
+  const ms = rawNodes.find((n) => n.kind === "milestone") || null;
+
+  const nextCp = cps.find((c) => score < c.targetRep) || null;
+  let activeId = null;
+  if (nextCp) activeId = nextCp.id;
+  else if (ms && score < ms.targetRep) activeId = ms.id;
+
+  const nodes = rawNodes.map((n) => {
+    if (n.kind === "checkpoint") {
+      const done = score >= n.targetRep;
+      const locked = !done && !(nextCp && n.id === nextCp.id);
+      return { ...n, done, active: false, locked };
+    }
+    // milestone
+    const done = score >= n.targetRep;
+    const active = Boolean(!done && n.id === activeId);
+    const locked = !done && !active;
+    return { ...n, done, active, locked };
+  });
+
+  return { ...base, unlocked: true, nodes };
+}
+
+function clamp01(n) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
 }
 
 /**
  * @param {{ score: number }} input
+ * @returns sections ordered low → high (the page reverses them for the climb view).
  */
 export function buildRepPathSections({ score }) {
-  const sections = SECTION_BLUEPRINT.map((bp) => ({
-    id: bp.id,
-    label: bp.label,
-    range: bp.range,
-    bannerTone: bp.bannerTone,
-    minGate: bp.minGate,
-    nodes: buildRawNodes(bp),
-  }));
+  const safeScore = Number.isFinite(score) ? Math.max(0, score) : 0;
+  const currentStageIndex = Math.floor(safeScore / STAGE_SIZE);
+  const lastClearIndex = currentStageIndex + (REVEAL_AHEAD - 1);
 
-  const gated = sections.map((sec) => {
-    const unlocked = score >= sec.minGate;
-    if (!unlocked) {
-      return {
-        ...sec,
-        unlocked: false,
-        nodes: sec.nodes.map((n) => ({ ...n, done: false, locked: true, active: false })),
-      };
-    }
+  const sections = [];
+  for (let i = 0; i <= lastClearIndex; i += 1) {
+    sections.push(gateStage(i, safeScore));
+  }
 
-    const cps = sec.nodes.filter((n) => n.kind === "checkpoint");
-    const ms = sec.nodes.find((n) => n.kind === "milestone") || null;
-
-    let activeId = null;
-    const nextCp = cps.find((c) => score < c.targetRep);
-    if (nextCp) activeId = nextCp.id;
-    else if (ms && score < ms.targetRep) activeId = ms.id;
-
-    const nodes = sec.nodes.map((n) => {
-      if (n.kind === "checkpoint") {
-        const done = score >= n.targetRep;
-        const active = false;
-        const locked = !done && !(nextCp && n.id === nextCp.id);
-        return { ...n, done, active, locked };
-      }
-      if (n.kind === "milestone") {
-        const done = score >= n.targetRep;
-        const active = Boolean(!done && n.id === activeId);
-        const locked = !done && !active;
-        return { ...n, done, active, locked };
-      }
-      return n;
-    });
-
-    return { ...sec, unlocked: true, nodes };
+  // Fogged frontier: the NEXT stage is rendered for real but ghosted behind a
+  // gradient that dissolves into the page (Rocket-League style). Its name stays
+  // hidden; the fog lifts (`reveal` → 1) as the user climbs through their current
+  // stage, so the peek only opens up when they're closing in on it.
+  const frontier = gateStage(lastClearIndex + 1, safeScore);
+  const peekNodes = frontier.nodes.filter((n) => n.kind === "checkpoint").slice(0, FRONTIER_PEEK);
+  const intoStage = safeScore - currentStageIndex * STAGE_SIZE;
+  const reveal = clamp01(intoStage / STAGE_SIZE);
+  sections.push({
+    ...frontier,
+    nodes: peekNodes,
+    isFrontier: true,
+    reveal,
+    /** Rep until the next stage clears the fog (one stage boundary away). */
+    repToUnlock: STAGE_SIZE - intoStage,
+    label: "The climb continues",
+    range: "Unlocks as you climb",
+    bannerTone: "neutral",
   });
 
-  return gated;
+  return sections;
 }
 
 export const REP_PATH_EARN_ROWS = [

@@ -69,6 +69,7 @@ export default function GigCard({ gig, onClick, tick }) {
       >
         <UserAvatar
           user={{
+            id: gig.posterId,
             resolvedAvatarUrl: gig.avatarUrl,
             avatar_color: gig.color,
             first_name: gig.initials?.[0],
@@ -83,11 +84,13 @@ export default function GigCard({ gig, onClick, tick }) {
             {gig.posterIsStudent ? <StudentBadge size={12} /> : null}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-            <Stars rating={gig.posterAvgRating} size={9} />
             {gig.posterReviewCount > 0 ? (
-              <span style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
-                {gig.posterAvgRating.toFixed(1)}
-              </span>
+              <>
+                <Stars rating={gig.posterAvgRating} size={9} />
+                <span style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
+                  {gig.posterAvgRating.toFixed(1)}
+                </span>
+              </>
             ) : (
               <span style={{ fontSize: 10, color: "var(--fg4)", fontFamily: "var(--mono)" }}>
                 No reviews
@@ -95,7 +98,7 @@ export default function GigCard({ gig, onClick, tick }) {
             )}
           </div>
         </div>
-        <LevelBadge label={gig.levelLabel} small />
+        <LevelBadge label={gig.levelLabel} userId={gig.posterId} small />
         <span
           style={{
             fontSize: 10,

@@ -18,6 +18,7 @@ import Profile from "./pages/Profile";
 import ProfileRep from "./pages/ProfileRep";
 import EditProfile from "./pages/EditProfile";
 import Settings from "./pages/Settings";
+import Inventory from "./pages/Inventory";
 import AsnmsuDiscounts from "./pages/AsnmsuDiscounts";
 import BottomNav from "./components/BottomNav";
 import DesktopSidebar from "./components/DesktopSidebar";
@@ -256,6 +257,7 @@ export default function App() {
               <Route path="/alerts" element={<Navigate to="/welcome" replace />} />
               <Route path="/profile" element={<Navigate to="/welcome" replace />} />
               <Route path="/profile/rep" element={<ProfileRep />} />
+              <Route path="/inventory" element={<Inventory />} />
             </Route>
             {/* Full-screen (no-nav) public surfaces + sign-in / marketing routes. */}
             <Route path="/gig/:gigId" element={<OpenGig currentUserId={null} />} />
@@ -331,6 +333,7 @@ export default function App() {
           <Route path="/profile/edit" element={<EditProfile />} />
           <Route path="/profile/:userId" element={<ProfileByIdRoute currentUserId={currentUserId} />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/inventory" element={<Inventory />} />
           <Route path="/asnmsu/discounts" element={<AsnmsuDiscounts />} />
           <Route path="/app-intro" element={<AppIntro />} />
           <Route path="/gig/:gigId" element={<OpenGig currentUserId={currentUserId} />} />

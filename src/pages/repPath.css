@@ -287,6 +287,160 @@
   padding: 14px 14px 6px;
 }
 
+/* Frontier info card — replaces the plain banner at the fogged summit, spelling out
+   that the path keeps unlocking and how close the next reveal is. */
+.rep-path-frontier-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 12px 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg2, #fff);
+  border: 1px solid var(--bd, #e4e4e7);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Hovering unlock hint — a compact pill that floats in the fog above the peek,
+   showing how close the next stage reveal is. Independent of the stage banner
+   below (which matches every other section). */
+.rep-path-frontier-hint {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7; /* above the fog veil (z 6) */
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 28px);
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
+  background: var(--bg2, #fff);
+  border: 1px solid var(--bd, #e4e4e7);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.rep-path-frontier-hint__icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg3, #f4f4f5);
+  color: var(--rp-zinc-500, #71717a);
+}
+
+.rep-path-frontier-hint__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg, #18181b);
+}
+
+.rep-path-frontier-hint__track {
+  flex-shrink: 0;
+  width: 52px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg3, #f4f4f5);
+  overflow: hidden;
+}
+
+.rep-path-frontier-hint__fill {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rp-green, #16a34a), var(--rp-green-bright, #22c55e));
+  transition: width 0.5s ease;
+}
+
+.rep-path-frontier-card__icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--bg3, #f4f4f5);
+  color: var(--rp-zinc-500, #71717a);
+}
+
+.rep-path-frontier-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.rep-path-frontier-card__title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg, #18181b);
+  line-height: 1.3;
+}
+
+.rep-path-frontier-card__sub {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg4, #a1a1aa);
+}
+
+.rep-path-frontier-card__track {
+  margin-top: 8px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg3, #f4f4f5);
+  overflow: hidden;
+}
+
+.rep-path-frontier-card__fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--rp-green, #16a34a), var(--rp-green-bright, #22c55e));
+  transition: width 0.5s ease;
+}
+
+/* Frontier — the next stage shows through, ghosted, then dissolves into the page
+   toward the summit (top). --rp-reveal (0→1) lifts the veil as the climber nears
+   it: near 0 it's mostly shrouded, near 1 most of the peek is exposed. */
+.rep-path-col--frontier {
+  pointer-events: none;
+}
+
+.rep-path-col--frontier .rep-path-node {
+  opacity: 0.72;
+  filter: grayscale(0.2);
+}
+
+.rep-path-col--frontier .rep-path-step-copy {
+  opacity: 0.6;
+}
+
+.rep-path-fog {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  /* Bottom stays fully clear (the peek), then fades to solid page colour toward the
+     summit. Higher reveal pushes the solid line up, exposing more of the next stage. */
+  --fog-solid: calc(60% + var(--rp-reveal, 0) * 32%);
+  background: linear-gradient(
+    to top,
+    transparent 0%,
+    transparent 20%,
+    var(--bg, #fafafa) var(--fog-solid),
+    var(--bg, #fafafa) 100%
+  );
+}
+
 .rep-path-svg {
   position: absolute;
   inset: 0;
@@ -477,16 +631,24 @@
   font-weight: 600;
 }
 
-.rep-path-milestone-reached--reliable {
-  color: var(--rp-blue);
+.rep-path-milestone-reached--common {
+  color: #16a34a;
 }
 
-.rep-path-milestone-reached--trusted {
-  color: var(--rp-green-dark);
+.rep-path-milestone-reached--rare {
+  color: #2563eb;
 }
 
-.rep-path-milestone-reached--champ {
-  color: var(--rp-purple);
+.rep-path-milestone-reached--epic {
+  color: #7c3aed;
+}
+
+.rep-path-milestone-reached--legendary {
+  color: #ca8a04;
+}
+
+.rep-path-milestone-reached--cosmic {
+  color: #4f46e5;
 }
 
 .rep-path-node__num {
@@ -558,23 +720,118 @@
   color: #a1a1aa;
 }
 
-.rep-path-node--milestone.rep-path-node--done.rep-path-ms--reliable {
-  background: var(--rp-blue);
-  border-color: #1e40af;
-  box-shadow: 0 4px 0 #1e3a8a;
+/* Every milestone is a Legendary chest — once unlocked/opened it reads GOLD,
+   so a cleared stage cap glows yellow as you climb past it to the next tier.
+   (The tier tag it grants is revealed inside the chest, not on the node.) */
+.rep-path-node--milestone.rep-path-node--done {
+  background: #eab308;
+  border-color: #ca8a04;
+  box-shadow: 0 4px 0 #a16207;
 }
 
-.rep-path-node--milestone.rep-path-node--done.rep-path-ms--trusted {
-  background: var(--rp-green);
-  border-color: var(--rp-green-dark);
-  box-shadow: 0 4px 0 #14532d;
+/* Chest-ready: reached, holds an unopened chest — tappable, glowing, and all
+   chests wiggle in UNISON (same animation, same timeline). */
+.rep-path-node--chestready {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  background: linear-gradient(180deg, #22c55e, #16a34a) !important;
+  border-color: #15803d !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 0 6px rgba(22, 163, 74, 0.18),
+    0 6px 18px rgba(22, 163, 74, 0.38) !important;
 }
 
-.rep-path-node--milestone.rep-path-node--done.rep-path-ms--legend,
-.rep-path-node--milestone.rep-path-node--done.rep-path-ms--champ {
-  background: var(--rp-purple);
-  border-color: #6d28d9;
-  box-shadow: 0 4px 0 #4c1d95;
+.rep-path-node--chestready .rep-path-node__num {
+  color: #fff;
+}
+
+/* Opened (claimed): spent — white with a soft green outline, no glow, no
+   motion. Instantly different from a live solid-green chest. */
+.rep-path-node--chestopened {
+  background: var(--bg2, #fff) !important;
+  border-color: rgba(22, 163, 74, 0.45) !important;
+  color: var(--rp-green-dark) !important;
+  box-shadow: none !important;
+}
+
+.rep-path-node--chestopened .rep-path-node__num {
+  color: var(--rp-green-dark);
+}
+
+.rep-path-node--chestready:active {
+  transform: scale(0.94);
+}
+
+/* Number ↔ chest swap. Both layers stack; one 5.6s shared timeline keeps every
+   chest on the path in unison. */
+.rep-path-swap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.rep-path-swap__base,
+.rep-path-swap__chest {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+}
+
+.rep-path-swap__base {
+  animation: rep-swap-base 5.6s ease-in-out infinite;
+}
+
+.rep-path-swap__chest {
+  animation: rep-swap-chest 5.6s ease-in-out infinite;
+}
+
+/* Number holds, shrinks away, returns. */
+@keyframes rep-swap-base {
+  0%, 40% { opacity: 1; transform: scale(1); }
+  46%, 92% { opacity: 0; transform: scale(0.3); }
+  97%, 100% { opacity: 1; transform: scale(1); }
+}
+
+/* Chest POPS in (overshoot), shakes a little, pops back out — old Disney. */
+@keyframes rep-swap-chest {
+  0%, 42% { opacity: 0; transform: scale(0) rotate(0deg); }
+  47% { opacity: 1; transform: scale(1.28) rotate(0deg); }
+  50% { transform: scale(0.9) rotate(0deg); }
+  53% { transform: scale(1.08) rotate(0deg); }
+  56% { transform: scale(1) rotate(0deg); }
+  62% { transform: scale(1) rotate(-9deg); }
+  66% { transform: scale(1) rotate(8deg); }
+  70% { transform: scale(1) rotate(-5deg); }
+  73% { transform: scale(1) rotate(0deg); }
+  88% { opacity: 1; transform: scale(1) rotate(0deg); }
+  94%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+}
+
+/* Legendary chest (stage cap): gold treatment. */
+.rep-path-node--chestlegend {
+  background: linear-gradient(180deg, #facc15, #eab308) !important;
+  border-color: #ca8a04 !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 0 6px rgba(234, 179, 8, 0.2),
+    0 6px 18px rgba(234, 179, 8, 0.42) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rep-path-swap__base {
+    animation: none;
+    opacity: 0;
+  }
+  .rep-path-swap__chest {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .rep-path-node--milestone.rep-path-node--locked {

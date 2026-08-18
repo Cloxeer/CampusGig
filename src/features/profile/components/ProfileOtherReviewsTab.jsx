@@ -60,7 +60,7 @@ export default function ProfileOtherReviewsTab({
                 borderBottom: idx < reviews.length - 1 ? undefined : "none",
               }}
             >
-              <UserAvatar user={reviewer} size={34} />
+              <UserAvatar user={{ id: r.reviewer_id, ...reviewer }} size={34} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>{reviewer.first_name || "User"}</span>

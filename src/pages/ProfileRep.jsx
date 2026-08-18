@@ -4,6 +4,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Lenis from "lenis";
 import { ArrowLeft, Plus, Check, Star, Award, Trophy, Lock, Crown, GraduationCap, ChevronDown } from "lucide-react";
+import PrizeMachineModal from "../components/PrizeMachineModal";
+import ChestIcon from "../components/ChestIcon";
+import { getClaimedChests, claimChest, subscribeChests, openChest, pickChestOption } from "../lib/chestClaims";
+import { hydrateInventory } from "../lib/cosmeticsInventory";
+import { useDisplayTag, TagBadge } from "../components/EquippedTagBadge";
+import { COSMETICS } from "../data/cosmetics";
 import { getMyProfile, getCampusRank, getAvatarUrl } from "../lib/profile";
 import UserAvatar from "../components/UserAvatar";
 import { queryKeys } from "../lib/queryClient";
@@ -79,10 +85,12 @@ function segmentProgress(score, fromTarget, toTarget) {
   return clamp01((score - fromTarget) / (toTarget - fromTarget));
 }
 
-function PathStep({ node, nodeRef }) {
+function PathStep({ node, nodeRef, onOpenChest }) {
   const isMilestone = node.kind === "milestone";
   const isCheckpoint = node.kind === "checkpoint";
   const MilestoneIcon = isMilestone ? ICONS[node.icon] || Crown : Award;
+  /** Reached, holds a chest, not yet opened → tappable chest node. */
+  const chestReady = Boolean(node.chestReady);
 
   let nodeClass = "rep-path-node";
   if (isMilestone) nodeClass += " rep-path-node--milestone";
@@ -91,41 +99,68 @@ function PathStep({ node, nodeRef }) {
   else if (node.active) nodeClass += " rep-path-node--active";
   else nodeClass += " rep-path-node--next";
   if (isMilestone && node.variant) nodeClass += ` rep-path-ms--${node.variant}`;
+  if (chestReady) {
+    nodeClass += " rep-path-node--chestready";
+    if (isMilestone) nodeClass += " rep-path-node--chestlegend";
+  } else if (node.chestClaimed) {
+    /* Spent: quiet outlined style — clearly different from a live chest. */
+    nodeClass += " rep-path-node--chestopened";
+  }
 
-  const subline = node.subtitle || "";
+  const subline = chestReady ? "Tap to open your chest" : node.subtitle || "";
   const reached =
-    isMilestone && node.done
+    isMilestone && node.done && !chestReady && node.rewardTagId
       ? {
-          reliable: "Reached · Reliable",
-          trusted: "Reached · Trusted",
-          champ: "Legend — you made it",
+          common: "Reached · New",
+          rare: "Reached · Reliable",
+          epic: "Reached · Trusted",
+          legendary: "Reached · Legend",
+          cosmic: "Beyond Legend — you made it",
         }[node.variant] || "Tier unlocked"
       : null;
 
-  const ariaLabel = `${isCheckpoint ? `Goal ${node.targetRep} rep` : node.title}${node.done ? ", completed" : node.locked ? ", locked" : node.active ? ", your current goal" : ", next goal"}`;
+  const ariaLabel = chestReady
+    ? `Open your ${isMilestone ? "legendary " : ""}chest — ${node.targetRep} rep reward`
+    : `${isCheckpoint ? `Goal ${node.targetRep} rep` : node.title}${node.done ? ", completed" : node.locked ? ", locked" : node.active ? ", your current goal" : ", next goal"}`;
 
   return (
     <div className={`rep-path-step-wrapper rep-path-step-wrapper--${node.row}`}>
       <div className={`rep-path-step rep-path-step--${node.row}`}>
         <div className="rep-path-node-wrap" ref={nodeRef}>
           {node.active && !node.locked ? <div className="rep-path-pulse" aria-hidden /> : null}
-          <div
-            className={nodeClass}
-            role="img"
-            aria-label={ariaLabel}
-          >
-            {isCheckpoint ? (
-              node.locked ? (
-                <Lock size={22} strokeWidth={2.2} aria-hidden />
+          {chestReady ? (
+            /* Disney swap: the node keeps its identity (number/icon) and the
+               chest POPS in over it, shakes, and pops back out — on a loop
+               shared by every chest (unison). */
+            <button type="button" className={nodeClass} onClick={onOpenChest} aria-label={ariaLabel}>
+              <span className="rep-path-swap" aria-hidden>
+                <span className="rep-path-swap__base">
+                  {isCheckpoint ? (
+                    <span className="rep-path-node__num">{node.targetRep}</span>
+                  ) : (
+                    <MilestoneIcon size={26} strokeWidth={2.2} color="currentColor" />
+                  )}
+                </span>
+                <span className="rep-path-swap__chest">
+                  <ChestIcon size={isMilestone ? 26 : 22} />
+                </span>
+              </span>
+            </button>
+          ) : (
+            <div className={nodeClass} role="img" aria-label={ariaLabel}>
+              {isCheckpoint ? (
+                node.locked ? (
+                  <Lock size={22} strokeWidth={2.2} aria-hidden />
+                ) : (
+                  <span className="rep-path-node__num">{node.targetRep}</span>
+                )
+              ) : node.locked ? (
+                <Lock size={isMilestone ? 26 : 22} strokeWidth={2.2} aria-hidden />
               ) : (
-                <span className="rep-path-node__num">{node.targetRep}</span>
-              )
-            ) : node.locked ? (
-              <Lock size={isMilestone ? 26 : 22} strokeWidth={2.2} aria-hidden />
-            ) : (
-              <MilestoneIcon size={isMilestone ? 26 : 22} strokeWidth={2.2} color="currentColor" aria-hidden />
-            )}
-          </div>
+                <MilestoneIcon size={isMilestone ? 26 : 22} strokeWidth={2.2} color="currentColor" aria-hidden />
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div className="rep-path-step-copy">
@@ -145,6 +180,13 @@ export default function ProfileRep() {
 
   const [sectionConnectors, setSectionConnectors] = useState({});
   const [markerHintSectionId, setMarkerHintSectionId] = useState(null);
+  /** The chest being opened (from a path node): { type, targetRep } | null. */
+  const [activeChest, setActiveChest] = useState(null);
+  /** Guest-only "Get Fake Prize" demo — full animation, nothing banked. */
+  const [demoOpen, setDemoOpen] = useState(false);
+  /** Claimed chest thresholds (local for now), kept live cross-tab. */
+  const [claimed, setClaimed] = useState(getClaimedChests);
+  useEffect(() => subscribeChests(() => setClaimed(getClaimedChests())), []);
   /** Climb-up additions: draw-in animation + floating return chip while climbing. */
   const [drawn, setDrawn] = useState(false);
   const [showChip, setShowChip] = useState(false);
@@ -392,6 +434,25 @@ export default function ProfileRep() {
     else el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /* Open a chest SERVER-SIDE (committed roll, no re-rolls), then reveal exactly
+     what the server granted: a single prize (standard/tier) or the 3 legendary
+     options to pick from. Falls back to the tier tag if the RPC is unreachable. */
+  async function openChestAt(node) {
+    const reward = await openChest(node.targetRep);
+    if (!reward || reward.error) {
+      setActiveChest({ type: node.chest === "legendary" ? "legendary" : "standard", targetRep: node.targetRep, rewardTagId: node.rewardTagId });
+      return;
+    }
+    if (reward.status === "granted") {
+      setActiveChest({ type: "standard", targetRep: node.targetRep, rewardTagId: reward.cosmetic_id });
+    } else if (reward.status === "picked") {
+      setActiveChest({ type: "standard", targetRep: node.targetRep, rewardTagId: reward.picked });
+    } else if (reward.status === "pending") {
+      const fixedChoices = (reward.options || []).map((id) => COSMETICS.find((c) => c.id === id)).filter(Boolean);
+      setActiveChest({ type: "legendary", targetRep: node.targetRep, fixedChoices });
+    }
+  }
+
   /* Reveal segments as they scroll into view (opacity only — transforms would skew connector geometry). */
   useEffect(() => {
     const root = scrollRef.current;
@@ -419,6 +480,9 @@ export default function ProfileRep() {
 
   const lvl = getLevel(repScore);
   const rank = rankData?.rank;
+  /* The badge shown here: equipped cosmetic tag, else the current tier tag —
+     the shared resolver, so hero/profile/inventory always agree. */
+  const displayTag = useDisplayTag(lvl.label);
   const fullName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Student";
   const heroAvatarUrl = profile?.avatar_url ? getAvatarUrl(profile.avatar_url) : null;
 
@@ -472,7 +536,19 @@ export default function ProfileRep() {
         </div>
         <div className="rep-path-topbar__title">Rep path</div>
         <div className="rep-path-topbar__trail">
-          {rank ? (
+          {isGuest ? (
+            /* Same chip style as the rank button — guests try the machine,
+               told up front it's a demo and pays out nothing. */
+            <button
+              type="button"
+              className="rep-path-topbar-rank"
+              onClick={() => setDemoOpen(true)}
+              aria-label="Try the prize machine — demo only, no real prize"
+            >
+              <span className="rep-path-topbar-rank__eyebrow">Demo</span>
+              <span className="rep-path-topbar-rank__value">Get Fake Prize</span>
+            </button>
+          ) : rank ? (
             <button
               type="button"
               className="rep-path-topbar-rank"
@@ -500,7 +576,7 @@ export default function ProfileRep() {
               return (
                 <section key={sec.id} aria-labelledby={`rep-sec-${sec.id}`}>
                   <div
-                    className="rep-path-col"
+                    className={`rep-path-col${sec.isFrontier ? " rep-path-col--frontier" : ""}`}
                     ref={(el) => {
                       if (el) sectionRefs.current.set(sec.id, el);
                       else sectionRefs.current.delete(sec.id);
@@ -587,12 +663,17 @@ export default function ProfileRep() {
 
                     {sec.nodes.slice().reverse().map((node) => {
                       const key = `${sec.id}::${node.id}`;
+                      /* Reached + unopened + not a guest → a live chest. */
+                      const hasChest = !isGuest && node.done && node.chest;
+                      const chestReady = hasChest && !claimed.includes(node.targetRep);
+                      const chestClaimed = hasChest && !chestReady;
 
                       return (
                         <div key={node.id} className="rep-path-segment">
                           <div className={`rep-path-row rep-path-row--${node.row}`}>
                             <PathStep
-                              node={node}
+                              node={hasChest ? { ...node, chestReady, chestClaimed } : node}
+                              onOpenChest={chestReady ? () => openChestAt(node) : undefined}
                               nodeRef={(el) => {
                                 if (el) nodeRefs.current.set(key, el);
                                 else nodeRefs.current.delete(key);
@@ -602,6 +683,37 @@ export default function ProfileRep() {
                         </div>
                       );
                     })}
+
+                    {/* Frontier fog: the next stage shows through, dissolving into the
+                        page toward the top. `--rp-reveal` (0→1) lifts the veil as the
+                        climber nears it. */}
+                    {sec.isFrontier ? (
+                      <div
+                        className="rep-path-fog"
+                        style={{ "--rp-reveal": sec.reveal ?? 0 }}
+                        aria-hidden
+                      />
+                    ) : null}
+
+                    {/* Hovering unlock hint — a compact pill floating in the mist above
+                        the peek, showing how close the next reveal is. The stage's banner
+                        (below) stays identical to every other section. */}
+                    {sec.isFrontier ? (
+                      <div className="rep-path-frontier-hint">
+                        <span className="rep-path-frontier-hint__icon" aria-hidden>
+                          <Lock size={13} strokeWidth={2.4} />
+                        </span>
+                        <span className="rep-path-frontier-hint__label">
+                          {sec.repToUnlock} rep to unlock
+                        </span>
+                        <span className="rep-path-frontier-hint__track" aria-hidden>
+                          <span
+                            className="rep-path-frontier-hint__fill"
+                            style={{ width: `${Math.round((sec.reveal ?? 0) * 100)}%` }}
+                          />
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                   <div id={`rep-sec-${sec.id}`} className={`rep-path-banner rep-path-banner--${sec.bannerTone}`}>
                     <span className="rep-path-banner__label">{sec.label}</span>
@@ -641,21 +753,19 @@ export default function ProfileRep() {
                   }}
                   size={44}
                   style={{ border: "2px solid var(--bd)", margin: "0 auto 6px" }}
+                  withCosmetics
                 />
               )}
               <div className="rep-path-name">{isGuest ? "The Rep path" : fullName}</div>
               <div className="rep-path-campus">NMSU · Las Cruces</div>
-              <div
-                className="rep-path-badge"
-                style={{
-                  background: lvl.bg,
-                  color: lvl.color,
-                  borderColor: lvl.border,
-                }}
-              >
-                <Award size={13} aria-hidden />
-                {lvl.label}
-              </div>
+              {/* THE app-wide TagBadge — identical everywhere a tag shows. Your
+                  equipped tag if you've chosen one, else your current tier tag
+                  (the shared display-tag resolver). */}
+              {displayTag ? (
+                <div style={{ display: "flex", justifyContent: "center", margin: "2px 0 4px" }}>
+                  <TagBadge cosmetic={displayTag} />
+                </div>
+              ) : null}
               <div className="rep-path-score">{repScore}</div>
               <div className="rep-path-score-lbl">Rep score</div>
               <div className="rep-path-prog">
@@ -750,6 +860,7 @@ export default function ProfileRep() {
               last_name: profile?.last_name,
             }}
             size={24}
+            withCosmetics
           />
         )}
         <span className="rep-path-return-chip__pts">{repScore} pts</span>
@@ -758,6 +869,25 @@ export default function ProfileRep() {
       </button>,
       document.body
       )}
+
+      <PrizeMachineModal
+        open={!!activeChest || demoOpen}
+        demo={demoOpen && !activeChest}
+        chestType={activeChest?.type === "legendary" ? "legendary" : "standard"}
+        fixedReward={activeChest?.rewardTagId ? COSMETICS.find((c) => c.id === activeChest.rewardTagId) || null : null}
+        fixedChoices={activeChest?.fixedChoices || null}
+        onPickOption={activeChest ? (c) => pickChestOption(activeChest.targetRep, c.id) : null}
+        onSettled={() => {
+          if (activeChest) claimChest(activeChest.targetRep);
+          hydrateInventory(); // sync real ownership from the server after a grant
+        }}
+        onClose={() => {
+          setActiveChest(null);
+          setDemoOpen(false);
+        }}
+        repScore={repScore}
+        rank={rank}
+      />
     </div>
   );
 }

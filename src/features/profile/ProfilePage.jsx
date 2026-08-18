@@ -13,6 +13,7 @@ import { useProfileReviewsUrlSync } from "./hooks/useProfileReviewsUrlSync";
 import { buildActivityItems } from "./mappers/buildProfileActivityItems";
 import { refreshProfileData } from "./utils/refreshProfileData";
 import ProfilePageSkeleton from "./components/ProfilePageSkeleton";
+import { Backpack } from "lucide-react";
 import ProfileNotFound from "./components/ProfileNotFound";
 import ProfileTopBar from "./components/ProfileTopBar";
 import ProfileSettingsMenu from "./components/ProfileSettingsMenu";
@@ -286,6 +287,16 @@ export default function ProfilePage({ currentUserId }) {
       <div className="page fadein">
         <div className="topbar">
           <ProfileTopBar profileBackTarget={profileBackTarget} navigate={navigate} />
+          {/* Right-side controls: inventory + settings, grouped tight. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+          <button
+            type="button"
+            className="btn bg-btn bico"
+            aria-label="Inventory"
+            onClick={() => navigate("/inventory", { state: { returnTo: "/profile" } })}
+          >
+            <Backpack size={17} strokeWidth={2} />
+          </button>
           <ProfileSettingsMenu
             navigate={navigate}
             onLogout={handleLogout}
@@ -300,6 +311,7 @@ export default function ProfilePage({ currentUserId }) {
             onOpenBugReport={() => setBugReportOpen(true)}
             onOpenSupportReport={() => setSupportReportOpen(true)}
           />
+          </div>
         </div>
 
         <div className="scroll scroll--nav-pad scroll--fine-scrollbar">

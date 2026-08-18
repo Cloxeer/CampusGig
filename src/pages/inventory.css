@@ -1,0 +1,394 @@
+/* Inventory — Apple-Settings-style picker. Neutral surfaces, hairline rows,
+   rarity color only in swatches + small labels, green check for selection. */
+
+.invx-wrap {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 18px 16px 24px;
+}
+
+/* ---------- Live preview ---------- */
+
+.invx-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px 20px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  background: var(--bg2, #fff);
+  border: 1px solid var(--bd, #e4e4e7);
+}
+
+.invx-preview__avatar {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 72px;
+  height: 72px;
+  padding: 5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bd, #e4e4e7);
+  background: transparent;
+}
+
+.invx-preview__ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #71717a, #52525b);
+  font-size: 24px;
+  font-weight: 800;
+  color: #d4d4d8;
+  user-select: none;
+}
+
+.invx-preview__tag {
+  display: inline-flex;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--bg2, #fff);
+  border: 1.5px solid var(--bd, #e4e4e7);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg, #18181b);
+}
+
+.invx-preview__none {
+  font-size: 11.5px;
+  color: var(--fg4, #a1a1aa);
+}
+
+/* ---------- Grouped sections ---------- */
+
+/* Small collection count inside the shared ptab tab labels. */
+.invx-tabcount {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--fg4, #a1a1aa);
+}
+
+.invx-section {
+  margin-bottom: 20px;
+}
+
+.invx-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg3, #71717a);
+}
+
+.invx-section__count {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fg4, #a1a1aa);
+  font-family: var(--mono);
+}
+
+.invx-list {
+  border-radius: 14px;
+  background: var(--bg2, #fff);
+  border: 1px solid var(--bd, #e4e4e7);
+  overflow: hidden;
+}
+
+.invx-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s ease;
+}
+
+.invx-row:hover {
+  background: var(--bg3, #f4f4f5);
+}
+
+/* Inset hairline, iOS-style. */
+.invx-row + .invx-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 0;
+  height: 1px;
+  background: var(--bd, #ececee);
+}
+
+.invx-row__swatch {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+}
+
+/* Tag rows lead with THE real TagBadge — no swatch, no repeated name. */
+.invx-row__badge {
+  flex: none;
+  display: inline-flex;
+}
+
+.invx-row__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.invx-row__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg, #18181b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "?" info dot on the Default row — reveals a clean popover on hover/tap/focus. */
+.invx-hint {
+  flex: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 3px;
+  color: var(--fg4, #a1a1aa);
+  cursor: pointer;
+  border-radius: 50%;
+  outline: none;
+}
+.invx-hint:hover {
+  color: var(--fg3, #71717a);
+}
+.invx-hint:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green, #16a34a) 55%, transparent);
+}
+
+.invx-hint__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 218px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--ink, #18181b);
+  color: #fafafa;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  /* No transition on the hidden state → it vanishes INSTANTLY on hover-off.
+     The fade-in transition lives on the shown state below. */
+}
+/* Invisible bridge across the 8px gap between the dot and the popover, so moving
+   the cursor down onto the tooltip never crosses dead space (it's a child of
+   .invx-hint, so hovering it — or this bridge — keeps :hover alive; leaving both
+   hides instantly). */
+.invx-hint__pop::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+.invx-hint__pop::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 13px;
+  border: 5px solid transparent;
+  border-bottom-color: var(--ink, #18181b);
+}
+.invx-hint:hover .invx-hint__pop,
+.invx-hint:focus .invx-hint__pop,
+.invx-hint--open .invx-hint__pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.invx-row__sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fg4, #a1a1aa);
+}
+
+/* Duplicate count — stacks from repeat drops (×2, ×3…). */
+.invx-row__count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg3, #71717a);
+  font-family: var(--mono);
+  background: var(--bg3, #f4f4f5);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+/* Locked (not yet earned) — Crossy Road-style grayed gallery row. */
+.invx-row--locked {
+  cursor: default;
+}
+
+.invx-row--locked:hover {
+  background: none;
+}
+
+.invx-row--locked .invx-row__swatch,
+.invx-row--locked .invx-row__badge {
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+
+.invx-row--locked .invx-row__name {
+  color: var(--fg4, #a1a1aa);
+  font-weight: 500;
+}
+
+.invx-row--locked .invx-row__sub {
+  color: var(--fg4, #c4c4c9);
+}
+
+.invx-lock {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--fg4, #c4c4c9);
+}
+
+/* Nudge toward the Rep path when nothing is unlocked yet. */
+.invx-earn {
+  display: block;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--bd, #d4d4d8);
+  background: var(--bg3, #f4f4f5);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg2, #3f3f46);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* Selection — a single green check, Apple-style. */
+.invx-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bd, #d4d4d8);
+  color: #fff;
+  background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.invx-check--on {
+  background: var(--green, #16a34a);
+  border-color: var(--green, #16a34a);
+}
+
+/* ---------- Swatches (the only place rarity color lives) ---------- */
+
+.invx-swatch--ring {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07);
+}
+
+.invx-swatch__hole {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--bg2, #fff);
+}
+
+.invx-swatch--none {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--bd, #d4d4d8);
+}
+
+.invx-foot {
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--fg4, #a1a1aa);
+  text-align: center;
+}
+
+/* ---------- Empty state ---------- */
+
+.invx-empty {
+  max-width: 300px;
+  margin: 64px auto 0;
+  text-align: center;
+}
+
+.invx-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 14px;
+  background: var(--bg3, #f4f4f5);
+  color: var(--fg3, #71717a);
+}
+
+.invx-empty__title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg, #18181b);
+}
+
+.invx-empty__sub {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--fg3, #71717a);
+  line-height: 1.5;
+}

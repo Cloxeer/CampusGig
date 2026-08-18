@@ -12,7 +12,7 @@ function PersonCard({ user, label, onClick }) {
       <UserAvatar user={user} size="lg" style={{ border: "2px solid var(--bd)" }} />
       <div className="gig-detail-person-card__name">{name}</div>
       <div className="gig-detail-person-card__role">{label}</div>
-      <LevelBadge label={lvl.label} />
+      <LevelBadge label={lvl.label} userId={user.id} />
       <div className="gig-detail-person-card__link">View Profile ›</div>
     </button>
   );
@@ -24,7 +24,7 @@ function PosterRow({ poster, posterName, posterLevel, onClick }) {
       <UserAvatar user={poster} size={40} />
       <div style={{ flex: 1 }}>
         <div className="gig-detail-poster-row__name">{posterName}</div>
-        <LevelBadge label={posterLevel.label} />
+        <LevelBadge label={posterLevel.label} userId={poster?.id} />
       </div>
       <span style={{ fontSize: 14, color: "var(--fg4)" }}>›</span>
     </div>

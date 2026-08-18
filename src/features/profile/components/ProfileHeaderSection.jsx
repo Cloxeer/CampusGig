@@ -27,21 +27,17 @@ export default function ProfileHeaderSection({
         size="xl"
         style={{ border: "2px solid var(--bd)" }}
         zoomable
+        withCosmetics={isOwnProfile}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.03em", marginBottom: 2 }}>{fullName}</div>
-        {isOwnProfile ? (
-          <div style={{ fontSize: 11, color: "var(--fg3)", fontFamily: "var(--mono)", marginBottom: 2 }}>
-            {profile.email}
-          </div>
-        ) : null}
         {joinedLabel && (
-          <div style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)", marginBottom: 6, marginTop: isOwnProfile ? 0 : 2 }}>
+          <div style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)", marginBottom: 6, marginTop: 2 }}>
             Joined {joinedLabel}
           </div>
         )}
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-          <LevelBadge label={lvl.label} />
+          <LevelBadge label={lvl.label} userId={profile?.id} />
         </div>
       </div>
       {reviewsLoading ? (
@@ -51,15 +47,21 @@ export default function ProfileHeaderSection({
           style={{ textAlign: "right", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
           onClick={() => openReviews()}
         >
-          <Stars rating={parseFloat(avgRating)} size={13} />
-          <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--mono)", letterSpacing: "-.03em", marginTop: 2 }}>
-            {avgRating}
-          </div>
-          <div style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
-            {reviews.length > 0
-              ? `${reviews.length} review${reviews.length !== 1 ? "s" : ""}`
-              : "No reviews"}
-          </div>
+          {reviews.length > 0 ? (
+            <>
+              <Stars rating={parseFloat(avgRating)} size={13} />
+              <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--mono)", letterSpacing: "-.03em", marginTop: 2 }}>
+                {avgRating}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--fg3)", fontFamily: "var(--mono)" }}>
+                {`${reviews.length} review${reviews.length !== 1 ? "s" : ""}`}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 11, color: "var(--fg4)", fontFamily: "var(--mono)", padding: "6px 0 2px" }}>
+              No reviews
+            </div>
+          )}
           {isOwnProfile ? (
             <div style={{ fontSize: 10, color: "var(--fg4)", fontFamily: "var(--mono)" }}>tap to view</div>
           ) : (hasPendingReview || myReviewsToThemLength > 0) ? (

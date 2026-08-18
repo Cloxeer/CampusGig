@@ -197,10 +197,14 @@ export async function updateMyProfile(updates) {
   }
 
   if (Object.keys(privatePatch).length > 0) {
+    /* UPSERT, not UPDATE: a plain .update().eq() silently affects ZERO rows
+       (no error) when the contact row doesn't exist yet — which happens for
+       accounts created without one (e.g. clients). That read back as "saved"
+       while persisting nothing. Upsert creates the row if missing, updates it
+       otherwise. `email` is included so the insert path satisfies NOT NULL. */
     const { error: pErr } = await supabase
       .from("user_private_contact")
-      .update(privatePatch)
-      .eq("user_id", user.id);
+      .upsert({ user_id: user.id, email: user.email, ...privatePatch }, { onConflict: "user_id" });
     if (pErr) return { profile: null, error: toFriendlyError(pErr) };
   }
 

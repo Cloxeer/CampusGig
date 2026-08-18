@@ -26,6 +26,8 @@ export const queryKeys = {
   leaderboard: (limit) => ["leaderboard", limit],
   myActivity: ["myActivity"],
   accountDeletion: ["accountDeletion"],
+  /** Public marketing stats on the welcome/splash screen (get_public_stats RPC). */
+  publicStats: ["publicStats"],
   /** Public `/profile/:userId` bundle (profile + reviews + activity + stats). */
   userProfilePage: (userId) => ["userProfilePage", userId],
   /** Full gig + requests for unified gig detail page (getGigDetail). */

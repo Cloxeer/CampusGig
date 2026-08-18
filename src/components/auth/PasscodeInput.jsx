@@ -1,4 +1,4 @@
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
 
 const SLOT_COUNT = 6;
 
@@ -15,6 +15,9 @@ export default function PasscodeInput({ value, onChange, id: idProp, disabled = 
   const autoId = useId();
   const id = idProp ?? autoId;
   const inputRef = useRef(null);
+  /* The caret ring should only show while the (invisible) input REALLY has
+     focus — otherwise the first box looks selected before the user ever taps. */
+  const [focused, setFocused] = useState(false);
 
   const digits = String(value ?? "").replace(/\D/g, "").slice(0, SLOT_COUNT);
 
@@ -35,7 +38,7 @@ export default function PasscodeInput({ value, onChange, id: idProp, disabled = 
         </span>
         {Array.from({ length: SLOT_COUNT }, (_, i) => {
           const filled = i < digits.length;
-          const active = !disabled && digits.length < SLOT_COUNT && i === digits.length;
+          const active = focused && !disabled && digits.length < SLOT_COUNT && i === digits.length;
           return (
             <div
               key={i}
@@ -56,6 +59,8 @@ export default function PasscodeInput({ value, onChange, id: idProp, disabled = 
           autoComplete="one-time-code"
           value={digits}
           onChange={handleChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           disabled={disabled}
           aria-label={label}
         />

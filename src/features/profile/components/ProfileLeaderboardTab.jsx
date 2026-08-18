@@ -44,6 +44,7 @@ export default function ProfileLeaderboardTab({
           <UserAvatar
             user={{ resolvedAvatarUrl: p.avatarUrl, avatar_color: p.color, first_name: p.initials?.[0], last_name: p.initials?.[1] }}
             size={32}
+            withCosmetics={p.isYou}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
@@ -62,7 +63,7 @@ export default function ProfileLeaderboardTab({
                 gap: 6,
               }}
             >
-              <LevelBadge label={getLevel(p.rep).label} small />
+              <LevelBadge label={getLevel(p.rep).label} userId={p.userId} small />
             </div>
           </div>
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg2)", fontFamily: "var(--mono)", flexShrink: 0 }}>
@@ -98,6 +99,7 @@ export default function ProfileLeaderboardTab({
             <UserAvatar
               user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile.avatar_color, first_name: profile.first_name, last_name: profile.last_name }}
               size={32}
+              withCosmetics
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>
@@ -114,7 +116,7 @@ export default function ProfileLeaderboardTab({
                   gap: 6,
                 }}
               >
-                <LevelBadge label={lvl.label} small />
+                <LevelBadge label={lvl.label} userId={profile?.id} small />
               </div>
             </div>
             <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg2)", fontFamily: "var(--mono)", flexShrink: 0 }}>

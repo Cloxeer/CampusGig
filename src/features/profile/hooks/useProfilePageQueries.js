@@ -29,20 +29,26 @@ export function useProfilePageQueries(routeUserId) {
 
   const profile = profileData?.profile || null;
 
+  // These 5 don't depend on the profile row (each resolves auth internally), so
+  // they must NOT wait behind the profile request — gate only on self-profile so
+  // they fire in parallel with it. 7 concurrent requests ≈ one bundle's latency,
+  // while each stays its own shared source-of-truth key (no drift hole).
   const { data: reviewsData, isPending: reviewsPending } = useQuery({
     queryKey: queryKeys.myReviews,
     queryFn: getMyReviews,
-    enabled: !isOtherProfile && !!profile,
+    enabled: !isOtherProfile,
     staleTime: STATS_STALE_TIME,
   });
 
   const { data: gigStatsData } = useQuery({
     queryKey: queryKeys.myGigStats,
     queryFn: getMyGigStats,
-    enabled: !isOtherProfile && !!profile,
+    enabled: !isOtherProfile,
     staleTime: STATS_STALE_TIME,
   });
 
+  // campusRank is the ONE that genuinely needs profile fields (rep_score,
+  // created_at), so it stays gated on the profile resolving first.
   const { data: rankData } = useQuery({
     queryKey: queryKeys.campusRank,
     queryFn: () => getCampusRank(profile?.rep_score || 0, profile?.created_at),
@@ -53,21 +59,21 @@ export function useProfilePageQueries(routeUserId) {
   const { data: totalUsersData } = useQuery({
     queryKey: queryKeys.totalUsers,
     queryFn: getTotalUsers,
-    enabled: !isOtherProfile && !!profile,
+    enabled: !isOtherProfile,
     staleTime: 10 * 60 * 1000,
   });
 
   const { data: leaderboardData } = useQuery({
     queryKey: queryKeys.leaderboard(100),
     queryFn: () => getLeaderboard(100),
-    enabled: !isOtherProfile && !!profile,
+    enabled: !isOtherProfile,
     staleTime: STATS_STALE_TIME,
   });
 
   const { data: activityData, isPending: activityPending } = useQuery({
     queryKey: queryKeys.myActivity,
     queryFn: getMyActivity,
-    enabled: !isOtherProfile && !!profile,
+    enabled: !isOtherProfile,
     staleTime: STATS_STALE_TIME,
   });
 

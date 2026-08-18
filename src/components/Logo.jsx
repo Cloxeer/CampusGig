@@ -1,4 +1,5 @@
-export const LOGO_MARK_SRC = "/photos/favicon.ico";
+/* PNG, not the multi-size .ico — .ico renders unreliably in an inline <img>. */
+export const LOGO_MARK_SRC = "/photos/favicon-32x32.png";
 
 export default function Logo({ size = 15 }) {
   return (

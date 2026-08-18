@@ -120,13 +120,12 @@ export default function EditProfile() {
     setSaving(true);
 
     try {
+      /* Try the photo, but a failure must NOT block the rest of the form —
+         we capture the error and still save everything else below. */
+      let photoError = null;
       if (avatarFile) {
         const { error: avatarError } = await uploadAvatar(avatarFile);
-        if (avatarError) {
-          setError(`Photo upload failed: ${avatarError.message}`);
-          setSaving(false);
-          return;
-        }
+        if (avatarError) photoError = avatarError;
       }
 
       const { error: updateError } = await updateMyProfile({
@@ -141,7 +140,17 @@ export default function EditProfile() {
         return;
       }
 
+      /* Phone + contacts are saved regardless of the photo. */
       queryClient.invalidateQueries({ queryKey: queryKeys.myProfile });
+
+      if (photoError) {
+        /* Keep the user here with the photo error visible (and retryable)
+           rather than navigating away. */
+        setError(`Photo upload failed: ${photoError.message}`);
+        setSaving(false);
+        return;
+      }
+
       navigate(returnTo);
     } catch (err) {
       setError(err.message || "Something went wrong.");

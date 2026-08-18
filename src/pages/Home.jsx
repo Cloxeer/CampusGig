@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { Search, Award } from "lucide-react";
+import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile, getAvatarUrl } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
@@ -10,6 +10,7 @@ import { useLegacyGigRedirect } from "../hooks/useLegacyGigRedirect";
 import Logo, { LogoMark } from "../components/Logo";
 import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
+import ProfileRepCard from "../features/profile/components/ProfileRepCard";
 
 const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
 
@@ -122,6 +123,7 @@ export default function Home({ currentUserId }) {
                 <UserAvatar
                   user={{ resolvedAvatarUrl: avatarUrl, avatar_color: profile?.avatar_color, first_name: profile?.first_name, last_name: profile?.last_name }}
                   size="sm"
+                  withCosmetics
                 />
               </div>
             </>
@@ -134,87 +136,14 @@ export default function Home({ currentUserId }) {
       </div>
 
       <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
-        {isAuthed ? (
         <div style={{ margin: "14px 16px 0" }}>
-          <div
-            className="rep-card"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/profile/rep", { state: { returnTo: "/" } })}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                navigate("/profile/rep", { state: { returnTo: "/" } });
-              }
-            }}
-          >
-            <div className="rc-ey">Rep path · tap to open</div>
-            <div className="rc-row">
-              <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-                <span className="rc-score">{repScore}</span>
-                <span className="rc-pts">pts</span>
-              </div>
-              <div className="rc-badge" style={{ background: lvl.bg, color: lvl.color, borderColor: lvl.border }}>
-                <Award size={10} /> {lvl.label}
-              </div>
-            </div>
-            <div className="rc-track">
-              <div className="rc-fill" style={{ width: `${lvl.pct}%`, background: lvl.color }} />
-            </div>
-            <div className="rc-labels">
-              {["New", "Reliable", "Trusted", "Legend"].map((l) => (
-                <span key={l} className="rc-lbl" style={lvl.label === l ? { color: lvl.color, fontWeight: 600 } : undefined}>
-                  {l}
-                </span>
-              ))}
-            </div>
-            <div className="rc-footer">
-              {lvl.next ? (
-                <>
-                  +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +8 marking done · +10 as taker · +2 per post
-                </>
-              ) : (
-                "Max level reached"
-              )}
-            </div>
-          </div>
+          <ProfileRepCard
+            variant={isAuthed ? "self" : "guest"}
+            repScore={repScore}
+            lvl={lvl}
+            onRepPath={() => navigate("/profile/rep", { state: { returnTo: "/" } })}
+          />
         </div>
-        ) : (
-        <div style={{ margin: "14px 16px 0" }}>
-          <div
-            className="rep-card"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/profile/rep", { state: { returnTo: "/" } })}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                navigate("/profile/rep", { state: { returnTo: "/" } });
-              }
-            }}
-          >
-            <div className="rc-ey">Rep path · tap to explore</div>
-            <div style={{ fontSize: 19, fontWeight: 700, color: "var(--green)", letterSpacing: "-.025em", margin: "4px 0 7px", lineHeight: 1.18 }}>
-              Post a task — a verified student gets it done.
-            </div>
-            <div style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55, marginBottom: 16 }}>
-              Anyone can post work. Verified NMSU students take it on and earn rep on every job.
-            </div>
-            <div className="rc-track">
-              <div className="rc-fill" style={{ width: "12%", background: "var(--green)" }} />
-            </div>
-            <div className="rc-labels">
-              {["New", "Reliable", "Trusted", "Legend"].map((l) => (
-                <span key={l} className="rc-lbl">
-                  {l}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-        )}
 
         <div style={{ padding: "0 16px" }}>
           <div className="tabs" style={{ margin: "14px -16px 0", padding: "0 16px" }}>

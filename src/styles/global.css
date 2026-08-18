@@ -621,10 +621,13 @@ body {
   letter-spacing: .01em;
 }
 .bn { background: var(--bg3); color: var(--fg3); border: 1px solid var(--bd); }
-.lv-new { background: var(--bg3); color: var(--fg3); border: 1px solid var(--bd); }
-.lv-reliable { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-.lv-trusted { background: var(--green-bg); color: var(--green-text); border: 1px solid var(--green-bd); }
-.lv-legend { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
+/* Tier badge colors = the rarity colors of each tier's earned tag (see
+   REP_LEVELS / TIER_TAGS): New=common green, Reliable=rare blue, Trusted=epic
+   purple, Legend=legendary gold. */
+.lv-new { background: #ecfdf5; color: #16a34a; border: 1px solid #a7f3d0; }
+.lv-reliable { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.lv-trusted { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
+.lv-legend { background: #fefce8; color: #ca8a04; border: 1px solid #fde68a; }
 
 /* ── DIVIDERS ──────────────────────────────────────────────── */
 .sep { height: 1px; background: var(--bd); flex-shrink: 0; }

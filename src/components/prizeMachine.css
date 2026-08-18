@@ -1,0 +1,942 @@
+/* Prize Machine modal — Crossy Road-style voxel vending machine (pure CSS 3D)
+   + action-burst reveal. Flat per-face "voxel lighting": top lightest, front mid,
+   right darkest. Rarity theming flows through --pm-color / --pm-glow. */
+
+.pm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --pm-color: #16a34a;
+  --pm-glow: rgba(22, 163, 74, 0.55);
+}
+
+.pm-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(9, 9, 11, 0.6);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  cursor: default;
+  animation: pm-fade-in 0.22s ease;
+  transition: background 0.35s ease;
+}
+
+/* Win screen: deepen the room so the sunburst carries. */
+.pm-overlay--burst .pm-backdrop {
+  background: rgba(9, 9, 11, 0.8);
+}
+
+@keyframes pm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pm-confetti {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Rarity box(es) — shuffle with the lamps, lock on the roll. Legendary stacks
+   three (one per ball); the stack owns the screen position. */
+.pm-rarity-stack {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: 14px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pm-rarity-box {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 84px;
+  padding: 5px 13px 6px;
+  border-radius: 11px;
+  background: #fff;
+  border: 2px solid #e4e4e7;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.pm-rarity-box__eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  line-height: 1.2;
+}
+
+.pm-rarity-box__value {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #18181b;
+  line-height: 1.2;
+}
+
+.pm-close {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: rgba(24, 24, 27, 0.55);
+  color: #fafafa;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.pm-close:hover {
+  background: rgba(39, 39, 42, 0.8);
+  transform: scale(1.05);
+}
+
+.pm-stage {
+  position: relative;
+  z-index: 2;
+  width: min(92vw, 360px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+}
+
+.pm-title {
+  margin-bottom: 26px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(250, 250, 250, 0.92);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.pm-machine-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ---------- Voxel machine (CSS 3D, dimetric corner view) ---------- */
+
+.pm3-scene {
+  position: relative;
+  width: 260px;
+  height: 300px;
+  perspective: 1000px;
+  perspective-origin: 50% 30%;
+}
+
+.pm3-rig {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  margin-left: -75px; /* half of box width */
+  transform-style: preserve-3d;
+}
+
+/* Rarity lamp — dome light on the roof. Color/glow driven by Motion via
+   backgroundColor + currentColor (the shuffle → lock sequence). */
+.pm3-lamp {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  z-index: 6;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.85);
+  background: #a1a1aa;
+  color: #a1a1aa;
+  box-shadow:
+    0 0 12px 3px color-mix(in srgb, currentColor 65%, transparent),
+    inset -2px -3px 0 rgba(0, 0, 0, 0.16);
+}
+
+/* lamp stem: small mount connecting the dome to the roof */
+.pm3-lamp::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 10px;
+  height: 7px;
+  margin-left: -5px;
+  border-radius: 2px 2px 0 0;
+  background: #991b1b;
+}
+
+/* Each box is a stacked cuboid: its div is the layout slot; the three faces
+   (front / right / top) are absolutely placed planes. Flat voxel lighting:
+   top lightest, front mid, right darkest — never gradients inside a face. */
+.pm3-box {
+  position: relative;
+  width: 150px;
+  transform-style: preserve-3d;
+}
+
+.pf {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+/* shared cuboid geometry: width 150, depth 100 */
+.pf-front {
+  width: 150px;
+  transform: translate(-50%, -50%) translateZ(50px);
+}
+
+.pf-right {
+  width: 100px;
+  transform: translate(-50%, -50%) rotateY(90deg) translateZ(75px);
+}
+
+.pf-top {
+  width: 150px;
+  height: 100px;
+  transform: translate(-50%, -50%) rotateX(90deg) translateZ(var(--half-h, 10px));
+}
+
+/* Roof — overhanging slab */
+.pm3-roof {
+  height: 20px;
+  width: 162px;
+  margin: 0 -6px;
+  z-index: 4;
+}
+
+.pm3-roof .pf-front {
+  width: 162px;
+  height: 20px;
+  background: #dc2626;
+  border-radius: 3px 3px 0 0;
+  transform: translate(-50%, -50%) translateZ(56px);
+}
+
+.pm3-roof .pf-right {
+  width: 112px;
+  height: 20px;
+  background: #991b1b;
+  transform: translate(-50%, -50%) rotateY(90deg) translateZ(81px);
+}
+
+.pm3-roof .pf-top {
+  width: 162px;
+  height: 112px;
+  background: #f87171;
+  border-radius: 4px;
+  --half-h: 10px;
+}
+
+/* Glass dome */
+.pm3-glass {
+  height: 100px;
+}
+
+.pm3-glass .pf-front {
+  height: 100px;
+  background: rgba(191, 219, 254, 0.72);
+  border-left: 3px solid rgba(248, 250, 252, 0.9);
+  border-right: 3px solid rgba(248, 250, 252, 0.9);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pm3-glass .pf-right {
+  height: 100px;
+  background: rgba(147, 197, 253, 0.62);
+}
+
+.pm3-glass .pf-top {
+  background: rgba(219, 234, 254, 0.8);
+  --half-h: 50px;
+  visibility: hidden; /* covered by the roof slab */
+}
+
+.pm3-dots {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px 8px;
+}
+
+.pm3-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset -3px -4px 0 rgba(0, 0, 0, 0.14);
+}
+
+/* Body */
+.pm3-body {
+  height: 112px;
+}
+
+.pm3-body .pf-front {
+  height: 112px;
+  background: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.pm3-body .pf-right {
+  height: 112px;
+  background: #b91c1c;
+}
+
+.pm3-dial {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #fafafa;
+  border: 3px solid #d4d4d8;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+  display: grid;
+  place-items: center;
+}
+
+.pm3-dial__bar {
+  width: 9px;
+  height: 26px;
+  border-radius: 5px;
+  background: #52525b;
+}
+
+.pm3-chute {
+  width: 50px;
+  height: 42px;
+  border-radius: 8px;
+  background: #7f1d1d;
+  box-shadow: inset 0 6px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Base slab */
+.pm3-base {
+  height: 16px;
+  width: 162px;
+  margin: 0 -6px;
+}
+
+.pm3-base .pf-front {
+  width: 162px;
+  height: 16px;
+  background: #3f3f46;
+  border-radius: 0 0 4px 4px;
+  transform: translate(-50%, -50%) translateZ(56px);
+}
+
+.pm3-base .pf-right {
+  width: 112px;
+  height: 16px;
+  background: #27272a;
+  transform: translate(-50%, -50%) rotateY(90deg) translateZ(81px);
+}
+
+.pm3-base .pf-top {
+  width: 162px;
+  height: 112px;
+  background: #52525b;
+  --half-h: 8px;
+  visibility: hidden; /* covered by the body */
+}
+
+/* Soft ground shadow so the machine sits, not floats. */
+.pm3-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 190px;
+  height: 30px;
+  margin-left: -95px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.4) 0%, transparent 70%);
+}
+
+/* Dispensed capsule (2D sprite in front of the scene, near the chute exit). */
+.pm-capsule {
+  position: absolute;
+  left: 50%;
+  bottom: 88px;
+  margin-left: -21px; /* centered under the chute in the dimetric view */
+  width: 46px;
+  height: 46px;
+  z-index: 6;
+  transform-origin: 50% 100%; /* squash happens against the ground */
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
+}
+
+.pm-capsule__top,
+.pm-capsule__bottom {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  display: block;
+}
+
+.pm-capsule__top {
+  top: 0;
+  border-radius: 46px 46px 0 0;
+  background: var(--pm-capsule, #22c55e);
+}
+
+.pm-capsule__bottom {
+  bottom: 0;
+  border-radius: 0 0 46px 46px;
+  background: #fafafa;
+}
+
+.pm-capsule__shine {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  width: 12px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transform: rotate(-24deg);
+}
+
+.pm-open-btn {
+  margin-top: 18px;
+  min-width: 190px;
+  padding: 13px 26px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow:
+    0 6px 0 #15803d,
+    0 14px 26px rgba(0, 0, 0, 0.35);
+  transition: filter 0.15s ease;
+}
+
+.pm-open-btn:hover {
+  filter: brightness(1.06);
+}
+
+.pm-open-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 4px 0 #15803d,
+    0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.pm-open-btn--ghost {
+  background: rgba(63, 63, 70, 0.6);
+  box-shadow: none;
+  color: rgba(250, 250, 250, 0.75);
+  pointer-events: none;
+}
+
+/* ---------- The action burst ---------- */
+
+.pm-burst {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 500px;
+}
+
+/* Invisible counterweight above the eyebrow, balancing the actions below,
+   so the TAG sits at the true center — same center as the sunburst. */
+.pm-burst::before {
+  content: "";
+  flex: none;
+  height: 84px;
+}
+
+/* The 3-choice column is taller and has no actions below — no counterweight. */
+.pm-burst--choices::before {
+  height: 0;
+}
+
+/* Type header above the tag — rarity is spoken through color, not a badge. */
+.pm-prize-eyebrow {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 22px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(250, 250, 250, 0.85);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+}
+
+/* Full-screen sunburst wheel — the Crossy Road "you won" light show. Sits above
+   the backdrop, below the stage/confetti. Clean flat rays in the rarity tint. */
+.pm-sunburst {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Absolutely centered via negative margins — an oversized item in a grid cell
+   overflows toward the bottom-right instead of centering, and a translate
+   transform would be clobbered by the rotate keyframe. */
+.pm-sunburst__wheel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 230vmax;
+  height: 230vmax;
+  margin: -115vmax 0 0 -115vmax;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--pm-glow) 0deg 9deg,
+    transparent 9deg 22.5deg
+  );
+  opacity: 0.4;
+  animation: pm-spin 26s linear infinite;
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.75) 30%, rgba(0, 0, 0, 0.35) 60%);
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.75) 30%, rgba(0, 0, 0, 0.35) 60%);
+}
+
+@keyframes pm-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Impact frame: one-shot full-screen flash at the pop. */
+.pm-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  background: color-mix(in srgb, var(--pm-color) 30%, #fff);
+  pointer-events: none;
+}
+
+/* Expanding shockwave ring from the medal center. */
+.pm-shockwave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px; /* centered on the prize (lives inside .pm-prize) */
+  border-radius: 50%;
+  border: 4px solid var(--pm-color);
+  box-shadow: 0 0 24px var(--pm-glow);
+  pointer-events: none;
+}
+
+/* Twinkling sparkles around the medal. */
+.pm-sparkle {
+  position: absolute;
+  z-index: 2;
+  color: var(--pm-color);
+  text-shadow: 0 0 12px var(--pm-glow);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.pm-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px; /* centered on the prize (lives inside .pm-prize) */
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--pm-glow) 0%, transparent 65%);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+.pm-shell {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: 44px;
+  height: 24px;
+  margin-left: -22px;
+  pointer-events: none;
+}
+
+.pm-shell--top {
+  border-radius: 44px 44px 0 0;
+  background: var(--pm-capsule, #22c55e);
+}
+
+.pm-shell--bottom {
+  border-radius: 0 0 44px 44px;
+  background: #fafafa;
+}
+
+.pm-prize {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 18px;
+}
+
+/* The tag itself — a clean square pill with TWO strokes (border + offset
+   outline in the rarity color), exactly how it will look equipped on a profile. */
+.pm-prize__tag {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 28px;
+  border-radius: 18px;
+  background: #fff;
+  border: 3px solid var(--pm-color);
+  outline: 3px solid var(--pm-color);
+  outline-offset: 5px;
+  box-shadow:
+    0 0 44px var(--pm-glow),
+    0 18px 34px rgba(0, 0, 0, 0.45);
+}
+
+/* Avatar-border reveal: the ring is the star, modeled on a neutral "?" avatar. */
+.pm-prize__border {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.pm-avatar-ring {
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  padding: 9px; /* the visible ring band */
+  border-radius: 50%;
+  box-shadow:
+    0 0 44px var(--pm-glow),
+    0 18px 34px rgba(0, 0, 0, 0.45);
+}
+
+.pm-avatar-ring__ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #52525b, #3f3f46);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-size: 46px;
+  font-weight: 800;
+  color: #a1a1aa;
+  line-height: 1;
+  user-select: none;
+}
+
+.pm-prize__border-name {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fafafa;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.pm-prize__tag-name {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #18181b;
+  white-space: nowrap;
+}
+
+/* Legendary pick-one-of-three: three tags hover, each in its own rarity.
+   All pills share ONE width (sized for the longest name) so the stack reads
+   as a clean set — emoji anchored left, name anchored right. */
+.pm-choices {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Each pill's OUTER stroke extends ~7px past its box (3px outline + 4px
+     offset). 28px keeps clear daylight between outer strokes, even mid-repel. */
+  gap: 28px;
+  width: 100%;
+}
+
+.pm-choice {
+  width: min(80vw, 274px);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pm-choice__repel {
+  display: block;
+  width: 100%;
+}
+
+.pm-choice__inner {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 12px 28px;
+  min-height: 61px; /* same pill height whether it holds a tag or a border */
+  border-radius: 16px;
+  background: #fff;
+  border: 3px solid var(--choice-color, #16a34a);
+  outline: 3px solid var(--choice-color, #16a34a);
+  outline-offset: 4px;
+  box-shadow:
+    0 0 30px var(--choice-glow, rgba(22, 163, 74, 0.55)),
+    0 12px 26px rgba(0, 0, 0, 0.4);
+}
+
+/* Mini avatar-border preview inside a choice pill. */
+.pm-choice__ring {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 3.5px;
+  border-radius: 50%;
+}
+
+.pm-choice__ring-ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #52525b, #3f3f46);
+  font-size: 13px;
+  font-weight: 800;
+  color: #a1a1aa;
+  line-height: 1;
+}
+
+.pm-choice__name {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #18181b;
+  white-space: nowrap;
+}
+
+.pm-choice:focus-visible .pm-choice__inner {
+  outline-width: 4px;
+}
+
+.pm-actions {
+  position: relative;
+  z-index: 2;
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.pm-actions__row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* Guest-demo outro: plain-spoken "nothing was banked" line above the button. */
+.pm-demo-note {
+  max-width: 300px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* Secondary action: collect without wearing it. */
+.pm-collect {
+  min-width: 120px;
+  padding: 13px 22px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(24, 24, 27, 0.55);
+  color: #fafafa;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pm-collect:hover {
+  background: rgba(39, 39, 42, 0.75);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.pm-collect:active {
+  transform: translateY(1px);
+}
+
+.pm-continue {
+  min-width: 140px;
+  padding: 13px 30px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fafafa, #e4e4e7);
+  color: #18181b;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow:
+    0 5px 0 #a1a1aa,
+    0 14px 26px rgba(0, 0, 0, 0.35);
+  transition: filter 0.15s ease;
+}
+
+.pm-continue:hover {
+  filter: brightness(1.04);
+}
+
+.pm-continue:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 3px 0 #a1a1aa,
+    0 10px 18px rgba(0, 0, 0, 0.3);
+}
+
+.pm-again {
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  color: rgba(250, 250, 250, 0.6);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pm-again:hover {
+  color: rgba(250, 250, 250, 0.85);
+}
+
+/* ---------- Leave confirmation ---------- */
+
+.pm-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.pm-confirm__dim {
+  position: absolute;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(9, 9, 11, 0.45);
+  cursor: default;
+}
+
+.pm-confirm__card {
+  position: relative;
+  width: min(88vw, 320px);
+  padding: 18px 18px 16px;
+  border-radius: 16px;
+  background: var(--bg2, #fff);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.pm-confirm__title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg, #18181b);
+}
+
+.pm-confirm__sub {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fg3, #71717a);
+}
+
+.pm-confirm__row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.pm-confirm__stay,
+.pm-confirm__leave {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pm-confirm__stay {
+  border: 1px solid var(--bd, #e4e4e7);
+  background: var(--bg, #fafafa);
+  color: var(--fg, #18181b);
+}
+
+.pm-confirm__leave {
+  border: none;
+  background: #18181b;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-sunburst__wheel {
+    animation: none;
+  }
+  .pm-backdrop {
+    animation: none;
+  }
+}

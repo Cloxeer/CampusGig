@@ -305,7 +305,7 @@ export default function ReviewSheetModal({
                       : undefined
                   }
                 >
-                  <UserAvatar user={reviewer} size={34} />
+                  <UserAvatar user={{ id: rid, ...reviewer }} size={34} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)" }}>

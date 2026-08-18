@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, Search, Handshake, Star, ArrowLeft, ArrowRight, LogIn, Briefcase, Users, CheckCircle } from "lucide-react";
 import Logo, { LogoMark } from "../components/Logo";
-import { getPublicStats, getCachedPublicStats, subscribePublicStats } from "../lib/profile";
+import { getPublicStats, subscribePublicStats, PUBLIC_STATS_EMPTY } from "../lib/profile";
+import { queryKeys } from "../lib/queryClient";
 import { useCountUp } from "../hooks/useCountUp";
 
 const SLIDES = [
@@ -27,30 +29,28 @@ export default function Splash() {
   const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [slide, setSlide] = useState(0);
-  /* Instant paint from last-known numbers; then a fresh read + a live
-     subscription so open pages tick in real time as gigs/accounts land. */
-  const [stats, setStats] = useState(
-    () => getCachedPublicStats() || { totalPostings: 0, completed: 0, accounts: 0 }
-  );
+  const queryClient = useQueryClient();
+  /* Shared React Query cache: instant paint from the persisted last-known value,
+     then a background revalidate. staleTime 0 so a fresh read fires on mount. */
+  const { data: stats = PUBLIC_STATS_EMPTY } = useQuery({
+    queryKey: queryKeys.publicStats,
+    queryFn: getPublicStats,
+    staleTime: 0,
+  });
   /* Staggered odometer sweeps — each stat lands a beat after the previous.
      Live updates sweep from the current value, not from zero. */
   const totalPostings = useCountUp(stats.totalPostings, { delay: 120 });
   const completed = useCountUp(stats.completed, { delay: 260 });
   const accounts = useCountUp(stats.accounts, { delay: 400 });
 
+  /* Live subscription writes straight into the shared cache so the odometers
+     tick in real time as gigs/accounts land. */
   useEffect(() => {
-    let alive = true;
-    getPublicStats().then((v) => {
-      if (alive) setStats(v);
-    });
     const unsubscribe = subscribePublicStats((v) => {
-      if (alive) setStats(v);
+      queryClient.setQueryData(queryKeys.publicStats, v);
     });
-    return () => {
-      alive = false;
-      unsubscribe();
-    };
-  }, []);
+    return unsubscribe;
+  }, [queryClient]);
 
   if (showTutorial) {
     const s = SLIDES[slide];

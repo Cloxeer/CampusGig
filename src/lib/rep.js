@@ -78,9 +78,7 @@ export async function getTotalUsers() {
   return { total: count || 0, error };
 }
 
-const PUBLIC_STATS_CACHE_KEY = "cg_public_stats_v1";
-/** De-dupes concurrent callers into one network request. */
-let publicStatsInFlight = null;
+export const PUBLIC_STATS_EMPTY = { totalPostings: 0, completed: 0, accounts: 0 };
 
 function mapPublicStatsRow(row) {
   return {
@@ -90,47 +88,19 @@ function mapPublicStatsRow(row) {
   };
 }
 
-function persistPublicStats(value) {
-  try {
-    localStorage.setItem(PUBLIC_STATS_CACHE_KEY, JSON.stringify({ t: Date.now(), v: value }));
-  } catch {
-    /* storage full/blocked — cache is best-effort */
-  }
-}
-
-/** Last-known stats for instant first paint (may be stale; always revalidated). */
-export function getCachedPublicStats() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PUBLIC_STATS_CACHE_KEY) || "null");
-    return parsed?.v || null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Fresh marketing stats. Server-side this is a single-row read of a
  * trigger-maintained stats table (no live counting per visitor); the private
  * wrapper keeps anon away from row-level gig/user data (migration 20260814000001).
+ *
+ * Instant-paint + revalidate + concurrent-call de-dupe are all provided by the
+ * shared React Query cache now (queryKeys.publicStats, persisted to localStorage),
+ * so this is just the raw fetch — no bespoke localStorage cache anymore.
  */
 export async function getPublicStats() {
-  if (!publicStatsInFlight) {
-    publicStatsInFlight = (async () => {
-      const { data } = await supabase.rpc("get_public_stats");
-      const row = Array.isArray(data) ? data[0] : data;
-      const value = mapPublicStatsRow(row);
-      persistPublicStats(value);
-      return value;
-    })().finally(() => {
-      publicStatsInFlight = null;
-    });
-  }
-
-  try {
-    return await publicStatsInFlight;
-  } catch {
-    return getCachedPublicStats() || { totalPostings: 0, completed: 0, accounts: 0 };
-  }
+  const { data } = await supabase.rpc("get_public_stats");
+  const row = Array.isArray(data) ? data[0] : data;
+  return mapPublicStatsRow(row);
 }
 
 /**
@@ -146,9 +116,7 @@ export function subscribePublicStats(onChange) {
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "public_stats" },
       (payload) => {
-        const value = mapPublicStatsRow(payload.new);
-        persistPublicStats(value);
-        onChange(value);
+        onChange(mapPublicStatsRow(payload.new));
       }
     )
     .subscribe();
