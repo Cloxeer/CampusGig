@@ -5,6 +5,7 @@ import CosmeticRing from "./CosmeticRing";
 import { COSMETICS } from "../data/cosmetics";
 import { getInventory, subscribeInventory } from "../lib/cosmeticsInventory";
 import { useRegisteredEquipped } from "../lib/equippedRegistry";
+import { useSelfAvatarUrl } from "../lib/selfAvatar";
 import { isSelfId } from "../lib/selfUid";
 
 const SIZES = { xs: 22, sm: 30, md: 36, lg: 44, xl: 56 };
@@ -45,7 +46,7 @@ function useEquippedBorder(enabled) {
  * `withCosmetics` forces the self/local path (used by the Inventory preview and
  * your own profile header, where the object isn't a full users row).
  */
-export default function UserAvatar({ user, size = "md", style, zoomable = false, withCosmetics = false }) {
+export default function UserAvatar({ user, size = "md", style, zoomable = false, withCosmetics = false, photoOverride }) {
   const [zoomOpen, setZoomOpen] = useState(false);
   /* Explicit opt-in OR auto-detected self (full user objects carry .id). */
   const isSelf = withCosmetics || isSelfId(user?.id);
@@ -54,6 +55,10 @@ export default function UserAvatar({ user, size = "md", style, zoomable = false,
      the value embedded in the row we were handed. Reading the registry keeps
      this avatar in agreement with every other surface showing the same person. */
   const registered = useRegisteredEquipped(isSelf ? null : user?.id);
+  /* Self photo comes from the self-avatar registry when set (optimistic after an
+     upload), so your own avatar repaints everywhere the instant you change it —
+     the row's own URL is the fallback until then. Others always use their row. */
+  const selfAvatar = useSelfAvatarUrl(isSelf);
   const border = isSelf
     ? localBorder
     : borderById(registered?.border ?? user?.equipped_border);
@@ -64,7 +69,10 @@ export default function UserAvatar({ user, size = "md", style, zoomable = false,
 
   if (!user) return null;
 
-  const url = user.resolvedAvatarUrl || (user.avatar_url ? getAvatarUrl(user.avatar_url) : null);
+  /* `photoOverride` forces an exact photo and beats the self-avatar registry —
+     used by the Edit-Profile preview, which shows the candidate you're ABOUT to
+     save (a local file pick or the stored URL), not your last-saved avatar. */
+  const url = photoOverride || selfAvatar || user.resolvedAvatarUrl || (user.avatar_url ? getAvatarUrl(user.avatar_url) : null);
   const initials = `${user.first_name?.charAt(0) || ""}${user.last_name?.charAt(0) || ""}`.toUpperCase();
   const color = user.avatar_color || "#6366f1";
 
@@ -91,6 +99,7 @@ export default function UserAvatar({ user, size = "md", style, zoomable = false,
       <>
         {wrapInRing(
           <img
+            key={url}
             src={url}
             alt=""
             width={px}

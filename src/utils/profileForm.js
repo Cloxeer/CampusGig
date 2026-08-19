@@ -1,5 +1,6 @@
 import { nanpDigitsFromInput } from "./phoneNanp";
 import { EMPTY_CONTACT_PROFILE, OPTIONAL_CONTACT_FIELD_KEYS } from "./contactFields";
+import { looksLikeAvatarImage } from "./prepareAvatarImage";
 
 export { EMPTY_CONTACT_PROFILE };
 
@@ -21,11 +22,11 @@ export function validateNanpPhone(phone, { requiredMessage } = {}) {
 }
 
 export function validateAvatarFile(file) {
-  if (!file.type.startsWith("image/")) {
-    return { ok: false, error: "Please select an image file." };
+  if (!looksLikeAvatarImage(file)) {
+    return { ok: false, error: "Please select a photo." };
   }
-  if (file.size > 5 * 1024 * 1024) {
-    return { ok: false, error: "Image must be under 5 MB." };
+  if (file.size > 40 * 1024 * 1024) {
+    return { ok: false, error: "That photo is too large. Try a smaller one." };
   }
   return { ok: true, error: null };
 }

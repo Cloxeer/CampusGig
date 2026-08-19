@@ -9,6 +9,28 @@ function modeFromParams(searchParams) {
   return searchParams.get("mode") === "signup" ? "signup" : "login";
 }
 
+/* Remember the sign-in method WITHIN a session so leaving + returning to
+   "Welcome back" reopens on whatever you last used (e.g. passcode). Uses
+   sessionStorage on purpose: a brand-new visit still defaults to magic link —
+   we only remember your choice while you're moving around this session. */
+const SIGNIN_METHOD_KEY = "cg_signin_method";
+
+function loadSignInMethod() {
+  try {
+    return sessionStorage.getItem(SIGNIN_METHOD_KEY) === "passcode" ? "passcode" : "magic";
+  } catch {
+    return "magic";
+  }
+}
+
+function saveSignInMethod(method) {
+  try {
+    sessionStorage.setItem(SIGNIN_METHOD_KEY, method);
+  } catch {
+    /* private mode / storage disabled — fall back to the magic-link default */
+  }
+}
+
 function magicLinkErrorMessage(mlError, authMode) {
   const code = mlError?.code;
   const msg = (mlError?.message || "").toLowerCase();
@@ -65,7 +87,13 @@ export default function Auth() {
   const [searchParams, setSearchParams] = useSearchParams();
   const authMode = modeFromParams(searchParams);
   const [accountType, setAccountType] = useState(null); // signup: null → picker
-  const [signInMethod, setSignInMethod] = useState("magic");
+  const [signInMethod, setSignInMethod] = useState(loadSignInMethod);
+
+  /* Persist every method switch so it survives leaving + re-entering the page. */
+  function chooseSignInMethod(method) {
+    setSignInMethod(method);
+    saveSignInMethod(method);
+  }
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -258,7 +286,7 @@ export default function Auth() {
             <AuthSignInMethodToggle
               method={signInMethod}
               onChange={(method) => {
-                setSignInMethod(method);
+                chooseSignInMethod(method);
                 setError("");
               }}
             />
@@ -344,7 +372,7 @@ export default function Auth() {
                   type="button"
                   className="auth-inline-link"
                   onClick={() => {
-                    setSignInMethod("magic");
+                    chooseSignInMethod("magic");
                     setPasscode("");
                     setError("");
                   }}

@@ -1,4 +1,6 @@
 import { supabase } from "./supabase";
+import { prepareAvatarImage } from "../utils/prepareAvatarImage";
+import { setSelfAvatarUrl } from "./selfAvatar";
 
 export async function uploadAvatar(file) {
   const {
@@ -7,45 +9,54 @@ export async function uploadAvatar(file) {
 
   if (!user) return { path: null, error: { message: "Not authenticated" } };
 
-  /* TEMP DIAGNOSTIC — remove after we solve the avatar 400/RLS issue.
-     Prints what the *server* will actually see: the JWT's `sub` (which
-     becomes auth.uid()) and `role`, vs. the folder we're writing to. */
+  let jpeg;
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    const claims = token
-      ? JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")))
-      : null;
-    console.log("[avatar diag] getUser().id  =", user.id);
-    console.log("[avatar diag] token present =", Boolean(token));
-    console.log("[avatar diag] token.sub     =", claims?.sub);
-    console.log("[avatar diag] token.role    =", claims?.role);
-    console.log("[avatar diag] token.exp     =", claims?.exp, claims?.exp ? new Date(claims.exp * 1000).toISOString() : "");
-    console.log("[avatar diag] sub === id    =", claims?.sub === user.id);
-    console.log("[avatar diag] file.type     =", file.type, "size =", file.size);
+    jpeg = await prepareAvatarImage(file);
   } catch (e) {
-    console.log("[avatar diag] failed to decode token", e);
+    return { path: null, error: { message: e.message || "Could not read that photo." } };
   }
 
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${user.id}/avatar.${ext}`;
+  /* Storage's HTTP service currently ignores valid user JWTs (Auth + PostgREST
+     accept the same token). Upload via Edge Function: Auth getUser() + service role. */
+  const form = new FormData();
+  form.append("file", jpeg);
 
-  const { error: uploadError } = await supabase.storage
-    .from("avatars")
-    .upload(path, file, { upsert: true, contentType: file.type });
+  const { data: fnData, error: fnError } = await supabase.functions.invoke(
+    "upload-avatar",
+    { body: form },
+  );
 
-  if (uploadError) return { path: null, error: uploadError };
+  if (fnError) return { path: null, error: fnError };
+  if (fnData?.error) return { path: null, error: { message: fnData.error } };
+  const path = fnData?.path;
+  if (!path) return { path: null, error: { message: "Photo upload failed" } };
+
+  /* Same object key on every save — stamp a cache token so every screen that
+     reads avatar_url gets a new public URL (otherwise the old JPEG stays cached). */
+  const versionedPath = `${String(path).split("?")[0]}?v=${Date.now()}`;
+
+  /* Optimistic: publish the new URL to the self-avatar registry NOW so every
+     mounted surface that draws your avatar (profile header, the leaderboard's
+     "you" row, gig cards) repaints immediately — no refetch, no per-screen
+     staleness. `getAvatarUrl` resolves the object path + carries the cache token. */
+  setSelfAvatarUrl(getAvatarUrl(versionedPath));
 
   const { error: updateError } = await supabase
     .from("users")
-    .update({ avatar_url: path })
+    .update({ avatar_url: versionedPath })
     .eq("id", user.id);
 
-  return { path, error: updateError };
+  return { path: versionedPath, error: updateError };
 }
 
 export function getAvatarUrl(avatarPath) {
   if (!avatarPath) return null;
-  const { data } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
-  return data?.publicUrl || null;
+  const q = String(avatarPath).indexOf("?");
+  const objectPath = q === -1 ? avatarPath : avatarPath.slice(0, q);
+  const cacheQuery = q === -1 ? "" : avatarPath.slice(q + 1);
+  const { data } = supabase.storage.from("avatars").getPublicUrl(objectPath);
+  if (!data?.publicUrl) return null;
+  if (!cacheQuery) return data.publicUrl;
+  const join = data.publicUrl.includes("?") ? "&" : "?";
+  return `${data.publicUrl}${join}${cacheQuery}`;
 }

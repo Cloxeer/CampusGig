@@ -1,7 +1,9 @@
-import { useRef } from "react";
-import { Camera } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Loader } from "lucide-react";
 import ContactFields from "./ContactFields";
+import UserAvatar from "./UserAvatar";
 import { validateAvatarFile } from "../utils/profileForm";
+import { prepareAvatarImage } from "../utils/prepareAvatarImage";
 
 function FormErrorBanner({ error }) {
   if (!error) return null;
@@ -37,9 +39,12 @@ export default function ProfileContactForm({
   showFavorites = false,
 }) {
   const fileInputRef = useRef(null);
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
+  const [hover, setHover] = useState(false);
 
-  function handlePhotoSelect(e) {
+  async function handlePhotoSelect(e) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     const result = validateAvatarFile(file);
     if (!result.ok) {
@@ -47,7 +52,15 @@ export default function ProfileContactForm({
       return;
     }
     onError?.("");
-    onAvatarSelect?.(file);
+    setPreparingPhoto(true);
+    try {
+      const jpeg = await prepareAvatarImage(file);
+      onAvatarSelect?.(jpeg);
+    } catch (err) {
+      onError?.(err.message || "Could not read that photo. Try another one.");
+    } finally {
+      setPreparingPhoto(false);
+    }
   }
 
   const hasPhoto = Boolean(avatarDisplayUrl);
@@ -57,20 +70,29 @@ export default function ProfileContactForm({
     <>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         <div
-          style={{ position: "relative", cursor: "pointer" }}
-          onClick={() => fileInputRef.current?.click()}
+          /* `flex` collapses the inline-baseline descender gap the CosmeticRing
+             wrapper would otherwise add below itself, so the box is exactly the
+             photo and the hover camera centers true (not a few px low). */
+          style={{ position: "relative", display: "flex", cursor: preparingPhoto ? "wait" : "pointer" }}
+          onClick={() => !preparingPhoto && fileInputRef.current?.click()}
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
         >
           {hasPhoto ? (
-            <img
-              src={avatarDisplayUrl}
-              alt="Profile"
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                objectFit: "cover",
-                border: "2px solid var(--bd)",
+            /* Shared avatar so the equipped border/ring shows here too — users
+               preview exactly how their photo looks with the cosmetic they have
+               on. `photoOverride` pins the candidate URL (local pick or stored)
+               and `withCosmetics` reads the live equipped border. */
+            <UserAvatar
+              user={{
+                avatar_color: avatarFallback?.color,
+                first_name: avatarFallback?.initials?.[0],
+                last_name: avatarFallback?.initials?.[1],
               }}
+              size={80}
+              withCosmetics
+              photoOverride={avatarDisplayUrl}
+              style={{ border: "2px solid var(--bd)" }}
             />
           ) : avatarFallback ? (
             <div
@@ -92,32 +114,45 @@ export default function ProfileContactForm({
               {avatarFallback.initials ?? avatarFallback.placeholder}
             </div>
           ) : null}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              right: 0,
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: "var(--ink)",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "2px solid var(--bg)",
-            }}
-          >
-            <Camera size={13} />
-          </div>
+          {/* Whole photo is the click target; a translucent-white camera wash
+              fades in on hover (and while preparing) so it reads as editable
+              without a permanent badge. Sits over the photo only (inset 0 =
+              the size footprint), so an equipped border ring stays visible. */}
+          {hasPhoto && (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                background: "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                filter: "drop-shadow(0 1px 3px rgba(0,0,0,.6))",
+                opacity: hover || preparingPhoto ? 1 : 0,
+                transition: "opacity .15s ease",
+                pointerEvents: "none",
+                zIndex: 3,
+              }}
+            >
+              {preparingPhoto ? <Loader size={20} className="spin" /> : <Camera size={22} />}
+            </div>
+          )}
         </div>
-        <button type="button" className="btn bg-btn bsm" onClick={() => fileInputRef.current?.click()}>
-          {changeLabel}
+        <button
+          type="button"
+          className="btn bg-btn bsm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={preparingPhoto}
+        >
+          {preparingPhoto ? <Loader size={14} className="spin" /> : changeLabel}
         </button>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,image/heic,image/heif,.heic,.heif"
           style={{ display: "none" }}
           onChange={handlePhotoSelect}
         />
