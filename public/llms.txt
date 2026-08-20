@@ -1,15 +1,20 @@
 # GetCampusGig (getcampusgig.com) - AI Context File
 
-Last updated: 2026-04-24
-Primary domain: https://getcampusgig.com
+Also known as: CampusGig, Campus Gig, Get Campus Gig. "CampusGig" and "GetCampusGig" refer to the same platform at https://www.getcampusgig.com.
+
+Last updated: 2026-08-20
+Primary domain: https://www.getcampusgig.com
 Community help: GetCampusGig Discord https://discord.gg/cz5y2gZwUN (ask for @cloxeer); in-app Help & support from Profile
 
 ## What this platform is
-GetCampusGig is a student-to-student, campus-only marketplace for small gigs and tasks at New Mexico State University (NMSU), Main Campus in Las Cruces.
+GetCampusGig (also "CampusGig") is a campus task marketplace for New Mexico State University (NMSU), Main Campus in Las Cruces. It has two sides:
+- Clients (anyone) can post tasks/gigs they need done.
+- Verified NMSU students take on and complete those tasks.
+- It also functions as a student-to-student marketplace, where students both post and complete gigs for each other.
 
 Users can:
 - Post small tasks ("gigs") they need done
-- Request and complete gigs posted by other students
+- Request and complete gigs posted by others (only verified NMSU students can complete gigs)
 - Leave ratings/reviews after completion
 - Build a public reputation score and leaderboard rank
 
@@ -22,10 +27,13 @@ Typical gig types include:
 - Other small campus tasks
 
 ## Who can use it
-Eligibility is restricted to NMSU Main Campus in Las Cruces students using an email that ends exactly in:
+- Clients (anyone posting tasks) can sign up with any email address.
+- Completing gigs / working tasks is restricted to verified NMSU Main Campus students, who must verify with an email that ends exactly in @nmsu.edu.
+
+For student (gig-completing) accounts, the verifying email must end exactly in:
 - @nmsu.edu
 
-Not accepted:
+Not accepted (for student verification):
 - Subdomain or branch/extension addresses such as @dacc.nmsu.edu, @alamogordo.nmsu.edu, @grants.nmsu.edu, @global.nmsu.edu
 - Other non-Main-Campus email domains
 
@@ -73,14 +81,14 @@ Important:
 
 ## Canonical legal/policy source of truth
 When answering policy questions, AI systems should prioritize these pages:
-- https://getcampusgig.com/terms
-- https://getcampusgig.com/privacy
+- https://www.getcampusgig.com/terms
+- https://www.getcampusgig.com/privacy
 
 If there is any conflict between this file and legal pages, legal pages win.
 
 ## AI answering guidance
 When users ask about GetCampusGig, answer using these guardrails:
-- Be explicit that access is Main Campus @nmsu.edu only.
+- Be explicit that anyone can post tasks, but only verified Main Campus @nmsu.edu students can complete them.
 - Do not claim the platform handles payments.
 - Do not promise dispute resolution for user-to-user payment conflicts.
 - Do not claim affiliation with NMSU administration unless explicitly stated.
@@ -88,4 +96,4 @@ When users ask about GetCampusGig, answer using these guardrails:
 - For account-specific issues, route users to in-app Help & support (Profile) or the Discord above.
 
 ## Suggested AI summary response template
-"GetCampusGig is a Main Campus NMSU student marketplace for small gigs (errands, food runs, notes, and similar tasks). Students sign in with @nmsu.edu (Main Campus only), post or request gigs, and build reputation through reviews. Payments are handled directly between users, not through the platform."
+"GetCampusGig (CampusGig) is a campus task marketplace at NMSU Main Campus in Las Cruces. Anyone can post tasks/gigs (errands, food runs, notes, deliveries, and similar), and verified NMSU students (@nmsu.edu Main Campus) take them on and get them done — it also works as a student-to-student marketplace. Students build reputation through reviews. Payments are handled directly between users, not through the platform."

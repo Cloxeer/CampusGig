@@ -14,5 +14,5 @@ Disallow: /gigdetails
 Disallow: /gig/
 Disallow: /users
 
-Sitemap: https://getcampusgig.com/sitemap.xml
-LLMS: https://getcampusgig.com/llms.txt
+Sitemap: https://www.getcampusgig.com/sitemap.xml
+LLMS: https://www.getcampusgig.com/llms.txt
