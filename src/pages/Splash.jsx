@@ -7,6 +7,28 @@ import { getPublicStats, subscribePublicStats, PUBLIC_STATS_EMPTY } from "../lib
 import { queryKeys } from "../lib/queryClient";
 import { useCountUp } from "../hooks/useCountUp";
 
+/* Rotating hero headlines — a "rolling log" that swaps between the two sides of
+   the marketplace: earn (do gigs) and hire (post gigs). Each message is two
+   headline lines (one green accent) plus a subline. Keep lines short so they
+   never wrap at 38px. */
+const HERO_MESSAGES = [
+  {
+    line1: "Small tasks.",
+    line2: ["Real ", { g: "money." }],
+    sub: "Post it or pick it up — and build your campus rep.",
+  },
+  {
+    line1: "Need it done?",
+    line2: [{ g: "Hire a student." }],
+    sub: "Post any job. A verified NMSU student makes it happen.",
+  },
+  {
+    line1: "Your skills.",
+    line2: ["Real ", { g: "pay." }],
+    sub: "Design, code, tutor, run errands — get paid to do it.",
+  },
+];
+
 const SLIDES = [
   {
     icon: <Search size={28} />,
@@ -29,6 +51,15 @@ export default function Splash() {
   const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [slide, setSlide] = useState(0);
+  const [heroIdx, setHeroIdx] = useState(0);
+
+  /* Cycle the hero headline every few seconds (the "rolling log"). */
+  useEffect(() => {
+    const id = setInterval(() => {
+      setHeroIdx((i) => (i + 1) % HERO_MESSAGES.length);
+    }, 3800);
+    return () => clearInterval(id);
+  }, []);
   const queryClient = useQueryClient();
   /* Shared React Query cache: instant paint from the persisted last-known value,
      then a background revalidate. staleTime 0 so a fresh read fires on mount. */
@@ -142,9 +173,22 @@ export default function Splash() {
         <div className="sgrid" />
         <div className="sfade" />
         <div className="scontent shell-prose">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 44 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <LogoMark size={32} style={{ borderRadius: "var(--r)" }} />
             <Logo size={17} />
+          </div>
+
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: "var(--mono)",
+              letterSpacing: ".02em",
+              color: "var(--fg3)",
+              marginBottom: 44,
+            }}
+          >
+            Connect. <span style={{ color: "var(--green)" }}>Earn.</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
@@ -154,24 +198,36 @@ export default function Splash() {
             </span>
           </div>
 
-          <div
-            style={{
-              fontSize: 38,
-              fontWeight: 700,
-              letterSpacing: "-.045em",
-              lineHeight: 1.05,
-              color: "var(--fg)",
-              marginBottom: 14,
-            }}
-          >
-            Small tasks.
-            <br />
-            Real <span style={{ color: "var(--green)" }}>money.</span>
-          </div>
+          <div className="hero-roll">
+            <div className="hero-roll__item" key={heroIdx}>
+              <div
+                style={{
+                  fontSize: 38,
+                  fontWeight: 700,
+                  letterSpacing: "-.045em",
+                  lineHeight: 1.05,
+                  color: "var(--fg)",
+                  marginBottom: 14,
+                }}
+              >
+                {HERO_MESSAGES[heroIdx].line1}
+                <br />
+                {HERO_MESSAGES[heroIdx].line2.map((seg, i) =>
+                  typeof seg === "string" ? (
+                    seg
+                  ) : (
+                    <span key={i} style={{ color: "var(--green)" }}>
+                      {seg.g}
+                    </span>
+                  )
+                )}
+              </div>
 
-          <p style={{ fontSize: 14, color: "var(--fg3)", lineHeight: 1.65, maxWidth: 280 }}>
-            Post an errand. Pick one up. Build your campus reputation.
-          </p>
+              <p style={{ fontSize: 14, color: "var(--fg3)", lineHeight: 1.65, maxWidth: 280 }}>
+                {HERO_MESSAGES[heroIdx].sub}
+              </p>
+            </div>
+          </div>
 
           <div className="splash-stats">
             <div className="splash-stat">

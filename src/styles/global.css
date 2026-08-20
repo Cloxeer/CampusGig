@@ -1029,6 +1029,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .splash-stat { animation: none; }
 }
+
+/* ── SPLASH ROTATING HERO ("rolling log") ─────────────────── */
+.hero-roll {
+  /* Reserve height for 2 headline lines + up to 2 sub lines so swapping
+     messages never shifts the layout below. overflow hides the roll-in. */
+  min-height: 142px;
+  overflow: hidden;
+}
+.hero-roll__item {
+  animation: hero-roll-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes hero-roll-in {
+  0%   { opacity: 0; transform: translateY(1.05em); }
+  15%  { opacity: 0; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-roll__item { animation: none; }
+}
 .splash-stat-val {
   font-size: 20px;
   font-weight: 700;
