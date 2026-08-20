@@ -1033,20 +1033,44 @@ body {
 /* ── SPLASH ROTATING HERO ("rolling log") ─────────────────── */
 .hero-roll {
   /* Reserve height for 2 headline lines + up to 2 sub lines so swapping
-     messages never shifts the layout below. overflow hides the roll-in. */
+     messages never shifts the layout below. The two messages are stacked and
+     crossfade, so this is also the positioning context. */
+  position: relative;
   min-height: 142px;
-  overflow: hidden;
 }
+/* Both the outgoing and incoming message occupy the same box and overlap
+   during the transition. Apple-style easing: a long, soft deceleration. */
 .hero-roll__item {
-  animation: hero-roll-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  will-change: opacity, transform, filter;
+  /* buttery deceleration curve, close to iOS spring settle */
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.24, 1);
+  animation-fill-mode: both;
 }
-@keyframes hero-roll-in {
-  0%   { opacity: 0; transform: translateY(1.05em); }
-  15%  { opacity: 0; }
-  100% { opacity: 1; transform: translateY(0); }
+.hero-roll__item--in {
+  animation-name: hero-fade-in;
+  animation-duration: 1.15s;
+}
+.hero-roll__item--out {
+  animation-name: hero-fade-out;
+  animation-duration: 1.05s;
+  pointer-events: none;
+}
+@keyframes hero-fade-in {
+  0%   { opacity: 0; transform: translateY(14px); filter: blur(7px); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes hero-fade-out {
+  0%   { opacity: 1; transform: translateY(0); filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-12px); filter: blur(7px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-roll__item { animation: none; }
+  .hero-roll__item--out { display: none; }
 }
 .splash-stat-val {
   font-size: 20px;

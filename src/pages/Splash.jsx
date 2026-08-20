@@ -29,6 +29,41 @@ const HERO_MESSAGES = [
   },
 ];
 
+/* One hero message (headline + subline). `phase` drives the crossfade:
+   "in" settles into place, "out" softly blurs and drifts up. Both are stacked
+   in the same reserved box so they overlap during the transition. */
+function HeroMessage({ msg, phase }) {
+  return (
+    <div className={`hero-roll__item hero-roll__item--${phase}`}>
+      <div
+        style={{
+          fontSize: 38,
+          fontWeight: 700,
+          letterSpacing: "-.045em",
+          lineHeight: 1.05,
+          color: "var(--fg)",
+          marginBottom: 14,
+        }}
+      >
+        {msg.line1}
+        <br />
+        {msg.line2.map((seg, i) =>
+          typeof seg === "string" ? (
+            seg
+          ) : (
+            <span key={i} style={{ color: "var(--green)" }}>
+              {seg.g}
+            </span>
+          )
+        )}
+      </div>
+      <p style={{ fontSize: 14, color: "var(--fg3)", lineHeight: 1.65, maxWidth: 280 }}>
+        {msg.sub}
+      </p>
+    </div>
+  );
+}
+
 const SLIDES = [
   {
     icon: <Search size={28} />,
@@ -52,12 +87,18 @@ export default function Splash() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [slide, setSlide] = useState(0);
   const [heroIdx, setHeroIdx] = useState(0);
+  const [heroPrev, setHeroPrev] = useState(null);
 
-  /* Cycle the hero headline every few seconds (the "rolling log"). */
+  /* Cycle the hero headline every few seconds (the "rolling log"). We keep the
+     outgoing message mounted for one beat so the two crossfade — the old one
+     softly blurs + drifts up as the new one settles in. */
   useEffect(() => {
     const id = setInterval(() => {
-      setHeroIdx((i) => (i + 1) % HERO_MESSAGES.length);
-    }, 3800);
+      setHeroIdx((i) => {
+        setHeroPrev(i);
+        return (i + 1) % HERO_MESSAGES.length;
+      });
+    }, 4200);
     return () => clearInterval(id);
   }, []);
   const queryClient = useQueryClient();
@@ -199,34 +240,10 @@ export default function Splash() {
           </div>
 
           <div className="hero-roll">
-            <div className="hero-roll__item" key={heroIdx}>
-              <div
-                style={{
-                  fontSize: 38,
-                  fontWeight: 700,
-                  letterSpacing: "-.045em",
-                  lineHeight: 1.05,
-                  color: "var(--fg)",
-                  marginBottom: 14,
-                }}
-              >
-                {HERO_MESSAGES[heroIdx].line1}
-                <br />
-                {HERO_MESSAGES[heroIdx].line2.map((seg, i) =>
-                  typeof seg === "string" ? (
-                    seg
-                  ) : (
-                    <span key={i} style={{ color: "var(--green)" }}>
-                      {seg.g}
-                    </span>
-                  )
-                )}
-              </div>
-
-              <p style={{ fontSize: 14, color: "var(--fg3)", lineHeight: 1.65, maxWidth: 280 }}>
-                {HERO_MESSAGES[heroIdx].sub}
-              </p>
-            </div>
+            {heroPrev !== null && heroPrev !== heroIdx && (
+              <HeroMessage key={`out-${heroPrev}`} msg={HERO_MESSAGES[heroPrev]} phase="out" />
+            )}
+            <HeroMessage key={`in-${heroIdx}`} msg={HERO_MESSAGES[heroIdx]} phase="in" />
           </div>
 
           <div className="splash-stats">
