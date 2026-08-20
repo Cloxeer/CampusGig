@@ -8,6 +8,13 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 /** Anti-spam cap on new gigs per poster per rolling hour. */
 const MAX_GIGS_PER_HOUR = 5;
 
+/**
+ * Sentinel stored in `gigs.location` for remote gigs (no physical spot). Keeps
+ * remote/in-person fully persistent through the existing `location` column —
+ * no schema change, works across every read path that already selects location.
+ */
+export const REMOTE_LOCATION = "Remote";
+
 export async function getOpenGigs() {
   const nowIso = new Date().toISOString();
   // PostgREST splits on "." — ISO timestamps must be double-quoted or the filter matches nothing.
@@ -97,6 +104,7 @@ export function normalizeGig(g) {
     price: `$${Number(g.price).toFixed(2)}`,
     cat: g.category?.label || "Other",
     loc: g.location || "TBD",
+    isRemote: g.location === REMOTE_LOCATION,
     eta,
     deadline,
     status: g.status || "open",

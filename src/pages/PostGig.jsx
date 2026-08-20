@@ -1,28 +1,20 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { MapPin, Lock, Award, Clock, Utensils, Printer, Package, FileText, Bike, MessageCircle, Loader } from "lucide-react";
+import { MapPin, Globe, Lock, Award, Clock, Package, Bike, MessageCircle, GraduationCap, Sparkles, Loader } from "lucide-react";
 import { postNewGig, getGigForPosterEdit, updateMyGig } from "../lib/profile";
+import { REMOTE_LOCATION } from "../lib/gigs";
+import { CATEGORIES, FALLBACK_CATEGORY } from "../data/categories";
 import { queryClient, queryKeys } from "../lib/queryClient";
 import { readDraft, writeDraft, clearDraft } from "../utils/postGigDraft";
 import TopBar from "../components/TopBar";
 
 const ICON_MAP = {
-  Utensils: <Utensils size={15} />,
-  Printer: <Printer size={15} />,
-  Package: <Package size={15} />,
-  FileText: <FileText size={15} />,
   Bike: <Bike size={15} />,
+  Package: <Package size={15} />,
+  GraduationCap: <GraduationCap size={15} />,
+  Sparkles: <Sparkles size={15} />,
   MessageCircle: <MessageCircle size={15} />,
 };
-
-const CATS = [
-  { icon: "Utensils", label: "Food" },
-  { icon: "Printer", label: "Print" },
-  { icon: "Package", label: "Errand" },
-  { icon: "FileText", label: "Notes" },
-  { icon: "Bike", label: "Delivery" },
-  { icon: "MessageCircle", label: "Other" },
-];
 
 const TIME_OPTIONS = [
   { label: "No limit", minutes: 0 },
@@ -45,11 +37,12 @@ export default function PostGig() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("edit");
-  const [cat, setCat] = useState("Other");
+  const [cat, setCat] = useState(FALLBACK_CATEGORY);
   const [gigTitle, setGigTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("0");
   const [location, setLocation] = useState("");
+  const [remote, setRemote] = useState(false);
   const [timeLimitIdx, setTimeLimitIdx] = useState(0);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState(null);
@@ -73,14 +66,15 @@ export default function PostGig() {
       setPrice(d.price);
       setLocation(d.location);
       setTimeLimitIdx(d.timeLimitIdx);
+      setRemote(d.remote);
     }
     setDraftHydrated(true);
   }, [editId]);
 
   useEffect(() => {
     if (editId || !draftHydrated) return;
-    writeDraft({ cat, gigTitle, description, price, location, timeLimitIdx });
-  }, [editId, draftHydrated, cat, gigTitle, description, price, location, timeLimitIdx]);
+    writeDraft({ cat, gigTitle, description, price, location, timeLimitIdx, remote });
+  }, [editId, draftHydrated, cat, gigTitle, description, price, location, timeLimitIdx, remote]);
 
   const syncDescriptionHeight = useCallback(() => {
     const el = descRef.current;
@@ -125,11 +119,13 @@ export default function PostGig() {
         setLoadingEdit(false);
         return;
       }
-      setCat(gig.category?.label || "Other");
+      const isRemote = gig.location === REMOTE_LOCATION;
+      setCat(gig.category?.label || FALLBACK_CATEGORY);
       setGigTitle(gig.title || "");
       setDescription(gig.description || "");
       setPrice(String(gig.price ?? 0));
-      setLocation(gig.location || "");
+      setRemote(isRemote);
+      setLocation(isRemote ? "" : gig.location || "");
       setTimeLimitIdx(timeLimitIndexFromExpires(gig.created_at, gig.expires_at));
       setLoadingEdit(false);
     })();
@@ -144,8 +140,17 @@ export default function PostGig() {
       return;
     }
 
+    if (!remote && !location.trim()) {
+      setError("Add a gig location, or switch to Remote.");
+      return;
+    }
+
     setPosting(true);
     setError(null);
+
+    /* Remote gigs store the sentinel so remote/in-person survives a reload and
+       shows correctly on every card; in-person stores the typed spot. */
+    const locationToSave = remote ? REMOTE_LOCATION : location.trim();
 
     const selectedTime = TIME_OPTIONS[timeLimitIdx];
     let estimatedTime = null;
@@ -159,7 +164,7 @@ export default function PostGig() {
         description: String(description).trim() === "" ? null : description,
         categoryLabel: cat,
         price: parseFloat(price) || 0,
-        location: location.trim() || null,
+        location: locationToSave,
         estimatedTime,
       });
       if (upErr) {
@@ -173,7 +178,7 @@ export default function PostGig() {
         description: String(description).trim() === "" ? null : description,
         categoryLabel: cat,
         price: parseFloat(price) || 0,
-        location: location.trim() || null,
+        location: locationToSave,
         estimatedTime,
       });
 
@@ -240,7 +245,7 @@ export default function PostGig() {
         <div className="field">
           <label className="lbl">Category</label>
           <div className="cat-grid">
-            {CATS.map((c) => (
+            {CATEGORIES.map((c) => (
               <div key={c.label} className={`cat ${cat === c.label ? "on" : ""}`} onClick={() => setCat(c.label)}>
                 <div className="cico">{ICON_MAP[c.icon]}</div>
                 <span className="clbl">{c.label}</span>
@@ -275,11 +280,6 @@ export default function PostGig() {
               overflowY: descFocused ? "hidden" : "auto",
             }}
           />
-          <span className="hint" style={{ display: "block", marginTop: 6 }}>
-            Line breaks and spaces are kept as you type. Use <code style={{ fontSize: 11 }}>&amp;B</code>…<code style={{ fontSize: 11 }}>&amp;B</code> for bold,{" "}
-            <code style={{ fontSize: 11 }}>&amp;I</code>…<code style={{ fontSize: 11 }}>&amp;I</code> for italics,{" "}
-            <code style={{ fontSize: 11 }}>&amp;U</code>…<code style={{ fontSize: 11 }}>&amp;U</code> for underline.
-          </span>
         </div>
 
         <div className="field">
@@ -364,18 +364,44 @@ export default function PostGig() {
         </div>
 
         <div className="field">
-          <label className="lbl">Gig location</label>
-          <div className="ig">
-            <div className="iad">
-              <MapPin size={13} />
-            </div>
-            <input
-              className="ii"
-              placeholder="e.g. Science Hall Room 118A"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
+          <label className="lbl">Where</label>
+          <div className="seg" role="tablist" aria-label="Gig location type">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!remote}
+              className={`seg-btn ${!remote ? "on" : ""}`}
+              onClick={() => setRemote(false)}
+            >
+              <MapPin size={13} /> In person
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={remote}
+              className={`seg-btn ${remote ? "on" : ""}`}
+              onClick={() => setRemote(true)}
+            >
+              <Globe size={13} /> Remote
+            </button>
           </div>
+          {remote ? (
+            <span className="hint" style={{ display: "block", marginTop: 8 }}>
+              Done from anywhere — no meetup spot needed.
+            </span>
+          ) : (
+            <div className="ig" style={{ marginTop: 8 }}>
+              <div className="iad">
+                <MapPin size={13} />
+              </div>
+              <input
+                className="ii"
+                placeholder="e.g. Science Hall Room 118A"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         <div className="callout">

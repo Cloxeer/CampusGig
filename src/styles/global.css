@@ -2355,6 +2355,35 @@ body {
 .clbl { font-size: 11px; font-weight: 500; color: var(--fg3); }
 .cat.on .clbl { color: var(--ink-fg); }
 
+/* ── SEGMENTED CONTROL (e.g. In person / Remote) ───────────── */
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  background: var(--bg2);
+}
+.seg-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg3);
+  background: none;
+  border: none;
+  border-radius: calc(var(--r) - 3px);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.seg-btn:hover { color: var(--fg); }
+.seg-btn.on { background: var(--ink); color: var(--ink-fg); }
+
 /* ── ANIMATIONS ────────────────────────────────────────────── */
 /* NO fill-mode `forwards` here: the end state equals the element's natural
    state, so `forwards` buys nothing — but it permanently retains a transform

@@ -1,4 +1,4 @@
-import { MapPin, Clock, Timer } from "lucide-react";
+import { MapPin, Clock, Timer, Globe } from "lucide-react";
 import LevelBadge from "./LevelBadge";
 import StudentBadge from "./StudentBadge";
 import Stars from "./Stars";
@@ -44,7 +44,7 @@ export default function GigCard({ gig, onClick, tick }) {
         }}
       >
         <span className="gmi">
-          <MapPin size={10} /> {gig.loc}
+          {gig.isRemote ? <Globe size={10} /> : <MapPin size={10} />} {gig.loc}
         </span>
         {cd && !cd.expired ? (
           <span className="gmi" key={tick} style={{ color: "var(--amber)", fontWeight: 600 }}>

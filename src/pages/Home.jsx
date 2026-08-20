@@ -12,14 +12,18 @@ import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
 import ProfileRepCard from "../features/profile/components/ProfileRepCard";
 import AppSkeleton from "../components/AppSkeleton";
+import { FILTERABLE_CATEGORY_LABELS } from "../data/categories";
 
-const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
+/* "All" plus every real category (except the "Other" catch-all, which folds
+   into All). Sourced from the shared catalog so the tabs and the Post-a-gig
+   picker can never drift apart. */
+const TABS = ["All", ...FILTERABLE_CATEGORY_LABELS];
 
 export default function Home({ currentUserId }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState("Recent");
+  const [tab, setTab] = useState("All");
   const tick = useTimer();
 
   const isAuthed = Boolean(currentUserId);
@@ -54,11 +58,8 @@ export default function Home({ currentUserId }) {
   });
 
   const filteredGigs = activeGigs.filter((g) => {
-    if (tab === "Recent" || tab === "All") return true;
-    if (tab === "Food") return g.cat === "Food";
-    if (tab === "Errands") return g.cat === "Errand";
-    if (tab === "Notes") return g.cat === "Notes";
-    return true;
+    if (tab === "All") return true;
+    return g.cat === tab;
   });
 
   if (showFullSkeleton) return <AppSkeleton />;

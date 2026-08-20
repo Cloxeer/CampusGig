@@ -1,12 +1,16 @@
 /** Session-only draft for "Post a gig" (clears when the tab is closed). */
 
-const KEY = "campusgig:post-draft:v1";
+import { CATEGORY_LABELS } from "../data/categories";
 
-const CAT_LABELS = new Set(["Food", "Print", "Errand", "Notes", "Delivery", "Other"]);
+/* v2: category labels changed (Delivery/Errands/Academics/Creative/Other) and
+   drafts now carry the remote flag, so old v1 drafts are simply ignored. */
+const KEY = "campusgig:post-draft:v2";
+
+const CAT_LABELS = new Set(CATEGORY_LABELS);
 const MAX_TIME_IDX = 6;
 
 /**
- * @returns {{ cat: string, gigTitle: string, description: string, price: string, location: string, timeLimitIdx: number } | null}
+ * @returns {{ cat: string, gigTitle: string, description: string, price: string, location: string, timeLimitIdx: number, remote: boolean } | null}
  */
 export function readDraft() {
   try {
@@ -26,13 +30,13 @@ export function readDraft() {
     ) {
       return null;
     }
-    return { cat, gigTitle, description, price, location, timeLimitIdx };
+    return { cat, gigTitle, description, price, location, timeLimitIdx, remote: o.remote === true };
   } catch {
     return null;
   }
 }
 
-/** @param {{ cat: string, gigTitle: string, description: string, price: string, location: string, timeLimitIdx: number }} draft */
+/** @param {{ cat: string, gigTitle: string, description: string, price: string, location: string, timeLimitIdx: number, remote: boolean }} draft */
 export function writeDraft(draft) {
   if (!draft) return;
   try {

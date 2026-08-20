@@ -16,7 +16,11 @@
  * Keep this in lockstep with Home's real render.
  */
 
-const TABS = ["Recent", "Food", "Errands", "Notes", "All"];
+import { FILTERABLE_CATEGORY_LABELS } from "../data/categories";
+
+/* Same tab list as Home (shared catalog) so the skeleton doesn't flash the
+   wrong tabs before the real feed lands. */
+const TABS = ["All", ...FILTERABLE_CATEGORY_LABELS];
 const TIER_LABELS = ["New", "Reliable", "Trusted", "Legend"];
 
 export default function AppSkeleton() {
