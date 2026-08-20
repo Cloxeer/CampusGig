@@ -66,10 +66,13 @@ export async function sendMagicLink(email, options = {}) {
   if (typeof options.shouldCreateUser === "boolean") {
     otpOptions.shouldCreateUser = options.shouldCreateUser;
   }
-  if (options.firstName || options.lastName) {
+  if (options.firstName || options.lastName || options.referralSource) {
     otpOptions.data = {
       first_name: options.firstName?.trim(),
       last_name: options.lastName?.trim(),
+      /* Optional "how did you hear about us" — carried in auth metadata so the
+         profile insert (Onboarding → createProfile) can persist it. */
+      ...(options.referralSource && { referral_source: options.referralSource }),
     };
   }
 

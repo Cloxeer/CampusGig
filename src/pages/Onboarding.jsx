@@ -57,6 +57,7 @@ export default function Onboarding({ onComplete }) {
         firstName: user.user_metadata?.first_name || "",
         lastName: user.user_metadata?.last_name || "",
         email: user.email,
+        referralSource: user.user_metadata?.referral_source || null,
         ...profileContactsToApi(profile),
       });
 

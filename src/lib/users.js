@@ -127,6 +127,7 @@ export async function createProfile({
   apple_pay,
   google_pay,
   avatarColor,
+  referralSource,
 }) {
   const {
     data: { user },
@@ -139,6 +140,7 @@ export async function createProfile({
     first_name: firstName,
     last_name: lastName,
     ...(avatarColor && { avatar_color: avatarColor }),
+    ...(referralSource && { referral_source: referralSource }),
   };
 
   const { error } = await supabase.from("users").insert(userRow);

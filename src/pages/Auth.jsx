@@ -9,6 +9,14 @@ function modeFromParams(searchParams) {
   return searchParams.get("mode") === "signup" ? "signup" : "login";
 }
 
+/* Account type lives in the URL (?type=student|client), not React state, so
+   leaving the page (e.g. tapping Terms) and coming back keeps you on the same
+   step instead of dumping you back on the account-type picker. */
+function accountTypeFromParams(searchParams) {
+  const t = searchParams.get("type");
+  return t === "student" || t === "client" ? t : null;
+}
+
 /* Remember the sign-in method WITHIN a session so leaving + returning to
    "Welcome back" reopens on whatever you last used (e.g. passcode). Uses
    sessionStorage on purpose: a brand-new visit still defaults to magic link —
@@ -30,6 +38,17 @@ function saveSignInMethod(method) {
     /* private mode / storage disabled — fall back to the magic-link default */
   }
 }
+
+/* Optional "How did you hear about us?" — value is a stable code we store; the
+   label is what the user sees. Keep the list short and unambiguous. */
+const REFERRAL_OPTIONS = [
+  { value: "search_engine", label: "Search engine (Google, etc.)" },
+  { value: "poster", label: "Poster on campus" },
+  { value: "friend", label: "Recommended by a friend" },
+  { value: "hackathon", label: "Hackathon or event" },
+  { value: "social_media", label: "Social media" },
+  { value: "other", label: "Other" },
+];
 
 function magicLinkErrorMessage(mlError, authMode) {
   const code = mlError?.code;
@@ -86,8 +105,15 @@ export default function Auth() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const authMode = modeFromParams(searchParams);
-  const [accountType, setAccountType] = useState(null); // signup: null → picker
+  const accountType = accountTypeFromParams(searchParams); // signup: null → picker
   const [signInMethod, setSignInMethod] = useState(loadSignInMethod);
+
+  /* Pick / clear the account type by writing it to the URL (preserving mode). */
+  function setAccountType(type) {
+    const next = { mode: "signup" };
+    if (type) next.type = type;
+    setSearchParams(next);
+  }
 
   /* Persist every method switch so it survives leaving + re-entering the page. */
   function chooseSignInMethod(method) {
@@ -99,6 +125,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [passcode, setPasscode] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [referralSource, setReferralSource] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -138,7 +165,7 @@ export default function Auth() {
 
     const options =
       authMode === "signup"
-        ? { firstName, lastName, shouldCreateUser: true }
+        ? { firstName, lastName, shouldCreateUser: true, referralSource: referralSource || undefined }
         : { shouldCreateUser: false, allowAnyEmail: true };
 
     const { error: mlError } = await sendMagicLink(email, options);
@@ -173,6 +200,7 @@ export default function Auth() {
       lastName,
       shouldCreateUser: true,
       allowAnyEmail: true,
+      referralSource: referralSource || undefined,
     });
 
     setLoading(false);
@@ -384,6 +412,28 @@ export default function Auth() {
           )}
 
           {authMode === "signup" && (
+            <div className="field">
+              <label className="lbl">
+                How did you hear about us?{" "}
+                <span style={{ color: "var(--fg4)", fontSize: 11, fontWeight: 400 }}>— optional</span>
+              </label>
+              <select
+                className="inp"
+                value={referralSource}
+                onChange={(e) => setReferralSource(e.target.value)}
+                style={{ appearance: "auto", cursor: "pointer", color: referralSource ? "var(--fg)" : "var(--fg4)" }}
+              >
+                <option value="">Select one…</option>
+                {REFERRAL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value} style={{ color: "var(--fg)" }}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {authMode === "signup" && (
             <label
               style={{
                 display: "flex",
@@ -476,7 +526,6 @@ export default function Auth() {
             }}
             onClick={() => {
               setError("");
-              setAccountType(null);
               if (authMode === "signup") {
                 setSearchParams({});
               } else {
