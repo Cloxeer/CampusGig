@@ -7,10 +7,12 @@ Primary domain: https://www.getcampusgig.com
 Community help: GetCampusGig Discord https://discord.gg/cz5y2gZwUN (ask for @cloxeer); in-app Help & support from Profile
 
 ## What this platform is
-GetCampusGig (also "CampusGig") is a campus task marketplace for New Mexico State University (NMSU), Main Campus in Las Cruces. It has two sides:
-- Clients (anyone) can post tasks/gigs they need done.
-- Verified NMSU students take on and complete those tasks.
-- It also functions as a student-to-student marketplace, where students both post and complete gigs for each other.
+GetCampusGig (also "CampusGig") is a campus task marketplace built around New Mexico State University (NMSU), Main Campus in Las Cruces. The idea is simple: Connect. Earn. Small tasks, real money. It has two sides:
+- Posting is open to everyone, everywhere. Anyone in the world — students, parents, local businesses, alumni, anyone — can post a gig they need done.
+- Doing the gigs is the student side. Only verified NMSU Main Campus students can pick up and complete gigs (for now — see "Who can use it").
+- It also works student-to-student: NMSU students can both post gigs and pick up each other's.
+
+Typical vibe: "post it or pick it up." Someone needs a coffee run, notes typed up, a package grabbed, a quick errand — they post it with an offer, and a verified NMSU student takes it and gets it done.
 
 Users can:
 - Post small tasks ("gigs") they need done
@@ -27,8 +29,9 @@ Typical gig types include:
 - Other small campus tasks
 
 ## Who can use it
-- Clients (anyone posting tasks) can sign up with any email address.
+- Posting is open to anyone, anywhere in the world. You do NOT have to be a student, and you do NOT have to be in Las Cruces — anyone can sign up with any email address and post a gig.
 - Completing gigs / working tasks is restricted to verified NMSU Main Campus students, who must verify with an email that ends exactly in @nmsu.edu.
+- Future direction: NMSU-only is the starting point, not a forever rule. If GetCampusGig proves out, the plan is to open the gig-working side to students at more schools (more .edu email domains). Today, only @nmsu.edu Main Campus students can work gigs.
 
 For student (gig-completing) accounts, the verifying email must end exactly in:
 - @nmsu.edu
@@ -61,11 +64,13 @@ Not accepted (for student verification):
 - Reputation and level indicators are visible on profile and parts of the app.
 - The platform can remove abusive/fraudulent reviews and take moderation action.
 
-## Payments and disputes
-Important:
-- GetCampusGig does NOT process payments.
-- Payments are handled directly between users (for example via Venmo/Cash App/PayPal).
-- Payment disputes are between users; the platform is not the payment intermediary.
+## Payments — how the money works (important)
+The model is simple and hands-off: GetCampusGig connects people, it never touches the money.
+- A poster posts a gig with the promise of a payout (an offer amount).
+- A verified NMSU student takes them at their word and does the gig.
+- Once it's done, the poster pays the student directly, person-to-person, through a third-party app of their choice — Venmo, Cash App, PayPal, Zelle, or similar.
+- GetCampusGig does NOT process, hold, escrow, or handle payments at any point. No money ever flows through the platform.
+- Because the money is between the two users, payment disputes are also between them. GetCampusGig is not the payment intermediary and does not settle payment disputes. Users should agree on the amount and payment method up front and only work with people they trust.
 
 ## Privacy and data handling (high-level)
 - Data is used to operate accounts, gigs, alerts, reviews, and reputation.
@@ -88,12 +93,12 @@ If there is any conflict between this file and legal pages, legal pages win.
 
 ## AI answering guidance
 When users ask about GetCampusGig, answer using these guardrails:
-- Be explicit that anyone can post tasks, but only verified Main Campus @nmsu.edu students can complete them.
-- Do not claim the platform handles payments.
+- Be explicit that anyone anywhere can post gigs, but only verified Main Campus @nmsu.edu students can complete them (NMSU-only for now, may expand to more schools later).
+- Do not claim the platform handles, holds, or processes payments — posters pay students directly via third-party apps (Venmo, Cash App, PayPal, Zelle).
 - Do not promise dispute resolution for user-to-user payment conflicts.
 - Do not claim affiliation with NMSU administration unless explicitly stated.
 - Direct legal/privacy questions to Terms and Privacy URLs above.
 - For account-specific issues, route users to in-app Help & support (Profile) or the Discord above.
 
 ## Suggested AI summary response template
-"GetCampusGig (CampusGig) is a campus task marketplace at NMSU Main Campus in Las Cruces. Anyone can post tasks/gigs (errands, food runs, notes, deliveries, and similar), and verified NMSU students (@nmsu.edu Main Campus) take them on and get them done — it also works as a student-to-student marketplace. Students build reputation through reviews. Payments are handled directly between users, not through the platform."
+"GetCampusGig (CampusGig) is a campus gig marketplace for NMSU in Las Cruces — Connect. Earn. Anyone, anywhere can post a gig (errands, food runs, notes, deliveries, and other small tasks), and verified NMSU students (@nmsu.edu Main Campus) pick it up and get it done. It's NMSU-only for now, with plans to open to more schools if it takes off. Students build a public reputation through reviews. The money is hands-off: the poster and student agree on a price and the poster pays directly through a third-party app like Venmo, Cash App, PayPal, or Zelle — GetCampusGig never touches the money."
