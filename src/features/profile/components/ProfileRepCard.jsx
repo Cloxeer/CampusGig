@@ -1,8 +1,58 @@
+import { useState, useEffect } from "react";
 import { TagBadge } from "../../../components/EquippedTagBadge";
 import { tierTagForLabel } from "../../../data/cosmetics";
 
 /** The trust ladder shown along the bottom of the card. */
 const TIER_LABELS = ["New", "Reliable", "Trusted", "Legend"];
+
+/* Rotating pitch on the logged-out (guest) rep card — same two-sided story as
+   the splash hero: post/hire, then earn. Crossfades via the shared .txt-roll
+   animation (Apple-tuned easing lives in global.css). */
+const REP_GUEST_MESSAGES = [
+  {
+    head: "Post a task — a verified student gets it done.",
+    sub: "Anyone can post work. Verified NMSU students take it on and earn rep on every job.",
+  },
+  {
+    head: "Hire a student for almost anything.",
+    sub: "Design, coding, tutoring, errands — a verified NMSU student gets it done.",
+  },
+  {
+    head: "Do the work. Earn the rep.",
+    sub: "Pick up gigs from anyone, anywhere — every finished job grows your rep.",
+  },
+];
+
+function GuestRepPitch() {
+  const [idx, setIdx] = useState(0);
+  const [prev, setPrev] = useState(null);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setIdx((i) => {
+        setPrev(i);
+        return (i + 1) % REP_GUEST_MESSAGES.length;
+      });
+    }, 4200);
+    return () => clearInterval(id);
+  }, []);
+
+  const render = (m, phase, key) => (
+    <div className={`txt-roll__item txt-roll__item--${phase}`} key={key}>
+      <div style={{ fontSize: 19, fontWeight: 700, color: "var(--green)", letterSpacing: "-.025em", margin: "4px 0 7px", lineHeight: 1.18 }}>
+        {m.head}
+      </div>
+      <div style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55 }}>{m.sub}</div>
+    </div>
+  );
+
+  return (
+    <div className="txt-roll txt-roll--rep" style={{ marginBottom: 16 }}>
+      {prev !== null && prev !== idx && render(REP_GUEST_MESSAGES[prev], "out", `out-${prev}`)}
+      {render(REP_GUEST_MESSAGES[idx], "in", `in-${idx}`)}
+    </div>
+  );
+}
 
 /**
  * THE rep card — one component used everywhere (profile, Home feed). Its color
@@ -26,12 +76,7 @@ export default function ProfileRepCard({ repScore, lvl, rank, totalUsers, onRepP
         onKeyDown={onRepPath ? (e) => keyActivate(e, onRepPath) : undefined}
       >
         <div className="rc-ey">Rep path · tap to explore</div>
-        <div style={{ fontSize: 19, fontWeight: 700, color: "var(--green)", letterSpacing: "-.025em", margin: "4px 0 7px", lineHeight: 1.18 }}>
-          Post a task — a verified student gets it done.
-        </div>
-        <div style={{ fontSize: 13, color: "var(--fg3)", lineHeight: 1.55, marginBottom: 16 }}>
-          Anyone can post work. Verified NMSU students take it on and earn rep on every job.
-        </div>
+        <GuestRepPitch />
         <div className="rc-track">
           <div className="rc-fill" style={{ width: "12%", background: "var(--green)" }} />
         </div>
@@ -53,7 +98,7 @@ export default function ProfileRepCard({ repScore, lvl, rank, totalUsers, onRepP
   /* The tier badge IS the earned tag (rarity-colored, no icon). Falls back to a
      plain colored pill only if a tier somehow has no mapped tag. */
   const badge = tierTag ? (
-    <TagBadge cosmetic={tierTag} />
+    <TagBadge cosmetic={tierTag} full />
   ) : (
     <span className="badge" style={{ fontSize: 11, background: lvl.bg, color: lvl.color, border: `1px solid ${lvl.border}` }}>
       {lvl.label}
@@ -99,10 +144,17 @@ export default function ProfileRepCard({ repScore, lvl, rank, totalUsers, onRepP
         ))}
       </div>
       {interactive ? (
-        <div className="rc-footer">
+        /* Two nowrap segments in a wrapping row: the goal + the how-to-earn
+           breakdown sit on one line when there's room, and the whole breakdown
+           drops cleanly to its own second line on narrow screens instead of
+           hard-wrapping mid-list. */
+        <div className="rc-footer" style={{ display: "flex", flexWrap: "wrap", columnGap: 8, rowGap: 2 }}>
           {lvl.next ? (
             <>
-              +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span> · +8 marking done · +10 as taker · +2 per post
+              <span style={{ whiteSpace: "nowrap" }}>
+                +{lvl.toNext} pts to <span style={{ color: lvl.nextColor }}>{lvl.next}</span>
+              </span>
+              <span style={{ whiteSpace: "nowrap" }}>+8 marking done · +10 as taker · +2 per post</span>
             </>
           ) : (
             "Max level reached"

@@ -34,7 +34,7 @@ const HERO_MESSAGES = [
    in the same reserved box so they overlap during the transition. */
 function HeroMessage({ msg, phase }) {
   return (
-    <div className={`hero-roll__item hero-roll__item--${phase}`}>
+    <div className={`txt-roll__item txt-roll__item--${phase}`}>
       <div
         style={{
           fontSize: 38,
@@ -239,7 +239,7 @@ export default function Splash() {
             </span>
           </div>
 
-          <div className="hero-roll">
+          <div className="txt-roll txt-roll--hero">
             {heroPrev !== null && heroPrev !== heroIdx && (
               <HeroMessage key={`out-${heroPrev}`} msg={HERO_MESSAGES[heroPrev]} phase="out" />
             )}
