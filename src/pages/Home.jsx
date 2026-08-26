@@ -9,6 +9,7 @@ import { useOpenGigsQuery, useCompletedGigsQuery } from "../hooks/useOpenGigsQue
 import { useLegacyGigRedirect } from "../hooks/useLegacyGigRedirect";
 import { getContext } from "../lib/spotMemory";
 import { BrandLockup } from "../components/Logo";
+import { RELEASE_STAGE, releaseStageLabel } from "../data/releaseStage";
 import GigCard from "../components/GigCard";
 import UserAvatar from "../components/UserAvatar";
 import ProfileRepCard from "../features/profile/components/ProfileRepCard";
@@ -23,7 +24,10 @@ import {
 } from "../data/categories";
 
 const HOME_SPOT_CHAT = "home";
+const HOME_SPOT_STAGE_CHAT = "home-stage";
+const HOME_SPOT_WELCOME_CHAT = "home-welcome";
 const HOME_SPOT_DELAY_MS = 3200;
+const HOME_SPOT_STAGE_DELAY_MS = 3000;
 const HOME_TABS_SCROLL_MS = 820;
 const HOME_SPOT_POP_MS = 340;
 const HOME_SPOT_SCRIPT = {
@@ -31,6 +35,20 @@ const HOME_SPOT_SCRIPT = {
   hints: ["Click to see finished gigs — get ideas of what to post or take."],
   closer: "I'll stick around.",
 };
+const HOME_SPOT_WELCOME_SCRIPT = {
+  intro: "Spot here.",
+  hints: ["What are you waiting for?", "Sign in or sign up!"],
+  closer: "Go get 'em.",
+};
+
+function homeStageScript() {
+  const stage = releaseStageLabel();
+  return {
+    intro: "Spot again.",
+    hints: [`We're in ${stage}.`, "Stay on the lookout for the big launch."],
+    closer: "I'll stick around.",
+  };
+}
 
 function homeSpotStillOnScript() {
   const phase = getContext(HOME_SPOT_CHAT).phase;
@@ -40,6 +58,33 @@ function homeSpotStillOnScript() {
 function homeSpotFinished() {
   const phase = getContext(HOME_SPOT_CHAT).phase;
   return phase === "resting" || phase === "done";
+}
+
+function homeStageSpotPending() {
+  if (!RELEASE_STAGE) return false;
+  const phase = getContext(HOME_SPOT_STAGE_CHAT).phase;
+  return phase === "script" || phase === "await-dismiss";
+}
+
+function homeStageSpotFinished() {
+  const phase = getContext(HOME_SPOT_STAGE_CHAT).phase;
+  return phase === "resting" || phase === "done";
+}
+
+function homeWelcomeSpotPending() {
+  const phase = getContext(HOME_SPOT_WELCOME_CHAT).phase;
+  return phase === "script" || phase === "await-dismiss";
+}
+
+function homeWelcomeSpotFinished() {
+  const phase = getContext(HOME_SPOT_WELCOME_CHAT).phase;
+  return phase === "resting" || phase === "done";
+}
+
+function homeActFinished(act) {
+  if (act === "stage") return homeStageSpotFinished();
+  if (act === "welcome") return homeWelcomeSpotFinished();
+  return homeSpotFinished();
 }
 
 /** Ease the tabs strip only — never scrollIntoView (that also jumps the page). */
@@ -74,9 +119,14 @@ export default function Home({ currentUserId }) {
   const scrollRef = useRef(null);
   const tabsRef = useRef(null);
   const finishedTabRef = useRef(null);
+  const logoRef = useRef(null);
+  const stageRef = useRef(null);
+  const welcomeRef = useRef(null);
+  const [spotAct, setSpotAct] = useState("gigs");
   const [spotMounted, setSpotMounted] = useState(false);
   const [spotShow, setSpotShow] = useState(false);
   const spotWasShown = useRef(false);
+  const spotStageDidRun = useRef(false);
   const [spotCorner, setSpotCorner] = useState({ top: "120px", left: "16px" });
   const [spotSize, setSpotSize] = useState(72);
   const [spotGaze, setSpotGaze] = useState(null);
@@ -126,7 +176,10 @@ export default function Home({ currentUserId }) {
         run.then(() => {
           const rest = HOME_SPOT_DELAY_MS - (performance.now() - t0);
           const show = () => {
-            if (!cancelled) setSpotMounted(true);
+            if (!cancelled) {
+              setSpotAct("gigs");
+              setSpotMounted(true);
+            }
           };
           if (rest > 16) showTimer = setTimeout(show, rest);
           else show();
@@ -155,6 +208,32 @@ export default function Home({ currentUserId }) {
     const t = setTimeout(() => setSpotMounted(false), HOME_SPOT_POP_MS);
     return () => clearTimeout(t);
   }, [spotShow, spotMounted]);
+
+  useEffect(() => {
+    if (isAuthed || showFullSkeleton || !RELEASE_STAGE) return undefined;
+    if (spotMounted || spotShow) return undefined;
+    if (!homeSpotFinished() || !homeStageSpotPending()) return undefined;
+    const t = setTimeout(() => {
+      spotWasShown.current = false;
+      spotStageDidRun.current = true;
+      setSpotAct("stage");
+      setSpotMounted(true);
+    }, HOME_SPOT_STAGE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [isAuthed, showFullSkeleton, spotMounted, spotShow]);
+
+  useEffect(() => {
+    if (isAuthed || showFullSkeleton) return undefined;
+    if (spotMounted || spotShow) return undefined;
+    if (!spotStageDidRun.current) return undefined;
+    if (!homeStageSpotFinished() || !homeWelcomeSpotPending()) return undefined;
+    const t = setTimeout(() => {
+      spotWasShown.current = false;
+      setSpotAct("welcome");
+      setSpotMounted(true);
+    }, HOME_SPOT_STAGE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [isAuthed, showFullSkeleton, spotMounted, spotShow]);
 
   const repScore = profile?.rep_score || 0;
   const lvl = getLevel(repScore);
@@ -205,10 +284,50 @@ export default function Home({ currentUserId }) {
   useLayoutEffect(() => {
     if (showFullSkeleton) return undefined;
     const place = () => {
+      const desktop = window.matchMedia("(min-width: 900px)").matches;
+      if (spotAct === "stage") {
+        const lockup = document.querySelector(".topbar .tlogo") || logoRef.current;
+        const stage =
+          document.querySelector(".topbar .logo-stage") ||
+          lockup?.querySelector(".logo-stage") ||
+          stageRef.current;
+        const bar = document.querySelector(".topbar");
+        if (!lockup || !bar) return;
+        const lr = lockup.getBoundingClientRect();
+        const br = bar.getBoundingClientRect();
+        const sr = stage ? stage.getBoundingClientRect() : lr;
+        const size = desktop ? 46 : 50;
+        setSpotSize(size);
+        setSpotCorner({
+          top: `${Math.round(br.top + (br.height - size) / 2)}px`,
+          left: `${Math.round(lr.right + 20)}px`,
+        });
+        setSpotGaze({
+          x: sr.left + sr.width / 2,
+          y: sr.top + sr.height / 2,
+        });
+        return;
+      }
+      if (spotAct === "welcome") {
+        const btn = welcomeRef.current;
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        const size = desktop ? 46 : 50;
+        setSpotSize(size);
+        const left = Math.max(8, r.left - size - 8);
+        setSpotCorner({
+          top: `${Math.round(r.top + (r.height - size) / 2)}px`,
+          left: `${Math.round(left)}px`,
+        });
+        setSpotGaze({
+          x: r.left + r.width / 2,
+          y: r.top + r.height / 2,
+        });
+        return;
+      }
       const tab = finishedTabRef.current;
       if (!tab) return;
       const r = tab.getBoundingClientRect();
-      const desktop = window.matchMedia("(min-width: 900px)").matches;
       const size = desktop ? 68 : 76;
       setSpotSize(size);
       const gap = 8;
@@ -240,14 +359,14 @@ export default function Home({ currentUserId }) {
       scrollEl?.removeEventListener("scroll", place);
       tabsEl?.removeEventListener("scroll", place);
     };
-  }, [showFullSkeleton, includeRecent, spotShow, filteredGigs.length, spotPlaceTick]);
+  }, [showFullSkeleton, includeRecent, spotShow, spotAct, filteredGigs.length, spotPlaceTick]);
 
   if (showFullSkeleton) return <AppSkeleton />;
 
   return (
     <div className="page fadein">
       <div className="topbar">
-        <BrandLockup />
+        <BrandLockup lockupRef={logoRef} stageRef={stageRef} />
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {isAuthed ? (
             <>
@@ -263,7 +382,12 @@ export default function Home({ currentUserId }) {
               </div>
             </>
           ) : (
-            <button className="btn bp" style={{ fontSize: 13, padding: "6px 14px" }} onClick={() => navigate("/welcome")}>
+            <button
+              ref={welcomeRef}
+              className="btn bp"
+              style={{ fontSize: 13, padding: "6px 14px" }}
+              onClick={() => navigate("/welcome")}
+            >
               Welcome
             </button>
           )}
@@ -272,27 +396,44 @@ export default function Home({ currentUserId }) {
 
       {!isAuthed && spotMounted ? (
         <SpotMascot
-          key="home-spot"
+          key={`home-spot-${spotAct}`}
+          className={`home-spot home-spot--${spotAct}`}
           float
           show={spotShow}
           size={spotSize}
-          mood="attentive"
+          mood={spotAct === "stage" ? "excited" : "attentive"}
+          flip={spotAct === "stage"}
           corner={spotCorner}
           lookAt={spotGaze || "cursor"}
-          script={HOME_SPOT_SCRIPT}
-          chatId={HOME_SPOT_CHAT}
+          lookAtRef={spotAct === "stage" ? stageRef : spotAct === "welcome" ? welcomeRef : null}
+          script={
+            spotAct === "stage"
+              ? homeStageScript()
+              : spotAct === "welcome"
+                ? HOME_SPOT_WELCOME_SCRIPT
+                : HOME_SPOT_SCRIPT
+          }
+          chatId={
+            spotAct === "stage"
+              ? HOME_SPOT_STAGE_CHAT
+              : spotAct === "welcome"
+                ? HOME_SPOT_WELCOME_CHAT
+                : HOME_SPOT_CHAT
+          }
           autoSpeak
           autoAdvanceMs={HOME_SPOT_DELAY_MS}
-          bubbleSide="top"
+          bubbleSide={spotAct === "gigs" ? "top" : "bottom"}
           onBubbleChange={(open) => {
-            if (!open && homeSpotFinished()) setSpotShow(false);
+            if (!open && homeActFinished(spotAct)) setSpotShow(false);
           }}
           onClick={() => {
-            setTab(HOME_TAB_FINISHED);
-            const tabsEl = tabsRef.current;
-            const tabEl = finishedTabRef.current;
-            if (tabsEl && tabEl) easeTabsToTab(tabsEl, tabEl, HOME_TABS_SCROLL_MS);
-            if (homeSpotFinished()) setSpotShow(false);
+            if (spotAct === "gigs") {
+              setTab(HOME_TAB_FINISHED);
+              const tabsEl = tabsRef.current;
+              const tabEl = finishedTabRef.current;
+              if (tabsEl && tabEl) easeTabsToTab(tabsEl, tabEl, HOME_TABS_SCROLL_MS);
+            }
+            if (homeActFinished(spotAct)) setSpotShow(false);
           }}
         />
       ) : null}

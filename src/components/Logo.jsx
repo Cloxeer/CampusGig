@@ -8,7 +8,7 @@ function cssLen(size, fallback = "15px") {
   return typeof size === "number" ? `${size}px` : size;
 }
 
-export default function Logo({ size = 15 }) {
+export default function Logo({ size = 15, stageRef }) {
   const stage = releaseStageLabel();
   const len = cssLen(size);
   return (
@@ -25,7 +25,7 @@ export default function Logo({ size = 15 }) {
         GetCampus<span style={{ color: "var(--green)" }}>Gig</span>.com
       </span>
       {stage ? (
-        <span className="logo-stage" aria-label={stage}>
+        <span ref={stageRef} className="logo-stage" aria-label={stage}>
           {stage}
         </span>
       ) : null}
@@ -51,11 +51,13 @@ export function BrandLockup({
   logoSize = 15,
   className = "tlogo",
   markStyle,
+  lockupRef,
+  stageRef,
 }) {
   return (
-    <div className={className}>
+    <div className={className} ref={lockupRef}>
       <LogoMark size={markSize} style={markStyle} />
-      <Logo size={logoSize} />
+      <Logo size={logoSize} stageRef={stageRef} />
     </div>
   );
 }
