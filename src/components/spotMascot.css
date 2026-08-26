@@ -151,6 +151,12 @@
   overflow: visible;
 }
 
+/* Decorative clip only — clicks hit .spot-breathe. pointer-events:none keeps
+   Edge from attaching its PiP/translate video hover bar to this <video>. */
+.spot-video {
+  pointer-events: none;
+}
+
 /* Eyes are transformed in view-box space by JS (matrix + gaze + blink). */
 .spot-eye {
   transform-box: view-box;
