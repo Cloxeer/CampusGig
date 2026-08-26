@@ -1,16 +1,22 @@
 import { releaseStageLabel } from "../data/releaseStage";
 
-/* PNG, not the multi-size .ico — .ico renders unreliably in an inline <img>. */
-export const LOGO_MARK_SRC = "/photos/favicon-32x32.png";
+/* High-res mark (not the 32px favicon — that blurs at 52px). */
+export const LOGO_MARK_SRC = "/photos/logo-mark.png";
+
+function cssLen(size, fallback = "15px") {
+  if (size == null) return fallback;
+  return typeof size === "number" ? `${size}px` : size;
+}
 
 export default function Logo({ size = 15 }) {
   const stage = releaseStageLabel();
+  const len = cssLen(size);
   return (
-    <span className="logo-wordmark" style={{ "--logo-size": `${size}px` }}>
+    <span className="logo-wordmark" style={{ "--logo-size": len }}>
       <span
         className="logo-wordmark-name"
         style={{
-          fontSize: size,
+          fontSize: "var(--logo-size)",
           fontWeight: 700,
           letterSpacing: "-.04em",
           color: "var(--fg)",
@@ -28,10 +34,11 @@ export default function Logo({ size = 15 }) {
 }
 
 export function LogoMark({ size, style, className = "tmark" }) {
+  const dim = size == null ? undefined : size;
   return (
     <div
       className={className}
-      style={size != null ? { width: size, height: size, ...style } : style}
+      style={dim != null ? { width: dim, height: dim, ...style } : style}
     >
       <img src={LOGO_MARK_SRC} alt="" className="tmark-img" draggable={false} />
     </div>

@@ -965,11 +965,26 @@ body {
 .splash-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.splash-brand .tmark {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+.splash-brand .logo-wordmark {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.splash-brand .logo-wordmark-name {
+  white-space: nowrap;
 }
 .splash-brand .logo-stage {
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: 0.04em;
   text-shadow:
     -1.5px -1.5px 0 #27272a,
@@ -1016,8 +1031,32 @@ body {
   flex-shrink: 0;
 }
 /* ── SPLASH ────────────────────────────────────────────────── */
-.splash { min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
-.splash-body { flex: 1; padding: 0 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+.splash {
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.splash-body {
+  flex: 1 0 auto;
+  padding: 0 16px;
+  position: relative;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+.splash-back {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin: max(10px, env(safe-area-inset-top, 0px)) 0 8px -4px;
+}
 .sgrid {
   position: absolute;
   inset: 0;
@@ -1026,7 +1065,14 @@ body {
   opacity: .5;
 }
 .sfade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 25%, var(--bg) 82%); }
-.scontent { position: relative; z-index: 1; }
+.scontent {
+  position: relative;
+  z-index: 1;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .sdot {
   width: 7px;
   height: 7px;
@@ -1040,12 +1086,67 @@ body {
   50% { opacity: .3; transform: scale(.65); }
 }
 .sfoot {
-  padding: 20px 24px 36px;
+  flex-shrink: 0;
+  padding: 20px 24px max(28px, env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--bd);
   background: var(--bg);
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.sfoot-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 0 2px;
+  text-align: center;
+}
+.sfoot-policy {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+}
+.sfoot-policy svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sfoot-note-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--fg4);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.sfoot-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.16em;
+  color: var(--fg3);
+  white-space: nowrap;
+}
+.sfoot-go::before,
+.sfoot-go::after {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--bd2);
+}
+.sfoot-aggies {
+  color: var(--brand-wine);
+  letter-spacing: 0.12em;
 }
 
 /* ── SPLASH STATS ─────────────────────────────────────────── */

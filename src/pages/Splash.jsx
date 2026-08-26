@@ -393,10 +393,9 @@ export default function Splash() {
       <div className="splash-body">
         <button
           type="button"
-          className="btn bg-btn bico"
+          className="btn bg-btn bico splash-back"
           onClick={() => navigate("/")}
           aria-label="Back to home"
-          style={{ position: "absolute", top: 14, left: 14, zIndex: 2 }}
         >
           <ArrowLeft size={15} />
         </button>
@@ -405,7 +404,6 @@ export default function Splash() {
         <div className="scontent shell-prose">
           <BrandLockup
             className="splash-brand"
-            markSize={52}
             logoSize={22}
             markStyle={{ borderRadius: "var(--r)" }}
           />
@@ -470,11 +468,18 @@ export default function Splash() {
         <button className="btn bo bfull blg" onClick={() => navigate("/auth")}>
           Sign in
         </button>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, paddingTop: 2 }}>
-          <Lock size={11} color="var(--fg4)" />
-          <span style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--fg4)" }}>
-            Anyone can post · only verified NMSU students work gigs · GO aggies
-          </span>
+        <div className="sfoot-note">
+          <p className="sfoot-policy">
+            <Lock size={11} color="var(--fg4)" aria-hidden />
+            <span className="sfoot-note-copy">
+              Anyone can post · only verified NMSU students work gigs
+            </span>
+          </p>
+          <p className="sfoot-go">
+            <span>
+              GO <span className="sfoot-aggies">Aggies</span>
+            </span>
+          </p>
         </div>
       </div>
     </div>
