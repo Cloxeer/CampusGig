@@ -36,7 +36,7 @@ export default function SetPasscodeModal({ onClose, onSuccess, isChange = false 
             <KeyRound size={22} strokeWidth={2} aria-hidden />
           </div>
           <h2 id="set-passcode-modal-title" className="passcode-modal-hero__title">
-            {isChange ? "Change your passcode" : "Set your passcode"}
+            {isChange ? "Change your PIN" : "Set your PIN"}
           </h2>
           <p className="passcode-modal-hero__subtitle">
             Pick a private 6-digit code for faster sign-in. Magic link always works if you forget it.
@@ -63,7 +63,7 @@ export default function SetPasscodeModal({ onClose, onSuccess, isChange = false 
             className="btn bp bfull passcode-modal-ft__primary"
             disabled={loading || !canSubmit}
           >
-            {loading ? <Loader size={16} className="spin" /> : isChange ? "Update passcode" : "Save passcode"}
+            {loading ? <Loader size={16} className="spin" /> : isChange ? "Update PIN" : "Save PIN"}
           </button>
           <button type="button" className="btn bo bfull passcode-modal-ft__secondary" onClick={onClose} disabled={loading}>
             Cancel

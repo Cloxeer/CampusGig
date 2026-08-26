@@ -40,7 +40,7 @@ export default function PasscodeSetupPromptModal({
             Set up easy access?
           </h2>
           <p className="passcode-modal-hero__subtitle">
-            Add a <strong>6-digit passcode</strong> so next time you sign in with just your email and code — no
+            Add a <strong>6-digit PIN</strong> so next time you sign in with just your email and code — no
             inbox check.
           </p>
         </div>
@@ -49,7 +49,7 @@ export default function PasscodeSetupPromptModal({
           <div className="passcode-prompt-benefits">
             <div className="passcode-prompt-benefit">
               <span className="passcode-prompt-benefit__num">1</span>
-              <span>Open Sign in → choose <strong>Passcode</strong></span>
+              <span>Open Sign in → choose <strong>PIN</strong></span>
             </div>
             <div className="passcode-prompt-benefit">
               <span className="passcode-prompt-benefit__num">2</span>
@@ -74,7 +74,7 @@ export default function PasscodeSetupPromptModal({
           >
             <ShieldCheck size={14} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
             <span>
-              Keep it private — <strong>never share your passcode</strong> with anyone. The email
+              Keep it private — <strong>never share your PIN</strong> with anyone. The email
               magic link is the most secure way in, and it always works.
             </span>
           </p>
@@ -83,7 +83,7 @@ export default function PasscodeSetupPromptModal({
         <div className="modal-center-ft passcode-modal-ft">
           <button type="button" className="btn bp bfull passcode-modal-ft__primary" onClick={onSetPasscode}>
             <KeyRound size={15} aria-hidden />
-            Set passcode
+            Set PIN
           </button>
           <button type="button" className="btn bo bfull passcode-modal-ft__secondary" onClick={onAskLater}>
             Ask me later

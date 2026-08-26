@@ -32,7 +32,7 @@ function SummarizedPrivacy() {
         </P>
         <P>
           <strong>Clients</strong> (anyone else who wants to post work for students) sign up with any email address and a
-          password. Clients can post gigs but can never be marked as verified students.
+          magic link. Clients can post gigs but can never be marked as verified students.
         </P>
       </Section>
 
@@ -172,7 +172,7 @@ function LegalPrivacy() {
             status is derived solely from confirmed control of an @nmsu.edu mailbox.
           </LI>
           <LI>
-            <strong>Client Accounts:</strong> registered with any valid email address and a password by individuals or
+            <strong>Client Accounts:</strong> registered with any valid email address and a magic link by individuals or
             organizations seeking to post tasks. Client Accounts cannot obtain verified-student status and cannot accept
             or perform gigs.
           </LI>

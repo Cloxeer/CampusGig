@@ -13,6 +13,7 @@ import SpotMascot from "../components/SpotMascot";
 import { getMyProfile, getAvatarUrl } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
 import { safeAppReturnTo } from "../hooks/useModalParam";
+import ProfileTabBar from "../features/profile/components/ProfileTabBar";
 import "./inventory.css";
 
 /**
@@ -369,32 +370,32 @@ export default function Inventory() {
             </button>
           ) : null}
 
-          {/* View swap — the SAME tab bar the profile uses (Activity | Board). */}
-          <div style={{ display: "flex", borderBottom: "1px solid var(--bd)", marginBottom: 14 }} role="tablist" aria-label="Cosmetic type">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "tag"}
-              className={`ptab ${view === "tag" ? "on" : ""}`}
-              onClick={() => setView("tag")}
-            >
-              Tags
-              <span className="invx-tabcount">
-                {tags.filter((c) => inv.owned.includes(c.id)).length}/{tags.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "border"}
-              className={`ptab ${view === "border" ? "on" : ""}`}
-              onClick={() => setView("border")}
-            >
-              Borders
-              <span className="invx-tabcount">
-                {borders.filter((c) => inv.owned.includes(c.id)).length}/{borders.length}
-              </span>
-            </button>
+          <div style={{ marginBottom: 14 }}>
+            <ProfileTabBar
+              pTab={view}
+              setPTab={setView}
+              ariaLabel="Cosmetic type"
+              tabs={[
+                [
+                  "tag",
+                  <>
+                    Tags
+                    <span className="invx-tabcount">
+                      {tags.filter((c) => inv.owned.includes(c.id)).length}/{tags.length}
+                    </span>
+                  </>,
+                ],
+                [
+                  "border",
+                  <>
+                    Borders
+                    <span className="invx-tabcount">
+                      {borders.filter((c) => inv.owned.includes(c.id)).length}/{borders.length}
+                    </span>
+                  </>,
+                ],
+              ]}
+            />
           </div>
 
           {view === "tag" ? (

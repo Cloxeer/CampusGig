@@ -1,5 +1,5 @@
 import { nanpDigitsFromInput } from "./phoneNanp";
-import { EMPTY_CONTACT_PROFILE, OPTIONAL_CONTACT_FIELD_KEYS } from "./contactFields";
+import { EMPTY_CONTACT_PROFILE, OPTIONAL_CONTACT_FIELD_KEYS, hasRequiredPayment } from "./contactFields";
 import { looksLikeAvatarImage } from "./prepareAvatarImage";
 
 export { EMPTY_CONTACT_PROFILE };
@@ -36,7 +36,16 @@ export function profileContactsToApi(profile) {
   for (const key of OPTIONAL_CONTACT_FIELD_KEYS) {
     out[key] = trimOrNull(profile[key]);
   }
+  out.accepts_cash = Boolean(profile.accepts_cash);
   return out;
+}
+
+export function validateRequiredPayment(profile) {
+  if (hasRequiredPayment(profile)) return { ok: true, error: null };
+  return {
+    ok: false,
+    error: "Add one payment handle, or choose cash for now if you don't remember it.",
+  };
 }
 
 // Each contact handle is UNIQUE across accounts (user_private_contact_<key>_key).

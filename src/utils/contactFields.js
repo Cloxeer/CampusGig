@@ -23,6 +23,25 @@ export const OPTIONAL_CONTACT_FIELD_KEYS = [
   ...MORE_CONTACT_FIELDS,
 ].map((f) => f.key);
 
+/** Handles that count as “how I get paid” (not Snap / IG / Discord). */
+export const PAYMENT_CONTACT_KEYS = [
+  "venmo",
+  "cashapp",
+  "paypal",
+  "zelle",
+  "apple_pay",
+  "google_pay",
+];
+
+export function hasFilledPaymentHandle(profile) {
+  return PAYMENT_CONTACT_KEYS.some((k) => String(profile?.[k] || "").trim() !== "");
+}
+
+/** Phone save also needs one payment: a handle, or cash-for-now. */
+export function hasRequiredPayment(profile) {
+  return Boolean(profile?.accepts_cash) || hasFilledPaymentHandle(profile);
+}
+
 export const OPTIONAL_CONTACT_FIELD_BY_KEY = Object.fromEntries(
   [...POPULAR_CONTACT_FIELDS, ...MORE_CONTACT_FIELDS].map((f) => [f.key, f])
 );
@@ -47,6 +66,7 @@ export function normalizeContactFavoriteKeys(arr) {
 export const CONTACT_PROFILE_KEYS = ["phone", ...OPTIONAL_CONTACT_FIELD_KEYS];
 
 /** Blank editable contact profile for new / reset forms. */
-export const EMPTY_CONTACT_PROFILE = Object.fromEntries(
-  CONTACT_PROFILE_KEYS.map((k) => [k, ""])
-);
+export const EMPTY_CONTACT_PROFILE = {
+  ...Object.fromEntries(CONTACT_PROFILE_KEYS.map((k) => [k, ""])),
+  accepts_cash: false,
+};

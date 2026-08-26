@@ -45,7 +45,7 @@ export default function MagicLink() {
         <br />
         <strong style={{ color: "var(--fg)" }}>{email}</strong>
         <br />
-        Click it to sign in instantly. Next time, you can use a passcode on the Sign in page if you set one up.
+        Click it to sign in instantly. Next time, you can use a 6-digit PIN on the Sign in page if you set one up.
       </div>
 
       <div

@@ -17,21 +17,21 @@ export function mapPasscodeAuthError(error, context = "signin") {
   const code = error?.code;
 
   if (code === "invalid_credentials" || msg.includes("invalid login credentials")) {
-    return "Incorrect email or passcode. Try again or use a magic link.";
+    return "Incorrect email or PIN. Try again or use a magic link.";
   }
   if (msg.includes("email not confirmed")) {
     return "Confirm your email first, or sign in with a magic link.";
   }
   if (msg.includes("same password")) {
-    return "Choose a different passcode than your current one.";
+    return "Choose a different PIN than your current one.";
   }
   if (
     msg.includes("at least") &&
     (msg.includes("12") || msg.includes("8") || msg.includes("character"))
   ) {
     return context === "set"
-      ? "Could not save your 6-digit passcode. Please try again."
-      : "Could not sign in with this passcode. Try a magic link instead.";
+      ? "Could not save your 6-digit PIN. Please try again."
+      : "Could not sign in with this PIN. Try a magic link instead.";
   }
   if (
     msg.includes("weak") ||
@@ -40,8 +40,8 @@ export function mapPasscodeAuthError(error, context = "signin") {
     msg.includes("compromised") ||
     code === "weak_password"
   ) {
-    return "This passcode is too easy to guess. Pick a different 6-digit code.";
+    return "This PIN is too easy to guess. Pick a different 6-digit PIN.";
   }
 
-  return error?.message || (context === "set" ? "Could not save passcode." : "Could not sign in. Please try again.");
+  return error?.message || (context === "set" ? "Could not save PIN." : "Could not sign in. Please try again.");
 }

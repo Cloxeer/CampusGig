@@ -33,7 +33,7 @@ export default function PasscodeSetupForm({
   const [loading, setLoading] = useState(false);
 
   const canSubmit = pin.length === 6 && confirmPin.length === 6 && !loading;
-  const label = submitLabel ?? (isChange ? "Save new passcode" : "Save passcode");
+  const label = submitLabel ?? (isChange ? "Save new PIN" : "Save PIN");
 
   useEffect(() => {
     onLoadingChange?.(loading);
@@ -54,7 +54,7 @@ export default function PasscodeSetupForm({
     }
 
     if (pin !== confirmPin) {
-      setError("Passcodes don't match. Enter the same 6 digits in both fields.");
+      setError("PINs don't match. Enter the same 6 digits in both fields.");
       return;
     }
 
@@ -71,7 +71,7 @@ export default function PasscodeSetupForm({
     setLoading(false);
 
     if (persistErr) {
-      setError(persistErr.message || "Passcode saved for sign-in, but profile sync failed. Try again.");
+      setError(persistErr.message || "PIN saved for sign-in, but profile sync failed. Try again.");
       return;
     }
 
@@ -85,22 +85,22 @@ export default function PasscodeSetupForm({
     <form id={PASSCODE_SETUP_FORM_ID} className="passcode-setup-form" onSubmit={handleSave}>
       <div className="field">
         <label className="lbl">
-          {isChange ? "New 6-digit passcode" : "Choose 6-digit passcode"}
+          {isChange ? "New 6-digit PIN" : "Choose 6-digit PIN"}
         </label>
         <PasscodeInput
           value={pin}
           onChange={setPin}
           disabled={loading}
-          label="New 6-digit passcode"
+          label="New 6-digit PIN"
         />
       </div>
       <div className="field">
-        <label className="lbl">Confirm passcode</label>
+        <label className="lbl">Confirm PIN</label>
         <PasscodeInput
           value={confirmPin}
           onChange={setConfirmPin}
           disabled={loading}
-          label="Confirm 6-digit passcode"
+          label="Confirm 6-digit PIN"
         />
       </div>
 

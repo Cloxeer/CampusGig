@@ -17,6 +17,7 @@ export const USER_PRIVATE_SELECT = [
   "phone",
   ...OPTIONAL_CONTACT_FIELD_KEYS,
   "contact_favorite_keys",
+  "accepts_cash",
 ].join(", ");
 
 /** 48h after gig completion (matches Postgres `interval '2 days'`). */

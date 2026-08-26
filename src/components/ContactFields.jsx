@@ -1,18 +1,73 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Lock, AtSign, Phone, Mail, Star } from "lucide-react";
+import { Lock, AtSign, Phone, Mail, Star, Banknote } from "lucide-react";
 import FavoriteHintBubble from "./FavoriteHintBubble";
 import { formatNanpDisplay, nanpDigitsFromInput } from "../utils/phoneNanp";
-import { isEduEmail } from "../lib/auth";
+import { emailFieldLabel } from "../lib/auth";
 import {
   POPULAR_CONTACT_FIELDS as POPULAR,
   MORE_CONTACT_FIELDS as MORE,
   OPTIONAL_CONTACT_FIELD_BY_KEY as FIELD_BY_KEY,
   FAVORABLE_CONTACT_KEYS,
   normalizeContactFavoriteKeys,
+  hasFilledPaymentHandle,
 } from "../utils/contactFields";
 
 // Re-exported for existing import paths (e.g. EditProfile uses `../components/ContactFields`).
 export { FAVORABLE_CONTACT_KEYS, normalizeContactFavoriteKeys };
+
+export function ReadOnlyEmailField({ emailDisplay }) {
+  if (emailDisplay == null || emailDisplay === "") return null;
+  return (
+    <FieldRow label={emailFieldLabel(emailDisplay)}>
+      <div className="ig" style={{ opacity: 0.92 }}>
+        <div className="iad">
+          <Mail size={13} />
+        </div>
+        <input className="ii" value={emailDisplay} readOnly disabled style={{ color: "var(--fg2)" }} />
+      </div>
+    </FieldRow>
+  );
+}
+
+function CashForNowRow({ checked, hasHandle, onToggle }) {
+  return (
+    <div
+      className="callout"
+      style={{ marginTop: 4, marginBottom: 2, cursor: "pointer" }}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+      role="checkbox"
+      aria-checked={checked}
+      tabIndex={0}
+    >
+      <div className="ci">
+        <Banknote size={13} />
+      </div>
+      <span className="ct" style={{ flex: 1 }}>
+        <strong>{hasHandle ? "I also take cash in person" : "Cash for now"}</strong>
+        <span style={{ display: "block", marginTop: 2, fontWeight: 400 }}>
+          {hasHandle
+            ? "They can still pay you in cash when you meet."
+            : "Don't remember Venmo or Cash App? Choose this and add a handle later."}
+        </span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        aria-hidden
+        tabIndex={-1}
+        style={{ width: 18, height: 18, flexShrink: 0 }}
+      />
+    </div>
+  );
+}
 
 function FieldRow({ children, label, optional }) {
   return (
@@ -133,6 +188,7 @@ export default function ContactFields({
   phoneRequired = true,
   favoriteKeys = [],
   onFavoriteToggle,
+  showEmail = true,
 }) {
   const set = (key, val) => onFieldChange(key, val);
 
@@ -245,19 +301,12 @@ export default function ContactFields({
         Popular
       </div>
       <div style={sectionSubtitleStyle()}>
-        Email, phone, and the payment apps most students use first.
+        {showEmail
+          ? "Email, phone, and the payment apps most students use first."
+          : "Phone and the payment apps most students use first."}
       </div>
 
-      {emailDisplay != null && emailDisplay !== "" && (
-        <FieldRow label={isEduEmail(emailDisplay) ? "School email" : "Email"}>
-          <div className="ig" style={{ opacity: 0.92 }}>
-            <div className="iad">
-              <Mail size={13} />
-            </div>
-            <input className="ii" value={emailDisplay} readOnly disabled style={{ color: "var(--fg2)" }} />
-          </div>
-        </FieldRow>
-      )}
+      {showEmail ? <ReadOnlyEmailField emailDisplay={emailDisplay} /> : null}
 
       <FieldRow label={<>Phone {phoneRequired && <span style={{ color: "#dc2626", fontSize: 11, fontWeight: 600 }}>required</span>}</>}>
         <div className="ig">
@@ -292,6 +341,12 @@ export default function ContactFields({
           requestFavoriteToggle={requestFavoriteToggle}
         />
       ))}
+
+      <CashForNowRow
+        checked={Boolean(profile.accepts_cash)}
+        hasHandle={hasFilledPaymentHandle(profile)}
+        onToggle={() => set("accepts_cash", !profile.accepts_cash)}
+      />
 
       <div
         style={{

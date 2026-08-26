@@ -1,12 +1,24 @@
 import { useState, useEffect } from "react";
-import { Loader } from "lucide-react";
-import { Camera } from "lucide-react";
+import { Loader, Camera } from "lucide-react";
 import { createProfile, uploadAvatar } from "../lib/profile";
 import { supabase } from "../lib/supabase";
-import ProfileContactForm from "../components/ProfileContactForm";
-import { EMPTY_CONTACT_PROFILE, validateNanpPhone, profileContactsToApi, mapContactError } from "../utils/profileForm";
+import ProfileContactForm, { FormErrorBanner } from "../components/ProfileContactForm";
+import ProfilePhotoField from "../components/ProfilePhotoField";
+import NameFields from "../components/NameFields";
+import { ReadOnlyEmailField } from "../components/ContactFields";
+import {
+  EMPTY_CONTACT_PROFILE,
+  validateNanpPhone,
+  validateRequiredPayment,
+  profileContactsToApi,
+  mapContactError,
+} from "../utils/profileForm";
+import { hasRequiredPayment } from "../utils/contactFields";
 
 export default function Onboarding({ onComplete }) {
+  const [step, setStep] = useState("profile");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [profile, setProfile] = useState(EMPTY_CONTACT_PROFILE);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -16,8 +28,13 @@ export default function Onboarding({ onComplete }) {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user?.email) setEmailDisplay(user.email);
+      const meta = user?.user_metadata || {};
+      if (meta.first_name) setFirstName(String(meta.first_name));
+      if (meta.last_name) setLastName(String(meta.last_name));
     })();
   }, []);
 
@@ -30,21 +47,44 @@ export default function Onboarding({ onComplete }) {
     setAvatarPreview(URL.createObjectURL(file));
   }
 
-  const handleFinish = async (phoneRequiredMessage) => {
+  function goToContacts() {
+    setError("");
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last name are required.");
+      return;
+    }
+    setStep("contacts");
+  }
+
+  const handleFinish = async () => {
     setError("");
 
-    const phoneCheck = validateNanpPhone(profile.phone, {
-      requiredMessage: phoneRequiredMessage,
-    });
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last name are required.");
+      setStep("profile");
+      return;
+    }
+
+    const phoneCheck = validateNanpPhone(profile.phone);
     if (!phoneCheck.ok) {
       setError(phoneCheck.error);
+      setStep("contacts");
+      return;
+    }
+
+    const payCheck = validateRequiredPayment(profile);
+    if (!payCheck.ok) {
+      setError(payCheck.error);
+      setStep("contacts");
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         setError("Not authenticated. Please sign up again.");
@@ -54,8 +94,8 @@ export default function Onboarding({ onComplete }) {
 
       const { error: createError } = await createProfile({
         phone: profile.phone.trim(),
-        firstName: user.user_metadata?.first_name || "",
-        lastName: user.user_metadata?.last_name || "",
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: user.email,
         referralSource: user.user_metadata?.referral_source || null,
         ...profileContactsToApi(profile),
@@ -82,45 +122,80 @@ export default function Onboarding({ onComplete }) {
     }
   };
 
+  const initials = `${firstName.trim().charAt(0) || ""}${lastName.trim().charAt(0) || ""}`.toUpperCase();
+  const contactsReady = validateNanpPhone(profile.phone).ok && hasRequiredPayment(profile);
+
   return (
     <div className="page fadein">
       <div style={{ padding: "52px 20px 18px", borderBottom: "1px solid var(--bd)" }}>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.035em", marginBottom: 4 }}>
-          Set up your profile
+          {step === "profile" ? "Set up your profile" : "How people reach you"}
         </div>
         <div style={{ fontSize: 13, color: "var(--fg3)" }}>
-          Phone is required. Fill popular payment methods first — everything else is optional.
+          {step === "profile"
+            ? "Add your name and a photo. You can change these later."
+            : "Phone plus one way to get paid. Don't remember Venmo? Choose cash for now."}
         </div>
       </div>
 
       <div className="scroll" style={{ padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-        <ProfileContactForm
-          profile={profile}
-          onFieldChange={onFieldChange}
-          emailDisplay={emailDisplay}
-          error={error}
-          onError={setError}
-          avatarDisplayUrl={avatarPreview}
-          avatarFallback={{ placeholder: <Camera size={24} color="var(--fg4)" /> }}
-          onAvatarSelect={handleAvatarSelect}
-          phoneRequired
-        />
-
-        <button
-          className="btn bp bfull blg"
-          style={{ marginTop: 4, opacity: loading ? 0.7 : 1 }}
-          onClick={() => handleFinish()}
-          disabled={loading}
-        >
-          {loading ? <Loader size={16} className="spin" /> : "Finish setup"}
-        </button>
-        <button
-          className="btn bg-btn bfull"
-          onClick={() => handleFinish("Phone number is required — enter a valid 10-digit US number.")}
-          disabled={loading}
-        >
-          Skip optional fields
-        </button>
+        {step === "profile" ? (
+          <>
+            <ProfilePhotoField
+              onAvatarSelect={handleAvatarSelect}
+              onError={setError}
+              avatarDisplayUrl={avatarPreview}
+              avatarFallback={
+                initials
+                  ? { initials, color: "#6366f1" }
+                  : { placeholder: <Camera size={24} color="var(--fg4)" /> }
+              }
+              withCosmetics={false}
+            />
+            <NameFields
+              idPrefix="onboard"
+              firstName={firstName}
+              lastName={lastName}
+              onFirstName={setFirstName}
+              onLastName={setLastName}
+            />
+            <ReadOnlyEmailField emailDisplay={emailDisplay} />
+            <FormErrorBanner error={error} />
+            <button
+              type="button"
+              className="btn bp bfull blg"
+              style={{ marginTop: 4 }}
+              onClick={goToContacts}
+            >
+              Next
+            </button>
+          </>
+        ) : (
+          <>
+            <ProfileContactForm
+              profile={profile}
+              onFieldChange={onFieldChange}
+              emailDisplay={emailDisplay}
+              error={error}
+              onError={setError}
+              phoneRequired
+              showAvatar={false}
+              showEmail={false}
+            />
+            <button
+              type="button"
+              className="btn bp bfull blg"
+              style={{ marginTop: 4, opacity: loading || !contactsReady ? 0.55 : 1 }}
+              onClick={handleFinish}
+              disabled={loading || !contactsReady}
+            >
+              {loading ? <Loader size={16} className="spin" /> : "Save"}
+            </button>
+            <button type="button" className="btn bg-btn bfull" onClick={() => setStep("profile")} disabled={loading}>
+              Back
+            </button>
+          </>
+        )}
         <div style={{ height: 8 }} />
       </div>
     </div>

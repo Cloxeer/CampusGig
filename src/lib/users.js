@@ -126,6 +126,7 @@ export async function createProfile({
   zelle,
   apple_pay,
   google_pay,
+  accepts_cash,
   avatarColor,
   referralSource,
 }) {
@@ -159,6 +160,7 @@ export async function createProfile({
     ...(zelle && { zelle }),
     ...(apple_pay && { apple_pay }),
     ...(google_pay && { google_pay }),
+    accepts_cash: Boolean(accepts_cash),
   };
 
   const { error: contactError } = await supabase.from("user_private_contact").insert(contactRow);
@@ -172,6 +174,7 @@ const PRIVATE_USER_FIELDS = new Set([
   "email",
   ...OPTIONAL_CONTACT_FIELD_KEYS,
   "contact_favorite_keys",
+  "accepts_cash",
 ]);
 
 export async function updateMyProfile(updates) {
@@ -189,6 +192,8 @@ export async function updateMyProfile(updates) {
         privatePatch[k] = v;
       } else if (k === "contact_favorite_keys") {
         privatePatch[k] = v;
+      } else if (k === "accepts_cash") {
+        privatePatch[k] = Boolean(v);
       } else {
         const t = v == null ? "" : String(v).trim();
         privatePatch[k] = t === "" ? null : t;

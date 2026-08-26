@@ -18,6 +18,11 @@ export function isEduEmail(email) {
   return ALLOWED_DOMAINS.some((d) => trimmed.endsWith(`@${d}`));
 }
 
+/** Students sign up with @nmsu.edu; everyone else is a client. */
+export function emailFieldLabel(email) {
+  return isEduEmail(email) ? "School email" : "Email";
+}
+
 // ──────────────────────────────────────────────────
 // Magic Link (passwordless)
 // ──────────────────────────────────────────────────

@@ -11,7 +11,7 @@ const SLOT_COUNT = 6;
  * @param {boolean} [props.disabled]
  * @param {string} [props.label]
  */
-export default function PasscodeInput({ value, onChange, id: idProp, disabled = false, label = "6-digit passcode" }) {
+export default function PasscodeInput({ value, onChange, id: idProp, disabled = false, label = "6-digit PIN" }) {
   const autoId = useId();
   const id = idProp ?? autoId;
   const inputRef = useRef(null);

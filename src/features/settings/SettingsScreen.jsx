@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { Smartphone } from "lucide-react";
 import { useSettingsProfileQueries } from "./hooks/useSettingsProfileQueries";
 import { useDeviceNotifyPreferences } from "./hooks/useDeviceNotifyPreferences";
-import { useNameEditor } from "./hooks/useNameEditor";
 import { useEmailAlertsToggle } from "./hooks/useEmailAlertsToggle";
 import { useDeleteAccountModal } from "./hooks/useDeleteAccountModal";
 import SettingsScreenHeader from "./sections/SettingsScreenHeader";
@@ -20,7 +20,6 @@ export default function SettingsScreen() {
   const navigate = useNavigate();
   const { profile, email, isPending, isPendingDeletion, graceEndsLabel } = useSettingsProfileQueries();
   const { notifyGigUpdates, setNotifyGigUpdates, notifyAlerts, setNotifyAlerts } = useDeviceNotifyPreferences();
-  const nameEditor = useNameEditor(profile);
   const { emailAlerts, handleEmailAlertsChange, emailAlertsSaving } = useEmailAlertsToggle(profile);
   const deleteModal = useDeleteAccountModal();
 
@@ -32,18 +31,16 @@ export default function SettingsScreen() {
         <SettingsSignedInEmailCard email={email} isPending={isPending} />
         <SettingsPasscodeCard profile={profile} isPending={isPending} />
         <SettingsNameCard
-          firstName={nameEditor.firstName}
-          setFirstName={nameEditor.setFirstName}
-          lastName={nameEditor.lastName}
-          setLastName={nameEditor.setLastName}
-          nameError={nameEditor.nameError}
-          nameSaving={nameEditor.nameSaving}
-          onSaveName={nameEditor.handleSaveName}
-          isPending={isPending}
-          hasProfile={!!profile}
+          onNavigateEditProfile={() =>
+            navigate("/profile/edit", { state: { returnTo: "/settings", tab: "profile" } })
+          }
         />
         <SettingsEditContactsNavRow
-          onNavigateEditContacts={() => navigate("/profile/edit", { state: { returnTo: "/settings" } })}
+          icon={Smartphone}
+          label="Edit contacts & payment methods"
+          onNavigateEditContacts={() =>
+            navigate("/profile/edit", { state: { returnTo: "/settings", tab: "contacts" } })
+          }
         />
         <SettingsAlertsCard
           notifyGigUpdates={notifyGigUpdates}

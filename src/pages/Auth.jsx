@@ -218,7 +218,7 @@ export default function Auth() {
     setLoading(true);
 
     if (passcode.length !== 6) {
-      setError("Enter your 6-digit passcode.");
+      setError("Enter your 6-digit PIN.");
       setLoading(false);
       return;
     }
@@ -245,9 +245,9 @@ export default function Auth() {
     : isStudentSignup
       ? "Sign up with your Main Campus @nmsu.edu email. We'll send a magic link. Already joined? The link signs you in too."
       : isClientSignup
-        ? "Post work for verified NMSU students. Use any email — we'll send you a sign-in link. No password needed."
+        ? "Post work for verified NMSU students. Use any email — we'll send you a sign-in link."
         : signInMethod === "passcode"
-          ? "Sign in with your email and 6-digit passcode — no inbox check needed."
+          ? "Sign in with your email and 6-digit PIN — no inbox check needed."
           : "Enter the email you joined with. We'll send a sign-in link.";
 
   return (
@@ -387,12 +387,12 @@ export default function Auth() {
 
           {isLoginPasscode && (
             <div className="field">
-              <label className="lbl">6-digit passcode</label>
+              <label className="lbl">6-digit PIN</label>
               <PasscodeInput
                 value={passcode}
                 onChange={setPasscode}
                 disabled={loading}
-                label="6-digit passcode for sign in"
+                label="6-digit PIN for sign in"
               />
               <div className="hint" style={{ marginTop: 6, textAlign: "center" }}>
                 Set yours in Settings after joining. Forgot it?{" "}

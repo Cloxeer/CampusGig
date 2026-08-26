@@ -351,6 +351,7 @@ export default function ProfilePage({ currentUserId }) {
               openReviews={openReviews}
               reviewsLoading={q.reviewsPending}
               isOwnProfile
+              onEditProfile={() => navigate("/profile/edit", { state: { returnTo: "/profile" } })}
             />
 
             <ProfileStatBoxes
@@ -438,7 +439,7 @@ export default function ProfilePage({ currentUserId }) {
           onClose={passcodePrompt.closeSetPasscode}
           onSuccess={() => {
             passcodePrompt.handlePasscodeSaved();
-            showToast({ title: "Passcode saved", body: "Sign in faster next time with your 6-digit code." });
+            showToast({ title: "PIN saved", body: "Sign in faster next time with your 6-digit PIN." });
           }}
         />
       ) : null}

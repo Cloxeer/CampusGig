@@ -98,7 +98,7 @@ export default function ProfileSettingsMenu({
             icon={Pencil}
             onClick={() => closeThen(() => navigate("/profile/edit", { state: { returnTo: "/profile" } }))}
           >
-            Edit contacts
+            Edit profile
           </MenuRow>
           <MenuRow
             icon={BookOpen}

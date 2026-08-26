@@ -30,7 +30,7 @@ export default function AuthSignInMethodToggle({ method, onChange }) {
         className={`auth-seg-btn${method === "passcode" ? " on" : ""}`}
         onClick={() => onChange("passcode")}
       >
-        Passcode
+        PIN
       </button>
     </div>
   );

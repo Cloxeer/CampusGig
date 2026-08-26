@@ -1,6 +1,10 @@
-import { Smartphone, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
-export default function SettingsEditContactsNavRow({ onNavigateEditContacts }) {
+export default function SettingsEditContactsNavRow({
+  icon: Icon,
+  label,
+  onNavigateEditContacts,
+}) {
   return (
     <button
       type="button"
@@ -19,8 +23,8 @@ export default function SettingsEditContactsNavRow({ onNavigateEditContacts }) {
       }}
     >
       <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Smartphone size={18} color="var(--fg3)" />
-        Edit contacts &amp; payment methods
+        <Icon size={18} color="var(--fg3)" />
+        {label}
       </span>
       <ChevronRight size={18} color="var(--fg4)" />
     </button>

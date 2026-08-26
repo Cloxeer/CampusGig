@@ -25,11 +25,11 @@ export function validatePasscode(pin) {
   const trimmed = String(pin ?? "").trim();
 
   if (!/^\d{6}$/.test(trimmed)) {
-    return { valid: false, message: "Passcode must be exactly 6 digits." };
+    return { valid: false, message: "PIN must be exactly 6 digits." };
   }
 
   if (TRIVIAL_PASSCODES.has(trimmed)) {
-    return { valid: false, message: "Choose a less obvious passcode." };
+    return { valid: false, message: "Choose a less obvious PIN." };
   }
 
   return { valid: true };

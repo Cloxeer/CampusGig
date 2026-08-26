@@ -1,3 +1,4 @@
+import { emailFieldLabel } from "../lib/auth";
 import {
   OPTIONAL_CONTACT_FIELD_KEYS,
   OPTIONAL_CONTACT_FIELD_BY_KEY,
@@ -26,7 +27,14 @@ export function buildContactRows(user) {
 
   const rows = [];
   if (user.phone) rows.push({ key: "phone", label: "Phone", value: user.phone });
-  if (user.email) rows.push({ key: "email", label: "School email", value: user.email });
+  if (user.email) rows.push({ key: "email", label: emailFieldLabel(user.email), value: user.email });
+  if (user.accepts_cash) {
+    rows.push({
+      key: "cash",
+      label: "Cash",
+      value: "In person — you can add Venmo or Cash App later",
+    });
+  }
 
   const optionalKeys = sortOptionalContactKeys(
     OPTIONAL_CONTACT_FIELD_KEYS.filter((key) => user[key]),

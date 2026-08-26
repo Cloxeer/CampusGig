@@ -19,8 +19,8 @@ export default function SettingsPasscodeCard({ profile, isPending }) {
 
   function handlePasscodeSaved() {
     showToast({
-      title: hasPasscode ? "Passcode updated" : "Passcode saved",
-      body: "Use the Passcode tab on the Sign in page next time.",
+      title: hasPasscode ? "PIN updated" : "PIN saved",
+      body: "Use the PIN tab on the Sign in page next time.",
     });
   }
 
@@ -47,7 +47,7 @@ export default function SettingsPasscodeCard({ profile, isPending }) {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="settings-passcode-card__title-row">
-              <span className="settings-passcode-card__title">Passcode sign-in</span>
+              <span className="settings-passcode-card__title">PIN sign-in</span>
               <span
                 className={`settings-passcode-card__badge${hasPasscode ? " settings-passcode-card__badge--on" : " settings-passcode-card__badge--off"}`}
               >
@@ -56,14 +56,14 @@ export default function SettingsPasscodeCard({ profile, isPending }) {
             </div>
             <p className="settings-passcode-card__desc">
               {hasPasscode
-                ? "Your 6-digit code is ready. On sign-in, choose Passcode — no inbox check needed."
-                : "Create a private 6-digit code for faster sign-in on the Passcode tab."}
+                ? "Your 6-digit PIN is ready. On sign-in, choose PIN — no inbox check needed."
+                : "Create a private 6-digit PIN for faster sign-in on the PIN tab."}
             </p>
           </div>
         </div>
 
         {hasPasscode ? (
-          <div className="settings-passcode-card__masked" aria-label="Passcode saved, hidden">
+          <div className="settings-passcode-card__masked" aria-label="PIN saved, hidden">
             <span className="settings-passcode-card__dots" aria-hidden>
               ••••••
             </span>
@@ -77,7 +77,7 @@ export default function SettingsPasscodeCard({ profile, isPending }) {
             disabled={isPending}
             onClick={() => setSetModalOpen(true)}
           >
-            {hasPasscode ? "Change passcode" : "Set up passcode"}
+            {hasPasscode ? "Change PIN" : "Set up PIN"}
           </button>
           <button
             type="button"
