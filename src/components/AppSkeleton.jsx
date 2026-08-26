@@ -16,12 +16,14 @@
  * Keep this in lockstep with Home's real render.
  */
 
-import { FILTERABLE_CATEGORY_LABELS } from "../data/categories";
+import { homeFeedTabs } from "../data/categories";
+import { REP_LEVELS } from "../data/repLevels";
 
 /* Same tab list as Home (shared catalog) so the skeleton doesn't flash the
-   wrong tabs before the real feed lands. */
-const TABS = ["All", ...FILTERABLE_CATEGORY_LABELS];
-const TIER_LABELS = ["New", "Reliable", "Trusted", "Legend"];
+   wrong tabs before the real feed lands. Recent is included here; Home hides
+   it after load if nothing was posted in the last 7 days. */
+const TABS = homeFeedTabs(true);
+const TIER_LABELS = REP_LEVELS.map((l) => l.label);
 
 export default function AppSkeleton() {
   return (
@@ -29,7 +31,10 @@ export default function AppSkeleton() {
       <div className="topbar">
         <div className="tlogo">
           <div className="skel" style={{ width: 26, height: 26, borderRadius: 6 }} />
-          <div className="skel" style={{ width: 90, height: 16 }} />
+          <div>
+            <div className="skel" style={{ width: 110, height: 14, marginBottom: 4 }} />
+            <div className="skel" style={{ width: 36, height: 8 }} />
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <div className="skel" style={{ width: 34, height: 34, borderRadius: "var(--r)" }} />

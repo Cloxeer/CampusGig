@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Check, Lock, HelpCircle, Gift, ArrowLeftRight } from "lucide-react";
@@ -9,6 +9,7 @@ import { getInventory, equipCosmetic, unequipType, subscribeInventory } from "..
 import { TagBadge } from "../components/EquippedTagBadge";
 import UserAvatar from "../components/UserAvatar";
 import CosmeticRing from "../components/CosmeticRing";
+import SpotMascot from "../components/SpotMascot";
 import { getMyProfile, getAvatarUrl } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
 import { safeAppReturnTo } from "../hooks/useModalParam";
@@ -23,6 +24,24 @@ import "./inventory.css";
 /** One diameter for the live-preview avatar across every state (matches the
  *  bare-fallback `.invx-preview__avatar` size in inventory.css). */
 const PREVIEW_AVATAR = 72;
+
+/** Spot cycles through these expressions each time he hops sides — a "new" Spot
+ *  every pop. */
+const SPOT_MOODS = ["excited", "surprised", "attentive", "suspicious", "neutral"];
+
+/** Spot's arc on the inventory: greets once (only if you've never met), walks
+    the hints once, wraps up, then goes quiet (pester 5× or reload for more). */
+const SPOT_SCRIPT = {
+  intro: "Spot here — the name's Spot.",
+  hints: [
+    "Nice cosmetics.",
+    "Finish gigs to earn more.",
+    "Chests hide the rare stuff.",
+    "Tag plus border — very you.",
+    "This is your whole look.",
+  ],
+  closer: "Lookin' sharp.",
+};
 
 /** A border shown in the list = a mini avatar: THE SAME CosmeticRing everyone
  *  uses, wrapping a white "hole" where a photo would sit. Identical to the real
@@ -159,6 +178,30 @@ function SlotSection({ items, ownedIds, counts, equippedId, type }) {
 export default function Inventory() {
   const navigate = useNavigate();
   const location = useLocation();
+  /** Spot watches the equipped avatar/tag, hopping side to side every 8s. */
+  const spotAvatarRef = useRef(null);
+  const [spotSide, setSpotSide] = useState("left");
+  const [spotShow, setSpotShow] = useState(true);
+  const [spotMoodIdx, setSpotMoodIdx] = useState(0);
+  /** True while a speech bubble is open — freezes his side-hopping so he stays
+      put until you click away. */
+  const spotTalkingRef = useRef(false);
+  useEffect(() => {
+    let swap;
+    const id = setInterval(() => {
+      if (spotTalkingRef.current) return; // paused while he's talking
+      setSpotShow(false); // pop out
+      swap = setTimeout(() => {
+        setSpotSide((s) => (s === "left" ? "right" : "left")); // hop while hidden
+        setSpotMoodIdx((i) => (i + 1) % SPOT_MOODS.length); // fresh expression
+        setSpotShow(true); // pop back in
+      }, 240);
+    }, 8000);
+    return () => {
+      clearInterval(id);
+      clearTimeout(swap);
+    };
+  }, []);
   const [inv, setInv] = useState(getInventory);
   /** Which slot's catalog is on screen — swapped via the segmented control. */
   const [view, setView] = useState("tag"); // tag | border
@@ -267,6 +310,26 @@ export default function Inventory() {
               path (signed-in photo, guest ring, bare fallback) so the hero never
               changes size between states. */}
           <div className="invx-preview">
+            {/* Spot admires your equipped look, hopping left↔right every 8s with
+                a clean pop and a fresh expression, always facing your photo
+                (mirrored when he's on the right). Same shared component. */}
+            <SpotMascot
+              key="inv-spot"
+              float={false}
+              show={spotShow}
+              size={60}
+              mood={SPOT_MOODS[spotMoodIdx]}
+              flip={spotSide === "right"}
+              lookAtRef={spotAvatarRef}
+              script={SPOT_SCRIPT}
+              chatId="inventory"
+              bubbleSide="bottom"
+              onBubbleChange={(open) => {
+                spotTalkingRef.current = open;
+              }}
+              style={spotSide === "left" ? { left: 26, top: 30 } : { right: 26, top: 30 }}
+            />
+            <span ref={spotAvatarRef} style={{ display: "inline-flex" }}>
             {profile ? (
               /* Your actual photo, wearing the equipped ring (same logic as
                  everywhere else — UserAvatar handles the border itself). */
@@ -290,6 +353,7 @@ export default function Inventory() {
                 <span className="invx-preview__ph">?</span>
               </span>
             )}
+            </span>
             {displayTag ? (
               /* The EXACT badge used across the app — no bespoke pill. Shows the
                  equipped tag, or your tier tag when "None" is selected. */

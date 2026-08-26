@@ -1,0 +1,174 @@
+/* Spot — the CampusGig mascot. One shared brick, used anywhere.
+   Body + eye geometry come from bloub exports; all motion is driven live in
+   SpotMascot.jsx (breathing, blink, gaze, mood) — no baked keyframes here. */
+
+.spot-root {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none; /* never eat clicks unless onClick given (see .spot-clickable) */
+  /* pop out / pop in: quick fade with a springy scale so he "pops" cleanly */
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 0.2s ease,
+    transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: opacity, transform;
+}
+
+.spot-root[data-show="true"] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Inline placement: Spot lives in the page flow (parent sets top/left on a
+   relatively-positioned ancestor) and scrolls with the content instead of
+   being pinned to the viewport. No position transition — he pops out, jumps
+   while invisible, and pops back in, so he never slides across the text. */
+.spot-static {
+  position: absolute;
+}
+
+.spot-clickable {
+  pointer-events: auto;
+}
+.spot-root[data-show="false"] {
+  pointer-events: none;
+}
+.spot-clickable .spot-breathe {
+  cursor: pointer;
+}
+.spot-breathe:focus-visible {
+  outline: 2px solid var(--green, #16a34a);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+/* ── click-to-talk comic speech bubble ───────────────────────────────────────
+   Rendered in a portal on <body> and fixed-positioned from Spot's rect (see
+   SpotMascot.jsx), so nothing can clip it and it always stays on screen. The
+   tail is pinned under Spot via --tail-x, so it points from him wherever he is
+   (left, centre or right). */
+.spot-bubble {
+  position: fixed;
+  z-index: 9999;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 24px));
+  padding: 9px 13px;
+  border-radius: 14px;
+  background: var(--bg2, #fff);
+  color: var(--fg, #18181b);
+  border: 2px solid var(--fg, #18181b);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.12); /* offset "comic" drop */
+  font-size: 12.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: center;
+  pointer-events: auto;
+  animation: spotBubbleIn 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+[data-theme="dark"] .spot-bubble,
+:root:not([data-theme="light"]) .spot-bubble {
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* the pointer: two stacked triangles (outer = border colour, inner = fill) so
+   the comic tail keeps the same 2px outline as the bubble. */
+.spot-bubble::before,
+.spot-bubble::after {
+  content: "";
+  position: absolute;
+  left: var(--tail-x, 50%);
+  width: 0;
+  height: 0;
+  translate: -50% 0;
+}
+/* outline triangle */
+.spot-bubble::before {
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+}
+/* fill triangle (smaller, sits just inside the outline) */
+.spot-bubble::after {
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+
+/* above Spot → tail points DOWN */
+.spot-bubble[data-side="top"] {
+  transform-origin: var(--tail-x, 50%) 100%;
+}
+.spot-bubble[data-side="top"]::before {
+  top: 100%;
+  border-top: 12px solid var(--fg, #18181b);
+}
+.spot-bubble[data-side="top"]::after {
+  top: 100%;
+  margin-top: -2.6px;
+  border-top: 9px solid var(--bg2, #fff);
+}
+
+/* below Spot → tail points UP (the ^ that shows it's from him) */
+.spot-bubble[data-side="bottom"] {
+  transform-origin: var(--tail-x, 50%) 0%;
+}
+.spot-bubble[data-side="bottom"]::before {
+  bottom: 100%;
+  border-bottom: 12px solid var(--fg, #18181b);
+}
+.spot-bubble[data-side="bottom"]::after {
+  bottom: 100%;
+  margin-bottom: -2.6px;
+  border-bottom: 9px solid var(--bg2, #fff);
+}
+
+@keyframes spotBubbleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot-bubble {
+    animation: none;
+  }
+}
+
+/* JS writes breathing + body-tilt onto this layer so it never fights the
+   root's fade/pop transform. */
+.spot-breathe {
+  transform-origin: 50% 60%;
+}
+
+.spot-svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Eyes are transformed in view-box space by JS (matrix + gaze + blink). */
+.spot-eye {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+/* soft contact shadow so he sits on the page, not floats */
+.spot-shadow {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot-root {
+    transition: opacity 0.3s ease;
+    transform: none;
+  }
+  .spot-root[data-show="true"] {
+    transform: none;
+  }
+}

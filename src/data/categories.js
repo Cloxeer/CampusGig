@@ -27,3 +27,17 @@ export const FALLBACK_CATEGORY = "Other";
 
 /** Labels that make sense as browse filters (Other folds into "All"). */
 export const FILTERABLE_CATEGORY_LABELS = CATEGORY_LABELS.filter((l) => l !== FALLBACK_CATEGORY);
+
+/** Home feed tabs — one catalog so Home and AppSkeleton cannot drift. */
+export const HOME_TAB_RECENT = "Recent";
+export const HOME_TAB_ALL = "All";
+export const HOME_TAB_FINISHED = "Finished Gigs";
+export const HOME_RECENT_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Order: Recent + categories + All + Finished, or All first when Recent is hidden. */
+export function homeFeedTabs(includeRecent) {
+  if (includeRecent) {
+    return [HOME_TAB_RECENT, ...FILTERABLE_CATEGORY_LABELS, HOME_TAB_ALL, HOME_TAB_FINISHED];
+  }
+  return [HOME_TAB_ALL, ...FILTERABLE_CATEGORY_LABELS, HOME_TAB_FINISHED];
+}

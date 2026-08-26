@@ -15,20 +15,13 @@ const MAX_GIGS_PER_HOUR = 5;
  */
 export const REMOTE_LOCATION = "Remote";
 
-export async function getOpenGigs() {
-  const nowIso = new Date().toISOString();
-  // PostgREST splits on "." — ISO timestamps must be double-quoted or the filter matches nothing.
-  const { data, error } = await supabase
-    .from("gigs")
-    .select(`
-      id, title, description, price, location, estimated_time, expires_at, notes, status, created_at,
-      category:category_id(label, icon_name),
-      poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, account_type, equipped_tag, equipped_border)
-    `)
-    .eq("status", "open")
-    .or(`expires_at.is.null,expires_at.gt."${nowIso}"`)
-    .order("created_at", { ascending: false });
+const GIG_FEED_SELECT = `
+  id, title, description, price, location, estimated_time, expires_at, notes, status, created_at, completed_at,
+  category:category_id(label, icon_name),
+  poster:poster_id(id, first_name, last_name, avatar_color, avatar_url, rep_score, account_type, equipped_tag, equipped_border)
+`;
 
+async function enrichFeedGigs(data, error) {
   if (error || !data) return { gigs: data || [], error };
 
   const posterIds = [...new Set(data.map((g) => g.poster?.id).filter(Boolean))];
@@ -56,10 +49,34 @@ export async function getOpenGigs() {
     _reviewStats: posterReviewMap[g.poster?.id] || null,
   }));
 
-  /* Seed the shared registry from these fresh poster rows. */
   for (const g of data) noteEquippedFromRow(g.poster);
 
   return { gigs: enriched, error };
+}
+
+export async function getOpenGigs() {
+  const nowIso = new Date().toISOString();
+  // PostgREST splits on "." — ISO timestamps must be double-quoted or the filter matches nothing.
+  const { data, error } = await supabase
+    .from("gigs")
+    .select(GIG_FEED_SELECT)
+    .eq("status", "open")
+    .or(`expires_at.is.null,expires_at.gt."${nowIso}"`)
+    .order("created_at", { ascending: false });
+
+  return enrichFeedGigs(data, error);
+}
+
+/** Completed rows for the Home "Finished Gigs" examples gallery. RLS still scopes who sees which rows. */
+export async function getCompletedGigs() {
+  const { data, error } = await supabase
+    .from("gigs")
+    .select(GIG_FEED_SELECT)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(40);
+
+  return enrichFeedGigs(data, error);
 }
 
 /**

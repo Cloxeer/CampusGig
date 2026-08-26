@@ -50,7 +50,9 @@ export function deriveGigDetailView({
     userRequestStatus === "accepted";
   const showRejected = userRequestStatus === "rejected";
 
-  const showContactInfo = isActive || isCompleted;
+  const showContactInfo =
+    (isActive || isCompleted) &&
+    Boolean(currentUserId && (poster.id === currentUserId || taker?.id === currentUserId));
   const showPaymentLockCallout = !showContactInfo && !isCompleted;
 
   let phase = "discover";

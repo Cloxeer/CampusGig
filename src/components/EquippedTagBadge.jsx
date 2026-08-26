@@ -27,7 +27,7 @@ export function useDisplayTag(tierLabel) {
  * THE tag badge — the single source of truth for how a profile tag renders
  * app-wide: standard `.badge` shape, tinted in the tag's RARITY color.
  */
-export function TagBadge({ cosmetic, small }) {
+export function TagBadge({ cosmetic, small, full }) {
   const r = RARITIES[cosmetic.rarity];
   /* Cosmic's near-white tint would render as a blank pill — cosmic badges get
      their own look instead: drifting clouds + soft outer glow (borderFx.css). */
@@ -46,14 +46,31 @@ export function TagBadge({ cosmetic, small }) {
             }),
         /* Longest catalog names ("Caffeine Based Lifeform") fit every current
            surface at 375px, but tags render inside layouts we don't control
-           from here — never wrap or spill, truncate instead. */
+           from here — never wrap or spill. `minWidth:0` lets the badge shrink
+           so the inner span (not the badge) does the truncating — otherwise
+           flex+overflow eats the badge's right padding and the text jams the edge. */
         maxWidth: "100%",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
+        minWidth: 0,
+        /* `full` shows the entire tag name — wrapping to a second line if the
+           container is narrow — instead of truncating. Used where the layout
+           has vertical room (the rep card) and the name must read in full. */
+        ...(full ? { whiteSpace: "normal" } : null),
       }}
     >
-      {cosmetic.name}
+      <span
+        style={
+          full
+            ? { minWidth: 0, whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center" }
+            : {
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }
+        }
+      >
+        {cosmetic.name}
+      </span>
     </span>
   );
 }

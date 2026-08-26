@@ -17,3 +17,6 @@ dist
 
 # If you copy MCP config into the repo, ignore the real one (use mcp.json.example)
 .cursor/mcp.json
+
+# Hand-applied SQL archive — not live schema_migrations
+supabase/archive/

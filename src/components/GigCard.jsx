@@ -6,7 +6,7 @@ import UserAvatar from "./UserAvatar";
 import { elapsed, countdown } from "../utils/helpers";
 
 export default function GigCard({ gig, onClick, tick }) {
-  const cd = countdown(gig.deadline);
+  const cd = gig.status === "completed" ? null : countdown(gig.deadline);
 
   return (
     <div className="gig" onClick={onClick}>

@@ -1,11 +1,79 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, Search, Handshake, Star, ArrowLeft, ArrowRight, LogIn, Briefcase, Users, CheckCircle } from "lucide-react";
-import Logo, { LogoMark } from "../components/Logo";
+import { Lock, Send, GraduationCap, Banknote, ShieldCheck, ArrowLeft, ArrowRight, LogIn, Briefcase, Users, CheckCircle, User } from "lucide-react";
+import { BrandLockup } from "../components/Logo";
+import CosmeticRing from "../components/CosmeticRing";
+import { TagBadge } from "../components/EquippedTagBadge";
+import { COSMETICS } from "../data/cosmetics";
 import { getPublicStats, subscribePublicStats, PUBLIC_STATS_EMPTY } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
 import { useCountUp } from "../hooks/useCountUp";
+import SpotMascot from "../components/SpotMascot";
+import spotIdleCycle from "../assets/spot/spot-idle-cycle.mp4";
+
+/* The real cosmetics catalog, split once — the rotating showcase on the last
+   tutorial slide previews these on a placeholder pfp. */
+const SHOWCASE_BORDERS = COSMETICS.filter((c) => c.type === "border");
+const SHOWCASE_TAGS = COSMETICS.filter((c) => c.type === "tag");
+
+/* Pick a random cosmetic that is NOT the previous one and NOT the previous
+   rarity — so the showcase never repeats and always alternates rarity (no run
+   of commons). Different rarity guarantees a different item. */
+function pickNext(list, prev) {
+  const pool = prev ? list.filter((c) => c.rarity !== prev.rarity) : list;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/* One frame of the showcase: a temporary pfp inside a real border, with the
+   real tag below — the SAME CosmeticRing + TagBadge the Inventory uses. */
+function CosmeticFrame({ border, tag }) {
+  return (
+    <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+      <CosmeticRing cosmetic={border} size={60}>
+        <span style={{ display: "grid", placeItems: "center", width: "100%", height: "100%", background: "var(--bg3)", color: "var(--fg3)" }}>
+          <User size={26} />
+        </span>
+      </CosmeticRing>
+      <TagBadge cosmetic={tag} />
+    </span>
+  );
+}
+
+/* Live, rotating preview of the borders + tags we offer — randomized, never the
+   same (or same rarity) twice, crossfading smoothly between frames. */
+function CosmeticShowcase() {
+  const [s, setS] = useState(() => ({
+    border: pickNext(SHOWCASE_BORDERS, null),
+    tag: pickNext(SHOWCASE_TAGS, null),
+    prev: null,
+    n: 0,
+  }));
+  useEffect(() => {
+    const id = setInterval(() => {
+      setS((cur) => ({
+        border: pickNext(SHOWCASE_BORDERS, cur.border),
+        tag: pickNext(SHOWCASE_TAGS, cur.tag),
+        prev: { border: cur.border, tag: cur.tag },
+        n: cur.n + 1,
+      }));
+    }, 2200);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{ position: "relative", display: "grid", placeItems: "center", height: 96, marginBottom: 24 }}>
+      {/* Outgoing frame eases out while the incoming eases in — stacked in one cell. */}
+      {s.prev ? (
+        <span key={`p${s.n}`} style={{ gridArea: "1 / 1", animation: "cosmOut .55s ease forwards", pointerEvents: "none" }}>
+          <CosmeticFrame border={s.prev.border} tag={s.prev.tag} />
+        </span>
+      ) : null}
+      <span key={`c${s.n}`} style={{ gridArea: "1 / 1", animation: "cosmIn .55s ease" }}>
+        <CosmeticFrame border={s.border} tag={s.tag} />
+      </span>
+    </div>
+  );
+}
 
 /* Rotating hero headlines — a "rolling log" that swaps between the two sides of
    the marketplace: earn (do gigs) and hire (post gigs). Each message is two
@@ -66,19 +134,104 @@ function HeroMessage({ msg, phase }) {
 
 const SLIDES = [
   {
-    icon: <Search size={28} />,
-    title: "Browse open gigs",
-    body: "See tasks and jobs posted across campus — by local clients and fellow students alike.",
+    icon: <Send size={28} />,
+    title: "Post a job",
+    body: "Post a job and set the price. Outside clients' posts reach the whole world; posts from NMSU students stay between verified students — one platform, filtered by audience.",
   },
   {
-    icon: <Handshake size={28} />,
-    title: "Post work, or take it on",
-    body: "Anyone can post a task. Verified NMSU students pick it up and get it done — on their own schedule.",
+    icon: <GraduationCap size={28} />,
+    title: "A verified student does it",
+    body: "Verified NMSU students browse and pick the gigs they want, and get them done on their own schedule. Students can both post and take gigs — outside clients can only post, never take them.",
   },
   {
-    icon: <Star size={28} />,
-    title: "Build your reputation",
-    body: "Finish jobs, earn rep, and climb the leaderboard. Your campus reputation follows you.",
+    icon: <Banknote size={28} />,
+    title: "Pay directly",
+    body: "When it's finished, you pay the student directly — Venmo, Cash App, PayPal, or Zelle. GetCampusGig never touches the money.",
+  },
+  {
+    icon: <ShieldCheck size={28} />,
+    title: "Reviews keep it safe",
+    body: "Check someone's reviews before you deal, and steer clear of bad ones. Agree on the price up front and stay vigilant on both sides — whether you're paying or getting paid — since money is direct between you two. Always leave a review after; it builds everyone's rep.",
+  },
+  {
+    showcase: true,
+    title: "Earn rep & prizes",
+    body: "Every finished gig earns rep and climbs you up the leaderboard — and unlocks cosmetic prizes for your profile.",
+  },
+];
+
+/* Spot "acts out" each tutorial slide: a mood + a spot in the layout, right next
+   to that slide's info. He sits IN the page (not pinned to the screen) and looks
+   at the section as if reading it himself. `pos` is anchored to the content
+   column's centre with calc(), so it holds regardless of the column width.
+   Order matches SLIDES above. */
+/* `flip` mirrors Spot so his eyes face the content: he faces RIGHT by default
+   (eyes sit upper-right), so flip him only when he's placed to the RIGHT of the
+   column and needs to look left. */
+const SPOT_SLIDES = [
+  // Post a job — left of icon. Click him → he intros once, then walks this
+  // slide's points, wraps up, and rests (pester 5× or reload for bonus lines).
+  {
+    mood: "attentive",
+    flip: false,
+    pos: { top: -8, right: "calc(50% + 34px)" },
+    bubbleSide: "top",
+    chatId: "hiw-post",
+    script: {
+      intro: "Spot here — the name's Spot.",
+      hints: ["Post any job. Set the price.", "The whole world can see it."],
+      closer: "I live here. I'll help.",
+    },
+  },
+  // A verified student does it — right of icon, facing the title.
+  {
+    mood: "excited",
+    flip: true,
+    pos: { top: -8, left: "calc(50% + 34px)" },
+    bubbleSide: "top",
+    chatId: "hiw-student",
+    script: {
+      intro: "Oh hey — I'm Spot.",
+      hints: ["Real students, all verified.", "They pick it up, they do it.", "Students can post too."],
+    },
+  },
+  // Pay directly — below text, left.
+  {
+    mood: "neutral",
+    flip: false,
+    pos: { top: 250, right: "calc(50% + 30px)" },
+    bubbleSide: "bottom",
+    chatId: "hiw-pay",
+    script: {
+      intro: "It's Spot.",
+      hints: ["You pay each other, direct.", "Venmo, Zelle, Cash App.", "We never touch the money."],
+    },
+  },
+  // Reviews — right of icon.
+  {
+    mood: "suspicious",
+    flip: true,
+    pos: { top: -8, left: "calc(50% + 34px)" },
+    bubbleSide: "top",
+    chatId: "hiw-reviews",
+    script: {
+      intro: "Spot, watching your back.",
+      hints: ["Read reviews before you deal.", "Skip the sketchy ones.", "Always leave one after."],
+      closer: "Be fair out there.",
+    },
+  },
+  // Earn rep & prizes — above showcase (awe).
+  {
+    mood: "surprised",
+    flip: false,
+    pos: { top: -84, left: "calc(50% - 34px)" },
+    bubbleSide: "top",
+    chatId: "hiw-rep",
+    script: {
+      intro: "Last bit from Spot.",
+      hints: ["Finish gigs, earn rep.", "Climb the leaderboard.", "Unlock cool cosmetics."],
+      closer: "That's the tour.",
+    },
   },
 ];
 
@@ -86,6 +239,21 @@ export default function Splash() {
   const navigate = useNavigate();
   const [showTutorial, setShowTutorial] = useState(false);
   const [slide, setSlide] = useState(0);
+  const spotTarget = useRef(null);
+
+  /* Spot pops OUT, jumps to the new slide's spot while invisible, then pops
+     back IN — so he never slides across the text between pages. */
+  const [spotSlide, setSpotSlide] = useState(0);
+  const [spotShow, setSpotShow] = useState(true);
+  useEffect(() => {
+    if (slide === spotSlide) return undefined;
+    setSpotShow(false); // pop out at the old position
+    const t = setTimeout(() => {
+      setSpotSlide(slide); // move + change mood/flip while hidden
+      setSpotShow(true); // pop back in at the new position
+    }, 230);
+    return () => clearTimeout(t);
+  }, [slide, spotSlide]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [heroPrev, setHeroPrev] = useState(null);
 
@@ -132,23 +300,44 @@ export default function Splash() {
       <div className="splash fadein">
         <div className="splash-body" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <div className="sfade" />
-          <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0 20px" }}>
-            <div
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 16,
-                background: "var(--bg3)",
-                border: "1px solid var(--bd)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--fg2)",
-                marginBottom: 24,
-              }}
-            >
-              {s.icon}
-            </div>
+          <div ref={spotTarget} style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0 20px" }}>
+            {/* Spot sits right beside this slide's info (in the page, not pinned
+                to the screen) and watches it — new mood + spot each slide. */}
+            <SpotMascot
+              key="tour-spot"
+              float={false}
+              show={spotShow}
+              size={78}
+              mood={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).mood}
+              flip={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).flip}
+              rotate={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).rotate || 0}
+              videoSrc={spotSlide === 0 ? spotIdleCycle : null}
+              script={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).script}
+              chatId={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).chatId}
+              bubbleSide={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).bubbleSide || "top"}
+              style={(SPOT_SLIDES[spotSlide] || SPOT_SLIDES[0]).pos}
+              lookAtRef={spotTarget}
+            />
+            {s.showcase ? (
+              <CosmeticShowcase />
+            ) : (
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 16,
+                  background: "var(--bg3)",
+                  border: "1px solid var(--bd)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--fg2)",
+                  marginBottom: 24,
+                }}
+              >
+                {s.icon}
+              </div>
+            )}
             <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.03em", color: "var(--fg)", marginBottom: 10, lineHeight: 1.2 }}>
               {s.title}
             </div>
@@ -214,10 +403,12 @@ export default function Splash() {
         <div className="sgrid" />
         <div className="sfade" />
         <div className="scontent shell-prose">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <LogoMark size={32} style={{ borderRadius: "var(--r)" }} />
-            <Logo size={17} />
-          </div>
+          <BrandLockup
+            className="splash-brand"
+            markSize={52}
+            logoSize={22}
+            markStyle={{ borderRadius: "var(--r)" }}
+          />
 
           <div
             style={{
@@ -229,7 +420,7 @@ export default function Splash() {
               marginBottom: 44,
             }}
           >
-            Connect. <span style={{ color: "var(--green)" }}>Earn.</span>
+            Connect. <span style={{ color: "var(--green)" }}>Earn.</span> Repeat.
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>

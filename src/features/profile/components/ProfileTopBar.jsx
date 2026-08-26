@@ -1,4 +1,4 @@
-import Logo, { LogoMark } from "../../../components/Logo";
+import { BrandLockup } from "../../../components/Logo";
 
 export default function ProfileTopBar({ profileBackTarget, navigate }) {
   return (
@@ -11,10 +11,7 @@ export default function ProfileTopBar({ profileBackTarget, navigate }) {
       >
         <span style={{ fontSize: 15 }}>←</span>
       </button>
-      <div className="tlogo">
-        <LogoMark />
-        <Logo />
-      </div>
+      <BrandLockup />
     </>
   );
 }

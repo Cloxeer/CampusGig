@@ -930,6 +930,57 @@ body {
   flex-shrink: 0;
 }
 .tlogo { display: flex; align-items: center; gap: 8px; }
+.logo-wordmark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  min-width: 0;
+}
+.logo-wordmark-name { display: block; line-height: 1.05; }
+.logo-stage {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #c4c4cc;
+  line-height: 1.15;
+  margin-left: calc(var(--logo-size, 15px) * 0.78);
+  margin-top: calc(var(--logo-size, 15px) * -0.18);
+  z-index: 1;
+  pointer-events: none;
+  text-shadow:
+    -1px -1px 0 #3f3f46,
+     1px -1px 0 #3f3f46,
+    -1px  1px 0 #3f3f46,
+     1px  1px 0 #3f3f46,
+     0   -1.5px 0 #3f3f46,
+     0    1.5px 0 #3f3f46,
+    -1.5px 0 0 #3f3f46,
+     1.5px 0 0 #3f3f46;
+}
+.splash-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.splash-brand .logo-stage {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-shadow:
+    -1.5px -1.5px 0 #27272a,
+     1.5px -1.5px 0 #27272a,
+    -1.5px  1.5px 0 #27272a,
+     1.5px  1.5px 0 #27272a,
+     0     -2px 0 #27272a,
+     0      2px 0 #27272a,
+    -2px    0 0 #27272a,
+     2px    0 0 #27272a;
+}
 .tmark {
   width: 26px;
   height: 26px;
@@ -2395,6 +2446,17 @@ body {
   to { opacity: 1; transform: none; }
 }
 .fadein { animation: fadein .18s ease; }
+
+/* Cosmetic showcase crossfade (Splash tutorial) — the new item eases in as the
+   previous one eases out, stacked in the same grid cell. */
+@keyframes cosmIn {
+  from { opacity: 0; transform: translateY(7px) scale(.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cosmOut {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-7px) scale(1.04); }
+}
 
 @keyframes slidein {
   from { opacity: 0; transform: translateY(20px); }

@@ -10,6 +10,7 @@
 /* ---------- Live preview ---------- */
 
 .invx-preview {
+  position: relative; /* anchor for the Spot mascot in the empty left */
   display: flex;
   flex-direction: column;
   align-items: center;

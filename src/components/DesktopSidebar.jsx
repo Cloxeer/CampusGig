@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, Search, Plus, Bell, User } from "lucide-react";
-import { LogoMark } from "./Logo";
+import { BrandLockup } from "./Logo";
 
 export default function DesktopSidebar({ unreadCount = 0 }) {
   const navigate = useNavigate();
@@ -27,8 +27,7 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
   return (
     <aside className="desktop-sidebar" aria-label="Primary">
       <div className="dsk-brand">
-        <LogoMark size={28} />
-        <span className="dsk-brand-title">GetCampusGig.com</span>
+        <BrandLockup markSize={28} logoSize={13} />
       </div>
       <nav className="dsk-nav" aria-label="Main navigation">
         <Item to="/" icon={Home} label="Home" />

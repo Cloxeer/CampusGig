@@ -19,6 +19,11 @@ function reasonsForType(subjectType) {
       r.value === "spam" ? { ...r, label: "Spam or misleading listing" } : r
     );
   }
+  if (subjectType === "user") {
+    return REASONS_BASE.map((r) =>
+      r.value === "spam" ? { ...r, label: "Spam or fake account" } : r
+    );
+  }
   return REASONS_BASE;
 }
 
@@ -30,6 +35,10 @@ const COPY = {
   gig: {
     title: "Report gig",
     subtitle: "Why are you reporting this gig listing?",
+  },
+  user: {
+    title: "Report user",
+    subtitle: "Why are you reporting this person?",
   },
   BugReport: {
     title: "Report a bug",
@@ -49,9 +58,9 @@ For example:
 - Any error messages or unusual behavior?`;
 
 /**
- * Unified report flow for `public.reports` (subject_type `review` | `gig` | `BugReport` | `SupportReport`).
+ * Unified report flow: review | gig | user | BugReport | SupportReport.
  */
-export default function ReportModal({ subjectType, reviewId, gigId, onClose, onReported, initialPagePath }) {
+export default function ReportModal({ subjectType, reviewId, gigId, reportedUserId, onClose, onReported, initialPagePath }) {
   const [selected, setSelected] = useState(null);
   const [details, setDetails] = useState("");
   const [pagePath, setPagePath] = useState("");
@@ -104,6 +113,7 @@ export default function ReportModal({ subjectType, reviewId, gigId, onClose, onR
         subjectType,
         reviewId: subjectType === "review" ? reviewId : undefined,
         gigId: subjectType === "gig" ? gigId : undefined,
+        reportedUserId: subjectType === "user" ? reportedUserId : undefined,
         reason: selected,
         details: selected === "other" ? details.trim() || null : null,
       });

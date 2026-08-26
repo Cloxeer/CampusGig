@@ -763,7 +763,7 @@ export default function ProfileRep() {
                   (the shared display-tag resolver). */}
               {displayTag ? (
                 <div style={{ display: "flex", justifyContent: "center", margin: "2px 0 4px" }}>
-                  <TagBadge cosmetic={displayTag} />
+                  <TagBadge cosmetic={displayTag} full />
                 </div>
               ) : null}
               <div className="rep-path-score">{repScore}</div>

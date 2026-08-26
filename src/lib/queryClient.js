@@ -17,6 +17,7 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   myProfile: ["myProfile"],
   openGigs: ["openGigs"],
+  completedGigs: ["completedGigs", "v2"],
   notifications: ["notifications"],
   unreadCount: ["unreadCount"],
   myReviews: ["myReviews"],

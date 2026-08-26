@@ -13,7 +13,7 @@ import { useProfileReviewsUrlSync } from "./hooks/useProfileReviewsUrlSync";
 import { buildActivityItems } from "./mappers/buildProfileActivityItems";
 import { refreshProfileData } from "./utils/refreshProfileData";
 import ProfilePageSkeleton from "./components/ProfilePageSkeleton";
-import { Backpack } from "lucide-react";
+import { Backpack, Flag } from "lucide-react";
 import ProfileNotFound from "./components/ProfileNotFound";
 import ProfileTopBar from "./components/ProfileTopBar";
 import ProfileSettingsMenu from "./components/ProfileSettingsMenu";
@@ -71,6 +71,7 @@ export default function ProfilePage({ currentUserId }) {
   const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null);
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [supportReportOpen, setSupportReportOpen] = useState(false);
+  const [userReportOpen, setUserReportOpen] = useState(false);
 
   const menu = useProfileMenu();
   useProfileReviewsUrlSync({
@@ -164,7 +165,24 @@ export default function ProfilePage({ currentUserId }) {
     return (
       <>
         <div className="page fadein">
-          <TopBar title={fullName} />
+          <TopBar
+            title={fullName}
+            right={
+              currentUserId && routeUserId && String(currentUserId) !== String(routeUserId) ? (
+                <button
+                  type="button"
+                  className="rev-flag"
+                  aria-label="Report user"
+                  onClick={() => setUserReportOpen(true)}
+                  style={{ flexShrink: 0 }}
+                >
+                  <Flag size={13} strokeWidth={1.75} />
+                </button>
+              ) : (
+                <div style={{ width: 34 }} />
+              )
+            }
+          />
 
           <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
             <div style={{ padding: "20px 16px 0" }}>
@@ -276,6 +294,13 @@ export default function ProfilePage({ currentUserId }) {
             gigTitle={q.myReviewsToThem.find((x) => x.id === deleteConfirmReviewId)?.gig_title}
             onClose={() => setDeleteConfirmReviewId(null)}
             onDeleted={() => refreshOtherProfile()}
+          />
+        )}
+        {userReportOpen && routeUserId && (
+          <ReportModal
+            subjectType="user"
+            reportedUserId={routeUserId}
+            onClose={() => setUserReportOpen(false)}
           />
         )}
       </>

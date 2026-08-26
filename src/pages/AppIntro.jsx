@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Home, Compass, PlusCircle, Bell, User, Mail, ArrowRight, ArrowLeft, Loader } from "lucide-react";
-import Logo, { LogoMark } from "../components/Logo";
+import { BrandLockup } from "../components/Logo";
 import SettingsRowToggle from "../components/SettingsRowToggle";
+import SpotMascot from "../components/SpotMascot";
 import { getMyProfile, updateMyProfile } from "../lib/profile";
 import { queryClient, queryKeys } from "../lib/queryClient";
 
@@ -35,9 +36,47 @@ const CONTENT_SLIDES = [
   },
 ];
 
+/* Spot rides along the onboarding: a spot beside each screen's icon + a short,
+   cool-and-sweet hint script when you click him (he introduces himself, then
+   explains that screen). `msgs` order matches the 5 CONTENT_SLIDES + the final
+   Email slide. */
+const SPOT_ONBOARDING = [
+  {
+    mood: "attentive", flip: true, pos: { top: -8, left: "calc(50% + 34px)" },
+    chatId: "onboarding-home",
+    script: { intro: "Spot here. Welcome in — I'm Spot.", hints: ["This is Home — your gig feed.", "Scroll to see what's open."], closer: "I'll be around." },
+  },
+  {
+    mood: "excited", flip: false, pos: { top: -8, right: "calc(50% + 34px)" },
+    chatId: "onboarding-explore",
+    script: { intro: "Oh hey — I'm Spot.", hints: ["Explore is the hunt.", "Search, browse, filter to fit."] },
+  },
+  {
+    mood: "attentive", flip: true, pos: { top: -8, left: "calc(50% + 34px)" },
+    chatId: "onboarding-post",
+    script: { intro: "Spot, at your service.", hints: ["Need something done? Post it.", "Set a price. A student takes it."] },
+  },
+  {
+    mood: "attentive", flip: false, pos: { top: -8, right: "calc(50% + 34px)" },
+    chatId: "onboarding-alerts",
+    script: { intro: "Name's Spot, by the way.", hints: ["The bell is your inbox.", "Requests, updates, reviews."] },
+  },
+  {
+    mood: "excited", flip: true, pos: { top: -8, left: "calc(50% + 34px)" },
+    chatId: "onboarding-profile",
+    script: { intro: "Spot here.", hints: ["This one's you.", "Rep, reviews, your history.", "Menu's top-right for Settings."], closer: "Make it yours." },
+  },
+  {
+    mood: "neutral", flip: false, pos: { top: -8, right: "calc(50% + 34px)" },
+    chatId: "onboarding-email",
+    script: { intro: "Spot again.", hints: ["Emails: only what matters.", "No spam. Ever."], closer: "Flip it anytime in Settings." },
+  },
+];
+
 export default function AppIntro() {
   const navigate = useNavigate();
   const location = useLocation();
+  const spotTarget = useRef(null);
 
   const { data: profileData, isPending: profilePending } = useQuery({
     queryKey: queryKeys.myProfile,
@@ -52,6 +91,20 @@ export default function AppIntro() {
   const [emailOptIn, setEmailOptIn] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  /* Spot pops out, hops to the new screen's spot while hidden, then pops in —
+     so he never slides across the copy between screens. */
+  const [spotSlide, setSpotSlide] = useState(0);
+  const [spotShow, setSpotShow] = useState(true);
+  useEffect(() => {
+    if (slide === spotSlide) return undefined;
+    setSpotShow(false);
+    const t = setTimeout(() => {
+      setSpotSlide(slide);
+      setSpotShow(true);
+    }, 230);
+    return () => clearTimeout(t);
+  }, [slide, spotSlide]);
 
   const returnTo = typeof location.state?.returnTo === "string" ? location.state.returnTo : "/";
 
@@ -147,8 +200,20 @@ export default function AppIntro() {
     <div className="splash fadein">
       <div style={{ padding: "16px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <LogoMark size={28} style={{ borderRadius: "var(--r)" }} />
-          <Logo size={16} />
+          {/* Replay (already onboarded) has no Skip and no footer Back on the
+              first screen — give it a clean way out. */}
+          {isReplay && slide === 0 && (
+            <button
+              type="button"
+              className="btn bg-btn bico"
+              aria-label="Back"
+              onClick={() => navigate(returnTo === "/app-intro" ? "/" : returnTo, { replace: true })}
+              style={{ marginRight: 2 }}
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
+          <BrandLockup markSize={28} logoSize={16} markStyle={{ borderRadius: "var(--r)" }} />
         </div>
         {isRequired && (
           <button type="button" className="btn bg-btn" style={{ fontSize: 12, color: "var(--fg3)" }} onClick={handleSkip} disabled={saving}>
@@ -160,9 +225,24 @@ export default function AppIntro() {
       <div className="splash-body" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <div className="sfade" />
         <div
+          ref={spotTarget}
           className="shell-prose"
           style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0 20px" }}
         >
+          {/* Spot rides along — click him for a hint about this screen. */}
+          <SpotMascot
+            key="onboarding-spot"
+            float={false}
+            show={spotShow}
+            size={72}
+            mood={(SPOT_ONBOARDING[spotSlide] || SPOT_ONBOARDING[0]).mood}
+            flip={(SPOT_ONBOARDING[spotSlide] || SPOT_ONBOARDING[0]).flip}
+            script={(SPOT_ONBOARDING[spotSlide] || SPOT_ONBOARDING[0]).script}
+            chatId={(SPOT_ONBOARDING[spotSlide] || SPOT_ONBOARDING[0]).chatId}
+            bubbleSide="top"
+            lookAtRef={spotTarget}
+            style={(SPOT_ONBOARDING[spotSlide] || SPOT_ONBOARDING[0]).pos}
+          />
           <div
             style={{
               width: 64,

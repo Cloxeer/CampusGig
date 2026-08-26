@@ -34,58 +34,81 @@ export async function getReviewsForUser(userId) {
   return { reviews: data || [], error };
 }
 
+const SUBJECT_ALIASES = {
+  BugReport: "bug",
+  SupportReport: "support",
+};
+
+const SAFETY_REASONS = new Set(["harassment", "spam", "false_info", "hate_speech", "inappropriate", "other"]);
+
 /**
- * Unified reports table (`reports`): subject_type `review` | `gig` | `BugReport` | `SupportReport`.
- * For `BugReport`, `reason` = page path; `details` = description.
- * For `SupportReport`, `reason` = how to reach the student (email, Discord handle, etc.); `details` = what they need.
+ * Unified reports: gig | review | user | bug | support.
+ * UI may pass BugReport / SupportReport; those map to bug / support.
  */
-export async function submitReport({ subjectType, reviewId, gigId, reason, details }) {
+export async function submitReport({ subjectType, reviewId, gigId, reportedUserId, reason, details }) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return { error: { message: "Not authenticated" } };
-  if (subjectType === "SupportReport") {
+
+  const type = SUBJECT_ALIASES[subjectType] || subjectType;
+
+  if (type === "support") {
     const contact = typeof reason === "string" ? reason.trim() : "";
     const body = typeof details === "string" ? details.trim() : "";
     if (!contact) return { error: { message: "Please add how we can reach you (email, @ on Discord, etc.)." } };
     if (!body) return { error: { message: "Please describe what you need help with." } };
     const { error } = await supabase.from("reports").insert({
-      subject_type: "SupportReport",
+      subject_type: "support",
       review_id: null,
       gig_id: null,
+      reported_user_id: null,
       reporter_id: user.id,
-      reason: contact,
-      details: body,
+      reason: contact.slice(0, 320),
+      details: body.slice(0, 2000),
     });
     return { error };
   }
-  if (subjectType === "BugReport") {
+
+  if (type === "bug") {
     const page = typeof reason === "string" ? reason.trim() : "";
     const body = typeof details === "string" ? details.trim() : "";
     if (!page) return { error: { message: "Please choose where you saw the issue." } };
     if (!body) return { error: { message: "Please add a short description of what happened." } };
     const { error } = await supabase.from("reports").insert({
-      subject_type: "BugReport",
+      subject_type: "bug",
       review_id: null,
       gig_id: null,
+      reported_user_id: null,
       reporter_id: user.id,
-      reason: page,
-      details: body,
+      reason: page.slice(0, 200),
+      details: body.slice(0, 2000),
     });
     return { error };
   }
-  if (subjectType === "review" && !reviewId) {
+
+  if (type === "review" && !reviewId) {
     return { error: { message: "reviewId is required" } };
   }
-  if (subjectType === "gig" && !gigId) {
+  if (type === "gig" && !gigId) {
     return { error: { message: "gigId is required" } };
+  }
+  if (type === "user" && !reportedUserId) {
+    return { error: { message: "reportedUserId is required" } };
+  }
+  if (type === "user" && String(reportedUserId) === String(user.id)) {
+    return { error: { message: "You cannot report yourself." } };
+  }
+  if (!SAFETY_REASONS.has(reason)) {
+    return { error: { message: "Please choose a reason." } };
   }
 
   const { error } = await supabase.from("reports").insert({
-    subject_type: subjectType,
-    review_id: subjectType === "review" ? reviewId : null,
-    gig_id: subjectType === "gig" ? gigId : null,
+    subject_type: type,
+    review_id: type === "review" ? reviewId : null,
+    gig_id: type === "gig" ? gigId : null,
+    reported_user_id: type === "user" ? reportedUserId : null,
     reporter_id: user.id,
     reason,
     details: details || null,
@@ -186,13 +209,12 @@ export async function getMyReviewsToUserByGig(revieweeId) {
   const byGigId = {};
   const list = [];
   for (const r of data || []) {
-    const gigTitle = r.gig && typeof r.gig === "object" && !Array.isArray(r.gig) ? r.gig.title : null;
     const row = {
       id: r.id,
       rating: r.rating,
       text: r.text,
       gig_id: r.gig_id,
-      gig_title: gigTitle || "Gig",
+      gig_title: r.gig && typeof r.gig === "object" && !Array.isArray(r.gig) ? r.gig.title : "Gig",
     };
     if (r.gig_id) byGigId[r.gig_id] = row;
     list.push(row);
