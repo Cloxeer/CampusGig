@@ -1,8 +1,11 @@
 import { queryClient, queryKeys } from "../../lib/queryClient";
+import { ACTIVE_REQUEST_ALERT_TYPE } from "../../lib/notificationTypes";
 import { updateNotificationsCache } from "./notificationsCache";
 
-export function patchAllReadInCache() {
-  updateNotificationsCache((items) => items.map((n) => ({ ...n, read: true })));
+export function patchDismissableReadInCache() {
+  updateNotificationsCache((items) =>
+    items.map((n) => (n.type === ACTIVE_REQUEST_ALERT_TYPE ? n : { ...n, read: true }))
+  );
 }
 
 export function invalidateUnreadCount() {

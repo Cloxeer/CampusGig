@@ -2,7 +2,7 @@ import { CheckCircle, Loader } from "lucide-react";
 import UserAvatar from "../../../components/UserAvatar";
 import { elapsed } from "../../../utils/helpers";
 import { GIG_NOTIF_TYPES, REVIEW_NOTIF_TYPES } from "../notificationTypes";
-import { isDeletable } from "../notificationModel";
+import { isDeletable, isActiveRequestAlert } from "../notificationModel";
 import { resolveNotifAvatar } from "../resolveNotificationAvatar";
 import NotificationFallbackAvatar from "./NotificationFallbackAvatar";
 import SwipeRow from "./SwipeRow";
@@ -20,7 +20,7 @@ export default function SingleAlertRow({
   const isGigClickable = GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id;
   const isReviewClickable = REVIEW_NOTIF_TYPES.has(n.type) && n.metadata?.reviewer_id;
   const isClickable = isGigClickable || isReviewClickable;
-  const showInlineAccept = n.type === "gig_requested" && n.metadata?.request_id;
+  const showInlineAccept = isActiveRequestAlert(n) && n.metadata?.request_id;
   const gigStatus = n.metadata?.gig_id ? gigStatusMap[n.metadata.gig_id] : null;
   const alreadyAccepted =
     gigStatus && (gigStatus.status === "active" || gigStatus.status === "completed");

@@ -1,5 +1,9 @@
+import { ACTIVE_REQUEST_ALERT_TYPE } from "../../lib/notificationTypes";
+
+export { ACTIVE_REQUEST_ALERT_TYPE };
+
 export const GIG_NOTIF_TYPES = new Set([
-  "gig_requested",
+  ACTIVE_REQUEST_ALERT_TYPE,
   "gig_request_sent",
   "gig_accepted",
   "gig_rejected",

@@ -3,6 +3,7 @@ import { getLevel } from "../utils/helpers";
 import { getAvatarUrl } from "./avatar";
 import { mergeUserPrivateContact, USER_PRIVATE_SELECT } from "./profileShared";
 import { noteEquippedFromRow } from "./equippedRegistry";
+import { getReviewStatsByUserIds, withReviewStats } from "./reviews";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 /** Anti-spam cap on new gigs per poster per rolling hour. */
@@ -25,24 +26,7 @@ async function enrichFeedGigs(data, error) {
   if (error || !data) return { gigs: data || [], error };
 
   const posterIds = [...new Set(data.map((g) => g.poster?.id).filter(Boolean))];
-  let posterReviewMap = {};
-
-  if (posterIds.length > 0) {
-    const { data: allReviews } = await supabase
-      .from("reviews")
-      .select("reviewee_id, rating")
-      .in("reviewee_id", posterIds);
-
-    if (allReviews) {
-      for (const r of allReviews) {
-        if (!posterReviewMap[r.reviewee_id]) {
-          posterReviewMap[r.reviewee_id] = { sum: 0, count: 0 };
-        }
-        posterReviewMap[r.reviewee_id].sum += r.rating;
-        posterReviewMap[r.reviewee_id].count += 1;
-      }
-    }
-  }
+  const posterReviewMap = await getReviewStatsByUserIds(posterIds);
 
   const enriched = data.map((g) => ({
     ...g,
@@ -339,14 +323,20 @@ export async function getGigDetail(gigId) {
     .eq("gig_id", gigId)
     .order("created_at", { ascending: false });
 
+  const statsMap = await getReviewStatsByUserIds([
+    gig.poster?.id,
+    gig.taker?.id,
+    ...(requests || []).map((r) => r.requester?.id),
+  ]);
+
   const mergedGig = {
     ...gig,
-    poster: mergeUserPrivateContact(gig.poster),
-    taker: mergeUserPrivateContact(gig.taker),
+    poster: withReviewStats(mergeUserPrivateContact(gig.poster), statsMap),
+    taker: withReviewStats(mergeUserPrivateContact(gig.taker), statsMap),
   };
   const mergedReqs = (requests || []).map((r) => ({
     ...r,
-    requester: mergeUserPrivateContact(r.requester),
+    requester: withReviewStats(mergeUserPrivateContact(r.requester), statsMap),
   }));
   for (const r of requests || []) noteEquippedFromRow(r.requester);
 

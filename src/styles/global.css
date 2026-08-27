@@ -311,15 +311,11 @@ body {
     position: relative;
     width: 100%;
   }
-  .dsi-dot {
-    position: absolute;
-    top: 8px;
-    right: 10px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--err);
-    border: 2px solid var(--bg2);
+  .desktop-sidebar .nav-alert-dot {
+    border-color: var(--bg2);
+  }
+  .dsi.on .nav-alert-dot {
+    border-color: var(--bg);
   }
   .dsk-post {
     margin-top: auto;
@@ -771,11 +767,40 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 .gig-detail-person-card__name {
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.2;
+}
+.gig-detail-person-card__reviews {
+  font-size: 10px;
+  color: var(--fg4);
+  font-family: var(--mono);
+  line-height: 1.2;
+  min-height: 14px;
+}
+.gig-detail-person-card__reviews--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gig-detail-person-card__reviews--start {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 3px 0 5px;
+}
+.gig-detail-person-card__reviews--rated {
+  gap: 4px;
+  color: var(--fg3);
+}
+.gig-detail-person-card__reviews-avg {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--fg3);
 }
 .gig-detail-person-card__role {
   font-size: 10px;
@@ -2117,6 +2142,26 @@ body {
 }
 .ni.on { color: var(--fg); }
 .nlbl { font-size: 10px; font-weight: 500; font-family: var(--mono); }
+.nav-alert-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.nav-alert-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--err);
+  border: 2px solid var(--bg);
+  box-sizing: border-box;
+  z-index: 1;
+  pointer-events: none;
+}
 .npost-wrap { flex: 1; display: flex; justify-content: center; align-items: flex-end; }
 .npost-btn {
   width: 40px;
@@ -2132,16 +2177,6 @@ body {
   transition: transform .1s;
 }
 .npost-btn:active { transform: scale(.9); }
-.nb-dot {
-  position: absolute;
-  top: 2px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--err);
-  border: 2px solid var(--bg);
-}
 
 /* Leaderboard */
 .lb-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--bd); }

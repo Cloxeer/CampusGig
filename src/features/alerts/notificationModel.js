@@ -1,3 +1,10 @@
+import { ACTIVE_REQUEST_ALERT_TYPE } from "./notificationTypes";
+
+/** Bell stays on until this request is accepted or rejected — visiting Alerts does not dismiss it. */
+export function isActiveRequestAlert(n) {
+  return n?.type === ACTIVE_REQUEST_ALERT_TYPE;
+}
+
 export function isDeletable(n, gigStatusMap) {
   if (!n.metadata?.gig_id) return true;
   if (n.type === "gig_completed" || n.type === "gig_rejected") return true;
@@ -13,7 +20,7 @@ export function groupNotifications(notifications) {
   const gigRequestBuckets = {};
 
   for (const n of notifications) {
-    if (n.type === "gig_requested" && n.metadata?.gig_id) {
+    if (isActiveRequestAlert(n) && n.metadata?.gig_id) {
       const key = n.metadata.gig_id;
       if (!gigRequestBuckets[key]) {
         gigRequestBuckets[key] = [];

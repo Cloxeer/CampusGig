@@ -7,8 +7,9 @@ import {
   acceptGigRequest,
 } from "../../../lib/profile";
 import { GIG_NOTIF_TYPES, REVIEW_NOTIF_TYPES } from "../notificationTypes";
+import { isActiveRequestAlert } from "../notificationModel";
 import {
-  patchAllReadInCache,
+  patchDismissableReadInCache,
   invalidateUnreadCount,
   removeNotifFromCache,
   removeNotifsFromCache,
@@ -24,7 +25,7 @@ export function useAlertsActions() {
 
   const handleMarkRead = useCallback(async () => {
     await markAllNotificationsRead();
-    patchAllReadInCache();
+    patchDismissableReadInCache();
     invalidateUnreadCount();
   }, []);
 
@@ -43,7 +44,7 @@ export function useAlertsActions() {
 
   const handleNotifClick = useCallback(
     async (n) => {
-      if (!n.read) {
+      if (!n.read && !isActiveRequestAlert(n)) {
         markNotificationRead(n.id);
         markSingleReadInCache(n.id);
         invalidateUnreadCount();
@@ -65,7 +66,7 @@ export function useAlertsActions() {
 
   const handleGroupClick = useCallback(
     async (items) => {
-      const unreadIds = items.filter((n) => !n.read).map((n) => n.id);
+      const unreadIds = items.filter((n) => !n.read && !isActiveRequestAlert(n)).map((n) => n.id);
       if (unreadIds.length > 0) {
         await Promise.all(unreadIds.map((id) => markNotificationRead(id)));
         markIdsReadInCache(unreadIds);

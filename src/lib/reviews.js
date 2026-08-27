@@ -34,6 +34,35 @@ export async function getReviewsForUser(userId) {
   return { reviews: data || [], error };
 }
 
+/** Average rating + count keyed by reviewee id. Same source GigCard and person cards use. */
+export async function getReviewStatsByUserIds(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  const map = {};
+  if (ids.length === 0) return map;
+
+  const { data: rows } = await supabase
+    .from("reviews")
+    .select("reviewee_id, rating")
+    .in("reviewee_id", ids);
+
+  for (const r of rows || []) {
+    if (!map[r.reviewee_id]) map[r.reviewee_id] = { sum: 0, count: 0 };
+    map[r.reviewee_id].sum += r.rating;
+    map[r.reviewee_id].count += 1;
+  }
+  return map;
+}
+
+export function withReviewStats(user, statsMap) {
+  if (!user) return user;
+  const stats = statsMap?.[user.id];
+  return {
+    ...user,
+    reviewCount: stats?.count || 0,
+    avgRating: stats && stats.count ? stats.sum / stats.count : 0,
+  };
+}
+
 const SUBJECT_ALIASES = {
   BugReport: "bug",
   SupportReport: "support",

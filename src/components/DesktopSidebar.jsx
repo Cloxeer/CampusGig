@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, Search, Plus, Bell, User } from "lucide-react";
 import { BrandLockup } from "./Logo";
+import NavAlertDot from "./NavAlertDot";
 
 export default function DesktopSidebar({ unreadCount = 0 }) {
   const navigate = useNavigate();
@@ -16,10 +17,11 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
           onClick={() => navigate(to)}
           aria-current={on ? "page" : undefined}
         >
-          <Icon size={18} strokeWidth={2} />
+          <NavAlertDot show={!!dot}>
+            <Icon size={18} strokeWidth={2} />
+          </NavAlertDot>
           <span className="dsi-lbl">{label}</span>
         </button>
-        {dot ? <span className="dsi-dot" aria-hidden /> : null}
       </div>
     );
   }

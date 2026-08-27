@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, Search, Plus, Bell, User } from "lucide-react";
+import NavAlertDot from "./NavAlertDot";
 
 export default function BottomNav({ unreadCount = 0 }) {
   const navigate = useNavigate();
@@ -32,11 +33,12 @@ export default function BottomNav({ unreadCount = 0 }) {
       <button
         className={`ni ${pathname === "/alerts" ? "on" : ""}`}
         onClick={() => navigate("/alerts")}
-        style={{ position: "relative" }}
+        aria-label={unreadCount > 0 ? "Alerts, active" : "Alerts"}
       >
-        <Bell size={18} />
+        <NavAlertDot show={unreadCount > 0}>
+          <Bell size={18} />
+        </NavAlertDot>
         <span className="nlbl">alerts</span>
-        {unreadCount > 0 && <div className="nb-dot" />}
       </button>
 
       <button

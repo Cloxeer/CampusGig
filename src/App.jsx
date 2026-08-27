@@ -235,6 +235,14 @@ export default function App() {
           queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${currentUserId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+        }
+      )
       .subscribe();
 
     return () => {

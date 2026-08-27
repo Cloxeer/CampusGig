@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import TopBar from "../../components/TopBar";
-import { groupNotifications } from "./notificationModel";
+import { groupNotifications, isActiveRequestAlert } from "./notificationModel";
 import { groupByDateBucket } from "../../utils/dateBuckets";
 import { useAlertsQuery } from "./hooks/useAlertsQuery";
 import { useAlertsMarkAllReadOnMount } from "./hooks/useAlertsMarkAllReadOnMount";
@@ -28,7 +28,7 @@ export default function AlertsPage() {
   const notifications = alertsData?.notifications || [];
   const gigStatusMap = alertsData?.gigStatusMap || {};
   const profileMap = alertsData?.profileMap || {};
-  const hasUnread = notifications.some((n) => !n.read);
+  const hasDismissableUnread = notifications.some((n) => !n.read && !isActiveRequestAlert(n));
   const groups = groupNotifications(notifications);
   /* Date buckets keep a long-lived inbox tidy: recent sections stay visible,
      everything older collapses behind a count. A group dates by its newest item. */
@@ -76,7 +76,7 @@ export default function AlertsPage() {
       <TopBar
         title="Alerts"
         right={
-          hasUnread ? (
+          hasDismissableUnread ? (
             <button type="button" className="btn bg-btn bsm" onClick={handleMarkRead}>
               Mark read
             </button>

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { ACTIVE_REQUEST_ALERT_TYPE } from "./notificationTypes";
 
 export async function getMyNotifications() {
   const { data: { user } } = await supabase.auth.getUser();
@@ -34,7 +35,8 @@ export async function markAllNotificationsRead() {
     .from("notifications")
     .update({ read: true })
     .eq("user_id", user.id)
-    .eq("read", false);
+    .eq("read", false)
+    .neq("type", ACTIVE_REQUEST_ALERT_TYPE);
 
   return { error };
 }

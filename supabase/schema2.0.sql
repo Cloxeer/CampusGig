@@ -935,6 +935,32 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION private.trg_clear_active_request_alerts()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF OLD.status = 'pending' AND NEW.status IS DISTINCT FROM 'pending' THEN
+    IF NEW.status = 'accepted' THEN
+      UPDATE public.notifications
+      SET read = true
+      WHERE type = 'gig_requested'
+        AND metadata->>'gig_id' = NEW.gig_id::text
+        AND read = false;
+    ELSE
+      UPDATE public.notifications
+      SET read = true
+      WHERE type = 'gig_requested'
+        AND metadata->>'request_id' = NEW.id::text
+        AND read = false;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION private.accept_gig_request(p_request_id UUID) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
 DECLARE uid UUID := auth.uid(); r RECORD; g RECORD; gtitle TEXT; pname TEXT; reqname TEXT;
@@ -1205,6 +1231,7 @@ CREATE TRIGGER trg_rep_gig_complete AFTER UPDATE ON public.gigs FOR EACH ROW EXE
 CREATE TRIGGER trg_after_review_insert AFTER INSERT ON public.reviews FOR EACH ROW EXECUTE FUNCTION public.after_review_change();
 CREATE TRIGGER trg_after_review_update AFTER UPDATE ON public.reviews FOR EACH ROW EXECUTE FUNCTION public.after_review_change();
 CREATE TRIGGER trg_after_review_delete AFTER DELETE ON public.reviews FOR EACH ROW EXECUTE FUNCTION public.after_review_delete();
+CREATE TRIGGER trg_clear_active_request_alerts AFTER UPDATE OF status ON public.gig_requests FOR EACH ROW EXECUTE FUNCTION private.trg_clear_active_request_alerts();
 CREATE TRIGGER trg_private_contact_email_nmsu
   BEFORE INSERT OR UPDATE OF email ON public.user_private_contact
   FOR EACH ROW EXECUTE FUNCTION public.enforce_private_contact_email_nmsu();

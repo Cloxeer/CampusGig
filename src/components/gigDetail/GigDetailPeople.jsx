@@ -1,6 +1,19 @@
 import LevelBadge from "../LevelBadge";
 import UserAvatar from "../UserAvatar";
+import Stars from "../Stars";
 import { getLevel } from "../../utils/helpers";
+
+function PersonReviewStars({ avgRating = 0, reviewCount = 0, align = "center" }) {
+  if (!reviewCount) {
+    return <div className={`gig-detail-person-card__reviews gig-detail-person-card__reviews--${align}`}>No reviews yet</div>;
+  }
+  return (
+    <div className={`gig-detail-person-card__reviews gig-detail-person-card__reviews--rated gig-detail-person-card__reviews--${align}`}>
+      <Stars rating={avgRating} size={11} />
+      <span className="gig-detail-person-card__reviews-avg">{avgRating.toFixed(1)}</span>
+    </div>
+  );
+}
 
 function PersonCard({ user, label, onClick }) {
   if (!user) return null;
@@ -11,6 +24,7 @@ function PersonCard({ user, label, onClick }) {
     <button type="button" className="gig-detail-person-card" onClick={onClick}>
       <UserAvatar user={user} size="lg" style={{ border: "2px solid var(--bd)" }} />
       <div className="gig-detail-person-card__name">{name}</div>
+      <PersonReviewStars avgRating={user.avgRating} reviewCount={user.reviewCount} />
       <div className="gig-detail-person-card__role">{label}</div>
       <LevelBadge label={lvl.label} userId={user.id} equippedTagId={user.equipped_tag} />
       <div className="gig-detail-person-card__link">View Profile ›</div>
@@ -24,6 +38,11 @@ function PosterRow({ poster, posterName, posterLevel, onClick }) {
       <UserAvatar user={poster} size={40} />
       <div style={{ flex: 1 }}>
         <div className="gig-detail-poster-row__name">{posterName}</div>
+        <PersonReviewStars
+          avgRating={poster?.avgRating}
+          reviewCount={poster?.reviewCount}
+          align="start"
+        />
         <LevelBadge label={posterLevel.label} userId={poster?.id} equippedTagId={poster?.equipped_tag} />
       </div>
       <span style={{ fontSize: 14, color: "var(--fg4)" }}>›</span>
