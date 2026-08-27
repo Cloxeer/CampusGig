@@ -5,6 +5,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import App from "./App";
 import { ToastProvider } from "./components/toast/ToastProvider";
+import ScrollToTop from "./components/ScrollToTop";
 import { queryClient } from "./lib/queryClient";
 import { queryPersister, PERSIST_BUSTER, PERSIST_MAX_AGE } from "./lib/queryPersister";
 // Self-hosted fonts (no Google Fonts CDN → no visitor IPs sent to Google).
@@ -30,6 +31,7 @@ createRoot(document.getElementById("root")).render(
       }}
     >
       <BrowserRouter>
+        <ScrollToTop />
         <ToastProvider>
           <App />
         </ToastProvider>

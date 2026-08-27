@@ -11,6 +11,7 @@ import { phoneFromStored } from "../utils/phoneNanp";
 import { EMPTY_CONTACT_PROFILE, validateNanpPhone, validateRequiredPayment, profileContactsToApi, mapContactError } from "../utils/profileForm";
 import ProfileTabBar from "../features/profile/components/ProfileTabBar";
 import EditProfileIdentity from "../features/profile/components/EditProfileIdentity";
+import { useQueryTab } from "../hooks/useQueryTab";
 
 const EDIT_PROFILE_RETURN_PATHS = new Set(["/profile", "/settings"]);
 const EDIT_TABS = [
@@ -45,7 +46,12 @@ function resolveEditProfileReturnTo(state) {
   return "/profile";
 }
 
-function resolveEditTab(state) {
+function resolveEditDefaultTab(state, search) {
+  const fromUrl = new URLSearchParams(search).get("tab");
+  if (EDIT_TAB_IDS.has(fromUrl)) {
+    persistEditTab(fromUrl);
+    return fromUrl;
+  }
   if (state?.tab === "contacts" || state?.tab === "profile") {
     persistEditTab(state.tab);
     return state.tab;
@@ -100,7 +106,7 @@ export default function EditProfile() {
   const returnTo = resolveEditProfileReturnTo(location.state);
   const hydratedRef = useRef(!!queryClient.getQueryData(queryKeys.myProfile)?.profile);
 
-  const [tab, setTab] = useState(() => resolveEditTab(location.state));
+  const [tab, setTab] = useQueryTab(EDIT_TAB_IDS, resolveEditDefaultTab(location.state, location.search));
   const [profile, setProfile] = useState(() => {
     const p = queryClient.getQueryData(queryKeys.myProfile)?.profile;
     return p ? profileRowToForm(p) : { ...EMPTY_CONTACT_PROFILE, contact_favorite_keys: [] };

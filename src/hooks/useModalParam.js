@@ -17,7 +17,11 @@ export function useModalParam(key) {
   const open = useCallback(
     (val = "1") => {
       pushedRef.current = true;
-      setSearchParams({ [key]: val });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set(key, val);
+        return next;
+      });
     },
     [key, setSearchParams]
   );
@@ -30,9 +34,16 @@ export function useModalParam(key) {
     } else if (returnTo) {
       navigate(returnTo, { replace: true });
     } else {
-      setSearchParams({}, { replace: true });
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete(key);
+          return next;
+        },
+        { replace: true }
+      );
     }
-  }, [navigate, setSearchParams, location.state]);
+  }, [key, navigate, setSearchParams, location.state]);
 
   useEffect(() => {
     if (!value) pushedRef.current = false;

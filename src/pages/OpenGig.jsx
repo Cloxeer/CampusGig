@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { queryClient, queryKeys } from "../lib/queryClient";
 import { safeAppReturnTo } from "../hooks/useModalParam";
+import { navigateBack } from "../utils/navBack";
 import { useGigDetailQuery } from "../hooks/useGigDetailQuery";
 import GigDetailView from "../components/gigDetail/GigDetailView";
 
@@ -21,8 +22,7 @@ export default function OpenGig({ currentUserId }) {
 
   function handleClose() {
     const r = safeAppReturnTo(location.state);
-    if (r) navigate(r, { replace: true });
-    else navigate(-1);
+    navigateBack(navigate, r || "/");
   }
 
   function handleStatusChange() {
@@ -36,8 +36,7 @@ export default function OpenGig({ currentUserId }) {
     if (detailError) return;
     if (gig !== null) return;
     const r = safeAppReturnTo(location.state);
-    if (r) navigate(r, { replace: true });
-    else navigate(-1);
+    navigateBack(navigate, r || "/");
   }, [gigId, detailPending, detailError, gig, navigate, location.state]);
 
   return (

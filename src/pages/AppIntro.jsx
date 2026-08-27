@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { navigateBack } from "../utils/navBack";
 import { useQuery } from "@tanstack/react-query";
 import { Home, Compass, PlusCircle, Bell, User, Mail, ArrowRight, ArrowLeft, Loader } from "lucide-react";
 import { BrandLockup } from "../components/Logo";
@@ -87,7 +88,11 @@ export default function AppIntro() {
   const isRequired = !!(profile && !profile.app_intro_completed_at);
   const isReplay = !!profile?.app_intro_completed_at;
 
-  const [slide, setSlide] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stepCount = CONTENT_SLIDES.length + 1;
+  const rawStep = Number.parseInt(searchParams.get("step"), 10);
+  const step = Number.isFinite(rawStep) && rawStep >= 1 && rawStep <= stepCount ? rawStep : 1;
+  const slide = step - 1;
   const [emailOptIn, setEmailOptIn] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -107,6 +112,13 @@ export default function AppIntro() {
   }, [slide, spotSlide]);
 
   const returnTo = typeof location.state?.returnTo === "string" ? location.state.returnTo : "/";
+
+  useEffect(() => {
+    if (searchParams.get("step") === String(step)) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("step", String(step));
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, step]);
 
   useEffect(() => {
     if (profile?.email_alerts_enabled !== undefined && profile?.email_alerts_enabled !== null) {
@@ -163,12 +175,12 @@ export default function AppIntro() {
 
   function goNext() {
     if (slide < CONTENT_SLIDES.length) {
-      setSlide((s) => s + 1);
+      navigate(`/app-intro?step=${step + 1}`);
     }
   }
 
   function goBack() {
-    if (slide > 0) setSlide((s) => s - 1);
+    if (slide > 0) navigateBack(navigate, `/app-intro?step=${step - 1}`);
   }
 
   const EMAIL_ALERTS_HINT =
@@ -207,7 +219,7 @@ export default function AppIntro() {
               type="button"
               className="btn bg-btn bico"
               aria-label="Back"
-              onClick={() => navigate(returnTo === "/app-intro" ? "/" : returnTo, { replace: true })}
+              onClick={() => navigateBack(navigate, returnTo === "/app-intro" ? "/" : returnTo)}
               style={{ marginRight: 2 }}
             >
               <ArrowLeft size={16} />

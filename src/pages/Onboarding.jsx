@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader, Camera } from "lucide-react";
 import { createProfile, uploadAvatar } from "../lib/profile";
 import { supabase } from "../lib/supabase";
@@ -16,7 +17,8 @@ import {
 import { hasRequiredPayment } from "../utils/contactFields";
 
 export default function Onboarding({ onComplete }) {
-  const [step, setStep] = useState("profile");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const step = searchParams.get("step") === "contacts" ? "contacts" : "profile";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [profile, setProfile] = useState(EMPTY_CONTACT_PROFILE);
@@ -25,6 +27,11 @@ export default function Onboarding({ onComplete }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailDisplay, setEmailDisplay] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("step") === "contacts" || searchParams.get("step") === "profile") return;
+    setSearchParams({ step: "profile" }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     (async () => {
@@ -53,7 +60,7 @@ export default function Onboarding({ onComplete }) {
       setError("First and last name are required.");
       return;
     }
-    setStep("contacts");
+    setSearchParams({ step: "contacts" });
   }
 
   const handleFinish = async () => {
@@ -61,21 +68,21 @@ export default function Onboarding({ onComplete }) {
 
     if (!firstName.trim() || !lastName.trim()) {
       setError("First and last name are required.");
-      setStep("profile");
+      setSearchParams({ step: "profile" }, { replace: true });
       return;
     }
 
     const phoneCheck = validateNanpPhone(profile.phone);
     if (!phoneCheck.ok) {
       setError(phoneCheck.error);
-      setStep("contacts");
+      setSearchParams({ step: "contacts" }, { replace: true });
       return;
     }
 
     const payCheck = validateRequiredPayment(profile);
     if (!payCheck.ok) {
       setError(payCheck.error);
-      setStep("contacts");
+      setSearchParams({ step: "contacts" }, { replace: true });
       return;
     }
 
@@ -191,7 +198,7 @@ export default function Onboarding({ onComplete }) {
             >
               {loading ? <Loader size={16} className="spin" /> : "Save"}
             </button>
-            <button type="button" className="btn bg-btn bfull" onClick={() => setStep("profile")} disabled={loading}>
+            <button type="button" className="btn bg-btn bfull" onClick={() => setSearchParams({ step: "profile" })} disabled={loading}>
               Back
             </button>
           </>

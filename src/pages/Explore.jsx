@@ -1,22 +1,38 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { useOpenGigsQuery } from "../hooks/useOpenGigsQuery";
 import { useLegacyGigRedirect } from "../hooks/useLegacyGigRedirect";
 import { useTimer } from "../utils/helpers";
 import TopBar from "../components/TopBar";
 import GigCard from "../components/GigCard";
+import { navigateBack } from "../utils/navBack";
 
 export default function Explore({ currentUserId }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [searchQ, setSearchQ] = useState("");
+  const [searchQ, setSearchQ] = useState(() => searchParams.get("q") || "");
   const tick = useTimer();
 
   const { gigs: allGigs, isPending: gigsPending } = useOpenGigsQuery();
 
   useLegacyGigRedirect("/explore");
+
+  function writeSearch(nextQ) {
+    setSearchQ(nextQ);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        const trimmed = nextQ.trim();
+        if (trimmed) next.set("q", nextQ);
+        else next.delete("q");
+        return next;
+      },
+      { replace: true }
+    );
+  }
 
   const searchResults = allGigs.filter((g) =>
     searchQ.trim() === ""
@@ -29,7 +45,7 @@ export default function Explore({ currentUserId }) {
 
   return (
     <div className="page fadein">
-      <TopBar title="Search" onBack={() => navigate("/", { replace: true })} />
+      <TopBar title="Search" onBack={() => navigateBack(navigate, "/")} />
 
       <div style={{ padding: "12px 16px 0" }}>
         <div
@@ -57,13 +73,13 @@ export default function Explore({ currentUserId }) {
             }}
             placeholder="Search gigs, categories, locations…"
             value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
+            onChange={(e) => writeSearch(e.target.value)}
             autoFocus
           />
           {searchQ && (
             <button
               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg3)", display: "flex" }}
-              onClick={() => setSearchQ("")}
+              onClick={() => writeSearch("")}
             >
               <X size={14} />
             </button>

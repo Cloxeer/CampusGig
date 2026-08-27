@@ -10,6 +10,7 @@ import DeleteReviewConfirmModal from "../../components/modals/DeleteReviewConfir
 import { useProfilePageQueries } from "./hooks/useProfilePageQueries";
 import { useProfileMenu } from "./hooks/useProfileMenu";
 import { useProfileReviewsUrlSync } from "./hooks/useProfileReviewsUrlSync";
+import { useQueryTab } from "../../hooks/useQueryTab";
 import { buildActivityItems } from "./mappers/buildProfileActivityItems";
 import { refreshProfileData } from "./utils/refreshProfileData";
 import ProfilePageSkeleton from "./components/ProfilePageSkeleton";
@@ -36,6 +37,17 @@ import { useToast } from "../../components/toast/ToastProvider";
 // e.g. open a profile from the Board and come back to the Board, not Activity.
 const PROFILE_TAB_STORAGE_KEY = "cg:profile:selfTab";
 const SELF_TABS = new Set(["activity", "leaderboard"]);
+const OTHER_TABS = new Set(["reviews", "activity"]);
+
+function selfDefaultTab() {
+  try {
+    const saved = localStorage.getItem(PROFILE_TAB_STORAGE_KEY);
+    if (SELF_TABS.has(saved)) return saved;
+  } catch {
+    /* ignore */
+  }
+  return "activity";
+}
 
 export default function ProfilePage({ currentUserId }) {
   const navigate = useNavigate();
@@ -47,21 +59,10 @@ export default function ProfilePage({ currentUserId }) {
   const [reviewsOpen, openReviews, closeReviews] = useModalParam("reviews");
   const [searchParams] = useSearchParams();
 
-  const [pTab, setPTab] = useState(() => {
-    if (routeUserId) return "reviews";
-    try {
-      if (new URLSearchParams(window.location.search).get("tab") === "leaderboard") return "leaderboard";
-    } catch {
-      /* ignore */
-    }
-    try {
-      const saved = localStorage.getItem(PROFILE_TAB_STORAGE_KEY);
-      if (SELF_TABS.has(saved)) return saved;
-    } catch {
-      /* ignore */
-    }
-    return "activity";
-  });
+  const [pTab, setPTab] = useQueryTab(
+    isOtherProfile ? OTHER_TABS : SELF_TABS,
+    isOtherProfile ? "reviews" : selfDefaultTab()
+  );
   const [loggingOut, setLoggingOut] = useState(false);
   const [targetReviewerId, setTargetReviewerId] = useState(null);
   const [deepLinkGigId, setDeepLinkGigId] = useState(null);
@@ -103,11 +104,6 @@ export default function ProfilePage({ currentUserId }) {
     }
   }, [searchParams, navigate, isOtherProfile]);
 
-  useEffect(() => {
-    if (routeUserId) return;
-    if (searchParams.get("tab") === "leaderboard") setPTab("leaderboard");
-  }, [searchParams, routeUserId]);
-
   // Remember the self-profile tab so returning to /profile restores it.
   useEffect(() => {
     if (routeUserId || !SELF_TABS.has(pTab)) return;
@@ -119,12 +115,13 @@ export default function ProfilePage({ currentUserId }) {
   }, [pTab, routeUserId]);
 
   useEffect(() => {
-    if (routeUserId || pTab !== "leaderboard" || searchParams.get("tab") !== "leaderboard") return;
+    if (routeUserId || pTab !== "leaderboard") return;
     const id = requestAnimationFrame(() => {
-      document.getElementById("profile-leaderboard-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const you = document.querySelector("#profile-leaderboard-section .lb-row.lb-you[data-lb-you]");
+      you?.scrollIntoView({ behavior: "auto", block: "center" });
     });
     return () => cancelAnimationFrame(id);
-  }, [routeUserId, pTab, searchParams]);
+  }, [routeUserId, pTab, q.leaderboard]);
 
   useLegacyGigRedirect(routeUserId ? `/profile/${routeUserId}` : "/profile", {
     enabled: isOtherProfile && Boolean(routeUserId),
@@ -351,7 +348,7 @@ export default function ProfilePage({ currentUserId }) {
               openReviews={openReviews}
               reviewsLoading={q.reviewsPending}
               isOwnProfile
-              onEditProfile={() => navigate("/profile/edit", { state: { returnTo: "/profile" } })}
+              onEditProfile={() => navigate("/profile/edit?tab=profile", { state: { returnTo: "/profile" } })}
             />
 
             <ProfileStatBoxes

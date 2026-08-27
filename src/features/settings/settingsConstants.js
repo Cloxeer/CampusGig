@@ -1,6 +1,9 @@
 export const DELETE_CONFIRM_PHRASE = "DELETE";
 
-export const APP_VERSION = "1.0.0";
+import pkg from "../../../package.json";
+
+/** Product version — same field as package.json (not a 1.0 launch). */
+export const APP_VERSION = pkg.version;
 
 export { COMMUNITY_DISCORD_INVITE_URL, DISCORD_SUPPORT_USERNAME } from "../../utils/supportCommunity";
 

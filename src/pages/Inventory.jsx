@@ -13,6 +13,8 @@ import SpotMascot from "../components/SpotMascot";
 import { getMyProfile, getAvatarUrl } from "../lib/profile";
 import { queryKeys } from "../lib/queryClient";
 import { safeAppReturnTo } from "../hooks/useModalParam";
+import { useQueryTab } from "../hooks/useQueryTab";
+import { navigateBack } from "../utils/navBack";
 import ProfileTabBar from "../features/profile/components/ProfileTabBar";
 import "./inventory.css";
 
@@ -22,8 +24,7 @@ import "./inventory.css";
  * the swatch + a small label. Ownership is server-backed (see cosmeticsInventory).
  */
 
-/** One diameter for the live-preview avatar across every state (matches the
- *  bare-fallback `.invx-preview__avatar` size in inventory.css). */
+const INV_TABS = new Set(["tag", "border"]);
 const PREVIEW_AVATAR = 72;
 
 /** Spot cycles through these expressions each time he hops sides — a "new" Spot
@@ -205,7 +206,7 @@ export default function Inventory() {
   }, []);
   const [inv, setInv] = useState(getInventory);
   /** Which slot's catalog is on screen — swapped via the segmented control. */
-  const [view, setView] = useState("tag"); // tag | border
+  const [view, setView] = useQueryTab(INV_TABS, "tag");
   const [redeemOpen, setRedeemOpen] = useState(false);
   /** Transient "Trading — coming soon" hint shown when the (placeholder) trade
    *  button is tapped. Auto-dismisses; closes on tap-outside. */
@@ -246,7 +247,7 @@ export default function Inventory() {
 
   function goBack() {
     const r = safeAppReturnTo(location.state);
-    navigate(r || "/profile");
+    navigateBack(navigate, r || "/profile");
   }
 
   return (

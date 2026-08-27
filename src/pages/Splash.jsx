@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { navigateBack } from "../utils/navBack";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, Send, GraduationCap, Banknote, ShieldCheck, ArrowLeft, ArrowRight, LogIn, Briefcase, Users, CheckCircle, User } from "lucide-react";
 import { BrandLockup } from "../components/Logo";
@@ -235,10 +236,29 @@ const SPOT_SLIDES = [
   },
 ];
 
+function clampHowItWorksStep(raw) {
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  if (n > SLIDES.length) return SLIDES.length;
+  return n;
+}
+
 export default function Splash() {
   const navigate = useNavigate();
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [slide, setSlide] = useState(0);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isHowItWorks = location.pathname === "/welcome/how-it-works";
+  const step = clampHowItWorksStep(searchParams.get("step"));
+  const slide = step - 1;
+
+  useEffect(() => {
+    if (!isHowItWorks) return;
+    if (searchParams.get("step") === String(step)) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("step", String(step));
+    setSearchParams(next, { replace: true });
+  }, [isHowItWorks, searchParams, setSearchParams, step]);
+
   const spotTarget = useRef(null);
 
   /* Spot pops OUT, jumps to the new slide's spot while invisible, then pops
@@ -292,7 +312,7 @@ export default function Splash() {
     return unsubscribe;
   }, [queryClient]);
 
-  if (showTutorial) {
+  if (isHowItWorks) {
     const s = SLIDES[slide];
     const isLast = slide === SLIDES.length - 1;
 
@@ -369,7 +389,10 @@ export default function Splash() {
               <LogIn size={16} /> Create account
             </button>
           ) : (
-            <button className="btn bp bfull blg" onClick={() => setSlide(slide + 1)}>
+            <button
+              className="btn bp bfull blg"
+              onClick={() => navigate(`/welcome/how-it-works?step=${step + 1}`)}
+            >
               Continue <ArrowRight size={16} />
             </button>
           )}
@@ -377,8 +400,8 @@ export default function Splash() {
             className="btn bg-btn bfull"
             style={{ color: "var(--fg3)", fontSize: 13 }}
             onClick={() => {
-              if (slide > 0) setSlide(slide - 1);
-              else setShowTutorial(false);
+              if (step > 1) navigateBack(navigate, `/welcome/how-it-works?step=${step - 1}`);
+              else navigateBack(navigate, "/welcome");
             }}
           >
             <ArrowLeft size={13} /> {slide > 0 ? "Back" : "Back to welcome"}
@@ -456,7 +479,7 @@ export default function Splash() {
       </div>
 
       <div className="sfoot">
-        <button className="btn bo bfull" onClick={() => setShowTutorial(true)}>
+        <button className="btn bo bfull" onClick={() => navigate("/welcome/how-it-works?step=1")}>
           How it works
         </button>
         <button

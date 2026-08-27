@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { navigateBack } from "../../utils/navBack";
 import { Smartphone } from "lucide-react";
 import { useSettingsProfileQueries } from "./hooks/useSettingsProfileQueries";
 import { useDeviceNotifyPreferences } from "./hooks/useDeviceNotifyPreferences";
@@ -25,21 +26,21 @@ export default function SettingsScreen() {
 
   return (
     <div className="page fadein">
-      <SettingsScreenHeader onBack={() => navigate("/profile")} />
+      <SettingsScreenHeader onBack={() => navigateBack(navigate, "/profile")} />
 
       <div className="scroll scroll--settings-pad scroll--fine-scrollbar" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <SettingsSignedInEmailCard email={email} isPending={isPending} />
         <SettingsPasscodeCard profile={profile} isPending={isPending} />
         <SettingsNameCard
           onNavigateEditProfile={() =>
-            navigate("/profile/edit", { state: { returnTo: "/settings", tab: "profile" } })
+            navigate("/profile/edit?tab=profile", { state: { returnTo: "/settings" } })
           }
         />
         <SettingsEditContactsNavRow
           icon={Smartphone}
           label="Edit contacts & payment methods"
           onNavigateEditContacts={() =>
-            navigate("/profile/edit", { state: { returnTo: "/settings", tab: "contacts" } })
+            navigate("/profile/edit?tab=contacts", { state: { returnTo: "/settings" } })
           }
         />
         <SettingsAlertsCard

@@ -28,12 +28,12 @@ import { supabase } from "./lib/supabase";
 import { getMyProfile, getUnreadNotificationCount, cancelPendingAccountDeletion } from "./lib/profile";
 import { queryClient, queryKeys } from "./lib/queryClient";
 
-const INDEXABLE_PATHS = new Set(["/", "/welcome", "/terms", "/privacy"]);
+const INDEXABLE_PATHS = new Set(["/", "/welcome", "/welcome/how-it-works", "/terms", "/privacy"]);
 
 /** Full-screen routes that DON'T resolve into the nav shell. On these the feed
  *  skeleton would flash the wrong layout, so they keep a plain centered loader. */
 const FULLSCREEN_LOADING_PATHS = new Set([
-  "/welcome", "/auth", "/magic", "/terms", "/privacy", "/onboarding", "/app-intro",
+  "/welcome", "/welcome/how-it-works", "/auth", "/magic", "/terms", "/privacy", "/onboarding", "/app-intro",
 ]);
 function isShellLoadingRoute() {
   const p = window.location.pathname;
@@ -294,6 +294,7 @@ export default function App() {
             {/* Full-screen (no-nav) public surfaces + sign-in / marketing routes. */}
             <Route path="/gig/:gigId" element={<OpenGig currentUserId={null} />} />
             <Route path="/welcome" element={<Splash />} />
+            <Route path="/welcome/how-it-works" element={<Splash />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/magic" element={<MagicLink />} />
             <Route path="/terms" element={<Terms />} />
@@ -364,6 +365,8 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/asnmsu/discounts" element={<AsnmsuDiscounts />} />
           <Route path="/app-intro" element={<AppIntro />} />
+          <Route path="/welcome" element={<Splash />} />
+          <Route path="/welcome/how-it-works" element={<Splash />} />
           <Route path="/gig/:gigId" element={<OpenGig currentUserId={currentUserId} />} />
           <Route path="/users/:userId" element={<UsersToProfileRedirect />} />
           <Route path="/terms" element={<Terms />} />

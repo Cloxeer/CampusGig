@@ -21,6 +21,7 @@
   --green: #22c55e;
   --green-d: #16a34a;
   --green-bg: #f0fdf4;
+  --green-bg-strong: #bbf7d0;
   --green-bd: #bbf7d0;
   --green-text: #15803d;
   /* Amber = warnings/pending ONLY */
@@ -2145,7 +2146,7 @@ body {
 /* Leaderboard */
 .lb-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--bd); }
 .lb-row:last-child { border-bottom: none; }
-.lb-you { background: var(--green-bg); }
+.lb-you { background: var(--green-bg-strong); }
 .lb-rank { width: 20px; font-size: 12px; font-weight: 700; font-family: var(--mono); color: var(--fg3); text-align: center; flex-shrink: 0; }
 .lb-rank.top { color: var(--green-text); }
 .lb-av {

@@ -35,6 +35,7 @@ export default function ProfileLeaderboardTab({
         <div
           key={p.rank}
           className={`lb-row ${p.isYou ? "lb-you" : ""}`}
+          data-lb-you={p.isYou ? "1" : undefined}
           style={{ cursor: p.isYou ? "default" : "pointer" }}
           onClick={() => {
             if (!p.isYou && p.userId) navigate(`/profile/${p.userId}`);
@@ -87,12 +88,12 @@ export default function ProfileLeaderboardTab({
           </div>
           <div
             className="lb-row lb-you"
+            data-lb-you-sticky="1"
             style={{
               position: "sticky",
               bottom: 0,
               borderTop: "2px solid var(--green-bd)",
               borderBottom: "none",
-              background: "var(--green-bg)",
             }}
           >
             <span className="lb-rank">{rank}</span>

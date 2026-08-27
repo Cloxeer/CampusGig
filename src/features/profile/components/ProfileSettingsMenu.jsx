@@ -96,7 +96,7 @@ export default function ProfileSettingsMenu({
           </MenuRow>
           <MenuRow
             icon={Pencil}
-            onClick={() => closeThen(() => navigate("/profile/edit", { state: { returnTo: "/profile" } }))}
+            onClick={() => closeThen(() => navigate("/profile/edit?tab=profile", { state: { returnTo: "/profile" } }))}
           >
             Edit profile
           </MenuRow>
