@@ -11,6 +11,7 @@ import { getPublicStats, subscribePublicStats, PUBLIC_STATS_EMPTY } from "../lib
 import { queryKeys } from "../lib/queryClient";
 import { useCountUp } from "../hooks/useCountUp";
 import SpotMascot from "../components/SpotMascot";
+import LiveStatusDot from "../components/LiveStatusDot";
 import spotIdleCycle from "../assets/spot/spot-idle-cycle.mp4";
 
 /* The real cosmetics catalog, split once — the rotating showcase on the last
@@ -445,7 +446,7 @@ export default function Splash() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
-            <div className="sdot" />
+            <LiveStatusDot />
             <span style={{ fontSize: 12, fontFamily: "var(--mono)", color: "var(--fg3)" }}>
               post it or pick it up · NMSU Las Cruces
             </span>

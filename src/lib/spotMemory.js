@@ -47,6 +47,10 @@ export function getContext(id) {
   return c;
 }
 
+export function resetContext(id) {
+  contexts.delete(id);
+}
+
 // ── Spot's voice, shared everywhere ─────────────────────────────────────────
 // Continuation openers used once he's already met you (so later pages read as
 // "he's still talking to me", not a fresh greeting).

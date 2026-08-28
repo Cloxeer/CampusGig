@@ -15,13 +15,13 @@ function PersonReviewStars({ avgRating = 0, reviewCount = 0, align = "center" })
   );
 }
 
-function PersonCard({ user, label, onClick }) {
+function PersonCard({ user, label, onClick, rootRef }) {
   if (!user) return null;
   const name = `${user.first_name || ""} ${user.last_name || ""}`.trim();
   const lvl = getLevel(user.rep_score || 0);
 
   return (
-    <button type="button" className="gig-detail-person-card" onClick={onClick}>
+    <button type="button" ref={rootRef} className="gig-detail-person-card" onClick={onClick}>
       <UserAvatar user={user} size="lg" style={{ border: "2px solid var(--bd)" }} />
       <div className="gig-detail-person-card__name">{name}</div>
       <PersonReviewStars avgRating={user.avgRating} reviewCount={user.reviewCount} />
@@ -50,8 +50,8 @@ function PosterRow({ poster, posterName, posterLevel, onClick }) {
   );
 }
 
-export default function GigDetailPeople({ model, onViewProfile }) {
-  const { poster, requesterUser, phase, requesterLabel, showNoRequestersYet } = model;
+export default function GigDetailPeople({ model, onViewProfile, counterpartRef }) {
+  const { poster, requesterUser, phase, requesterLabel, showNoRequestersYet, role } = model;
 
   if (phase === "discover") {
     return (
@@ -71,11 +71,17 @@ export default function GigDetailPeople({ model, onViewProfile }) {
     <div className="gig-detail-people">
       <div className="gig-detail-section-label">People</div>
       <div className="gig-detail-people-grid">
-        <PersonCard user={poster} label="Posted" onClick={() => onViewProfile(poster.id)} />
+        <PersonCard
+          user={poster}
+          label="Posted"
+          rootRef={role === "requester" ? counterpartRef : undefined}
+          onClick={() => onViewProfile(poster.id)}
+        />
         {requesterUser && (
           <PersonCard
             user={requesterUser}
             label={requesterLabel}
+            rootRef={role === "poster" ? counterpartRef : undefined}
             onClick={() => onViewProfile(requesterUser.id)}
           />
         )}

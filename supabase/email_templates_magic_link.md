@@ -1,32 +1,12 @@
-# Magic link / OTP emails — 15 minute expiry (900 seconds)
+# Auth email templates (GoTrue)
 
-You set **OTP expiry** to **900 seconds** in **Supabase Dashboard → Authentication → [Email]** (or Auth settings). The built-in templates do **not** auto-update the human-readable text when you change seconds.
+OTP expiry is **900 seconds**. Paste these in **Authentication → Email Templates**.
+Gig activity mail is a separate Edge Function (`send-gig-alert`) and uses the same card chrome.
 
-Edit these in **Authentication → Email Templates** (adjust wording to match your brand):
+## Magic link
 
-## Magic link (recommended copy)
+**Subject:** `Your CampusGig sign-in link`
 
-**Subject (example):** `Your CampusGig sign-in link`
+**Body:** paste `supabase/email_templates/magic_link.html` (source HTML, not this markdown).
 
-**Body — add a line like:**
-
-> This link expires in **15 minutes** for your security.
-
-If your template uses GoTrue variables, you can keep Supabase’s default link block and only add the sentence above the button or below the footer.
-
-## Confirm signup / Magic link (if separate)
-
-Use the same **15 minutes** line anywhere you describe validity.
-
-## OTP code emails (only if you use `{{ .Token }}` in the template)
-
-If users type a numeric code, mention:
-
-> This code expires in **15 minutes**.
-
----
-
-**Dashboard links**
-
-- Email templates: open your project → **Authentication** → **Email Templates**
-- OTP / magic link expiry (seconds): **Authentication** → providers / SMTP settings (same area where you set **900**)
+Confirm signup / invite / recovery: same card, only the headline and button label change. Keep `{{ .ConfirmationURL }}` and `{{ .Email }}`. Do not put gig-request copy in a login template.

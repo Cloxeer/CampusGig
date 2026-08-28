@@ -1,4 +1,5 @@
 import { CheckCircle, Check, Clock, Loader, Star, LogIn } from "lucide-react";
+import { countdown } from "../../utils/helpers";
 
 export default function GigDetailActions({
   model,
@@ -10,12 +11,16 @@ export default function GigDetailActions({
   isAuthed = true,
   onRequireAuth,
   onReview,
+  onReviewAfterComplete,
   revieweeFirstName,
+  taskLock = { locked: false, remainingMs: 0, endsAt: null },
+  markDoneRef,
+  actionsRootRef,
 }) {
   const { phase, role, showAlreadyRequested, showRejected, posterName, pendingReq, expired } = model;
 
   return (
-    <div className="gig-detail-actions">
+    <div className="gig-detail-actions" ref={actionsRootRef}>
       {phase === "discover" && (
         <>
           {!isAuthed ? (
@@ -106,16 +111,40 @@ export default function GigDetailActions({
       )}
 
       {phase === "active" && role === "poster" && (
-        <button
-          type="button"
-          className="btn bp bfull blg"
-          onClick={() => actions.complete(gig.id)}
-          disabled={actions.isLoading("complete")}
-          style={{ opacity: actions.isLoading("complete") ? 0.6 : 1 }}
-        >
-          {actions.isLoading("complete") ? <Loader size={16} className="spin" /> : <CheckCircle size={16} />}
-          {actions.isLoading("complete") ? "Completing…" : expired ? "Mark as Done Anyway" : "Mark as Done"}
-        </button>
+        <div ref={markDoneRef} className="gig-detail-mark-done">
+          <button
+            type="button"
+            className="btn bp bfull blg"
+            onClick={async () => {
+              const result = await actions.complete(gig.id);
+              if (result?.ok) onReviewAfterComplete?.();
+            }}
+            disabled={taskLock.locked || actions.isLoading("complete")}
+            style={{
+              opacity: taskLock.locked || actions.isLoading("complete") ? 0.55 : 1,
+            }}
+          >
+            {actions.isLoading("complete") ? (
+              <Loader size={16} className="spin" />
+            ) : taskLock.locked ? (
+              <Clock size={16} />
+            ) : (
+              <CheckCircle size={16} />
+            )}
+            {actions.isLoading("complete")
+              ? "Completing…"
+              : taskLock.locked
+                ? `Task time · ${countdown(taskLock.endsAt)?.text || "5:00"}`
+                : expired
+                  ? "Mark as Done Anyway"
+                  : "Mark as Done"}
+          </button>
+          {taskLock.locked ? (
+            <div className="gig-detail-mark-done__hint">Pay them first. This unlocks when task time is up — or come back when you&apos;re done.</div>
+          ) : (
+            <div className="gig-detail-mark-done__hint">Pay before you mark as done. Leave a review right after.</div>
+          )}
+        </div>
       )}
 
       {phase === "active" && role === "requester" && (

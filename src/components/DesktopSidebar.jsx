@@ -3,11 +3,11 @@ import { Home, Search, Plus, Bell, User } from "lucide-react";
 import { BrandLockup } from "./Logo";
 import NavAlertDot from "./NavAlertDot";
 
-export default function DesktopSidebar({ unreadCount = 0 }) {
+export default function DesktopSidebar({ unreadCount = 0, hasActiveGig = false }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  function Item({ to, icon: Icon, label, dot, active }) {
+  function Item({ to, icon: Icon, label, dot, live, active }) {
     const on = typeof active === "boolean" ? active : pathname === to;
     return (
       <div className="dsi-wrap">
@@ -17,7 +17,7 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
           onClick={() => navigate(to)}
           aria-current={on ? "page" : undefined}
         >
-          <NavAlertDot show={!!dot}>
+          <NavAlertDot show={!!dot} live={!!live}>
             <Icon size={18} strokeWidth={2} />
           </NavAlertDot>
           <span className="dsi-lbl">{label}</span>
@@ -34,7 +34,7 @@ export default function DesktopSidebar({ unreadCount = 0 }) {
       <nav className="dsk-nav" aria-label="Main navigation">
         <Item to="/" icon={Home} label="Home" />
         <Item to="/explore" icon={Search} label="Explore" />
-        <Item to="/alerts" icon={Bell} label="Alerts" dot={unreadCount > 0} />
+        <Item to="/alerts" icon={Bell} label="Alerts" dot={unreadCount > 0} live={hasActiveGig} />
         <Item to="/profile" icon={User} label="Profile" active={pathname === "/profile" || pathname === "/profile/rep"} />
       </nav>
       <div className="dsk-post">

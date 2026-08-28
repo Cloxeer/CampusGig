@@ -18,6 +18,18 @@
 import { tierTagForRep } from "../data/cosmetics";
 
 const STAGE_SIZE = 50; // rep per stage
+/** Stage 2 ("First Name Basis") starts here. Contact coach runs below this. */
+export const FIRST_NAME_BASIS_MIN_REP = STAGE_SIZE;
+
+export function isBeforeFirstNameBasis(score) {
+  return (Number(score) || 0) < FIRST_NAME_BASIS_MIN_REP;
+}
+
+/** Spot coaching (gig contacts, alerts, inventory) until First Name Basis
+ *  (end of stage 1 / 50 rep). After that he stays quiet. */
+export function isSpotTutorialActive(score) {
+  return isBeforeFirstNameBasis(score);
+}
 const CHECKPOINT_STEP = 10; // rep between chests
 const CHECKPOINTS_PER_STAGE = 4; // standard chests before the stage's legendary
 /** Stages drawn ahead of the current one; the rest collapse into a locked horizon. */

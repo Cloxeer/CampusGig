@@ -1,13 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useTimer } from "../../utils/helpers";
 import { deriveGigDetailView } from "../../utils/gigDetailModel";
+import { isSpotTutorialActive } from "../../utils/repPathModel";
+import { getMyProfile } from "../../lib/profile";
+import { queryKeys } from "../../lib/queryClient";
+import { resetContext } from "../../lib/spotMemory";
 import { useGigDetailExistingRequest } from "../../hooks/useGigDetailExistingRequest";
 import { useGigDetailActions } from "../../hooks/useGigDetailActions";
 import { useGigDetailReview } from "../../hooks/useGigDetailReview";
 import { GigDetailSkeleton } from "../GigDetailSkeletons";
 import GigNotFoundPanel from "../GigNotFoundPanel";
 import ReportModal from "../modals/ReportModal";
+import SpotCoachTour from "../SpotCoachTour";
+import {
+  MESSAGE_CONTACT_KEYS,
+  PAY_CONTACT_KEYS,
+  firstRowKey,
+  buildGigDetailCoachSteps,
+  deriveGigTaskLock,
+} from "../../data/spotGigContactTour";
+import PullToRefresh from "../PullToRefresh";
 import GigDetailTopBar from "./GigDetailTopBar";
 import GigDetailInfo from "./GigDetailInfo";
 import GigDetailPeople from "./GigDetailPeople";
@@ -29,7 +43,7 @@ export default function GigDetailView({
   requests = [],
   loading = false,
   fetchError = false,
-  onRetry,
+  onRefresh,
   notification,
   currentUserId,
   onClose,
@@ -41,6 +55,19 @@ export default function GigDetailView({
   const tick = useTimer();
   const [reportOpen, setReportOpen] = useState(false);
   const [requestedLocally, setRequestedLocally] = useState(false);
+  const [requestRefreshKey, setRequestRefreshKey] = useState(0);
+  const counterpartRef = useRef(null);
+  const otherContactRowEls = useRef({});
+  const ownContactRowEls = useRef({});
+  const markDoneRef = useRef(null);
+  const actionsRootRef = useRef(null);
+  const pageRef = useRef(null);
+
+  const { data: profileData } = useQuery({
+    queryKey: queryKeys.myProfile,
+    queryFn: getMyProfile,
+    enabled: Boolean(currentUserId),
+  });
 
   const meta = notification?.metadata || {};
   const resolvedGigId = gigIdProp || gig?.id || meta.gig_id;
@@ -51,9 +78,20 @@ export default function GigDetailView({
     setRequestedLocally(false);
   }, [resolvedGigId]);
 
+  useEffect(() => {
+    if (!resolvedGigId) return;
+    resetContext(`gig-contact-${resolvedGigId}`);
+  }, [resolvedGigId]);
+
   const { existingRequest, checkingRequest } = useGigDetailExistingRequest(resolvedGigId, {
     enabled: Boolean(resolvedGigId && gig && !isOwnGig && isAuthed),
+    refreshKey: requestRefreshKey,
   });
+
+  async function handleRefresh() {
+    setRequestRefreshKey((n) => n + 1);
+    await onRefresh?.();
+  }
 
   const actions = useGigDetailActions({
     gigId: resolvedGigId,
@@ -82,6 +120,19 @@ export default function GigDetailView({
     });
   }, [gig, requests, currentUserId, existingRequest, meta, requestedLocally]);
 
+  const [coachLayout, setCoachLayout] = useState(0);
+  useEffect(() => {
+    if (!model?.showContactInfo) return undefined;
+    let id2 = 0;
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => setCoachLayout((n) => n + 1));
+    });
+    return () => {
+      cancelAnimationFrame(id1);
+      if (id2) cancelAnimationFrame(id2);
+    };
+  }, [model?.showContactInfo, resolvedGigId]);
+
   if (loading) {
     return <GigDetailSkeleton onClose={onClose} />;
   }
@@ -98,14 +149,19 @@ export default function GigDetailView({
     return (
       <div className="page fadein">
         <GigDetailTopBar onClose={onClose} />
-        <div className="gig-detail-error-panel">
-          <div>Could not load gig details.</div>
-          {onRetry && (
-            <button type="button" className="btn bp bfull" style={{ maxWidth: 280 }} onClick={onRetry}>
-              Try again
-            </button>
-          )}
-        </div>
+        <PullToRefresh
+          className="scroll scroll--nav-pad scroll--fine-scrollbar"
+          onRefresh={onRefresh}
+        >
+          <div className="gig-detail-error-panel">
+            <div>Could not load gig details.</div>
+            {onRefresh && (
+              <button type="button" className="btn bp bfull" style={{ maxWidth: 280 }} onClick={() => onRefresh()}>
+                Try again
+              </button>
+            )}
+          </div>
+        </PullToRefresh>
       </div>
     );
   }
@@ -134,10 +190,45 @@ export default function GigDetailView({
   }
 
   const actionsWithRequest = { ...actions, request: handleRequest };
+  const taskLock = deriveGigTaskLock(gig, Date.now());
+  const isTaker = model.role === "requester";
+  const showContactCoach =
+    Boolean(model.showContactInfo) &&
+    (model.phase === "active" || model.phase === "done") &&
+    Boolean(profileData?.profile) &&
+    isSpotTutorialActive(profileData.profile.rep_score);
+
+  const counterpart = isTaker ? model.poster : model.requesterUser;
+  const messageEls = isTaker ? otherContactRowEls : ownContactRowEls;
+  const payEls = isTaker ? ownContactRowEls : otherContactRowEls;
+  const messageKey = firstRowKey(new Set(Object.keys(messageEls.current)), MESSAGE_CONTACT_KEYS);
+  const payKey = firstRowKey(new Set(Object.keys(payEls.current)), PAY_CONTACT_KEYS);
+  const coachSteps = showContactCoach
+    ? buildGigDetailCoachSteps({
+        role: model.role,
+        counterpartName: counterpart?.first_name,
+        hasPerson: Boolean(counterpart),
+        hasMessage: Boolean(messageKey),
+        hasPay: Boolean(payKey),
+        hasMarkDone: model.phase === "active" && model.role === "poster",
+        hasTakerWait: model.phase === "active" && isTaker,
+      }).map((step) => ({
+        ...step,
+        getEl: () => {
+          if (step.key === "person") return counterpartRef.current;
+          if (step.key === "message") return messageEls.current[messageKey] || null;
+          if (step.key === "pay") return payEls.current[payKey] || null;
+          if (step.key === "done") {
+            return isTaker ? actionsRootRef.current : markDoneRef.current || actionsRootRef.current;
+          }
+          return null;
+        },
+      }))
+    : [];
 
   return (
     <>
-      <div className="page fadein">
+      <div className="page fadein gig-detail-page" ref={pageRef}>
         <GigDetailTopBar
           onClose={onClose}
           canReport={model.canReport}
@@ -149,7 +240,10 @@ export default function GigDetailView({
           deleting={actions.isLoading("delete")}
         />
 
-        <div className="scroll scroll--nav-pad scroll--fine-scrollbar">
+        <PullToRefresh
+          className="scroll scroll--nav-pad scroll--fine-scrollbar"
+          onRefresh={onRefresh ? handleRefresh : undefined}
+        >
           {model.canPosterDelete && (
             <div className="gig-detail-poster-hint">
               <strong>Your gig.</strong> You can edit details or delete this post until someone accepts it.
@@ -157,7 +251,7 @@ export default function GigDetailView({
           )}
 
           <GigDetailInfo gig={gig} model={model} tick={tick} />
-          <GigDetailPeople model={model} onViewProfile={handleViewProfile} />
+          <GigDetailPeople model={model} onViewProfile={handleViewProfile} counterpartRef={counterpartRef} />
 
           {model.showPaymentLockCallout && (
             <div className="gig-detail-lock-wrap">
@@ -171,7 +265,7 @@ export default function GigDetailView({
             </div>
           )}
 
-          <GigDetailContacts model={model} />
+          <GigDetailContacts model={model} otherRowEls={otherContactRowEls} ownRowEls={ownContactRowEls} />
 
           <GigDetailActions
             model={model}
@@ -183,8 +277,18 @@ export default function GigDetailView({
             isAuthed={isAuthed}
             onRequireAuth={() => navigate("/welcome")}
             revieweeFirstName={revieweeFirstName}
+            taskLock={taskLock}
+            markDoneRef={markDoneRef}
+            actionsRootRef={actionsRootRef}
             onReview={() => {
               if (review.disabled) return;
+              navigate(
+                `/profile/${model.revieweeForReview}?reviews=1&gig=${encodeURIComponent(gig.id)}`,
+                { state: { returnTo: `/gig/${resolvedGigId}` } }
+              );
+            }}
+            onReviewAfterComplete={() => {
+              if (!model.revieweeForReview || !gig?.id) return;
               navigate(
                 `/profile/${model.revieweeForReview}?reviews=1&gig=${encodeURIComponent(gig.id)}`,
                 { state: { returnTo: `/gig/${resolvedGigId}` } }
@@ -198,7 +302,14 @@ export default function GigDetailView({
             </button>
           </div>
           <div style={{ height: 24 }} />
-        </div>
+        </PullToRefresh>
+
+        <SpotCoachTour
+          enabled={showContactCoach && coachLayout > 0 && coachSteps.length > 0}
+          chatId={`gig-contact-${resolvedGigId}`}
+          steps={coachSteps}
+          hostRef={pageRef}
+        />
       </div>
 
       {reportOpen && gig?.id && (

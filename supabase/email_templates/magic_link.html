@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in to GetCampusGig</title>
+</head>
+<body style="margin:0;padding:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Click to sign in. This link expires in 15 minutes.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;padding:32px 28px;">
+          <tr>
+            <td align="center" style="padding-bottom:20px;font-size:15px;font-weight:700;letter-spacing:-0.04em;color:#09090b;">
+              GetCampus<span style="color:#22c55e;">Gig</span>.com
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <div style="width:56px;height:56px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:50%;line-height:56px;font-size:22px;">&#9993;</div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:8px;font-size:20px;font-weight:700;letter-spacing:-0.03em;color:#09090b;line-height:1.3;">
+              Sign in to GetCampusGig
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:20px;font-size:14px;line-height:1.6;color:#71717a;">
+              We sent this magic link to<br />
+              <strong style="color:#09090b;">{{ .Email }}</strong><br />
+              Click it to sign in instantly. This link expires in <strong style="color:#09090b;">15 minutes</strong>.
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 20px;border-radius:8px;">
+                Sign in
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="font-size:13px;line-height:1.55;color:#71717a;">
+              Don&apos;t see it in your main inbox? Check your <strong style="color:#09090b;">spam</strong> or <strong style="color:#09090b;">junk</strong> folder — magic links often land there.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -25,7 +25,7 @@ import DesktopSidebar from "./components/DesktopSidebar";
 import DesktopFooter from "./components/DesktopFooter";
 import AppSkeleton from "./components/AppSkeleton";
 import { supabase } from "./lib/supabase";
-import { getMyProfile, getUnreadNotificationCount, cancelPendingAccountDeletion } from "./lib/profile";
+import { getMyProfile, getUnreadNotificationCount, userHasActiveGig, cancelPendingAccountDeletion } from "./lib/profile";
 import { queryClient, queryKeys } from "./lib/queryClient";
 
 const INDEXABLE_PATHS = new Set(["/", "/welcome", "/welcome/how-it-works", "/terms", "/privacy"]);
@@ -131,19 +131,19 @@ function AnonAuthGate() {
   );
 }
 
-function NavLayout({ unreadCount }) {
+function NavLayout({ unreadCount, hasActiveGig = false }) {
   const { pathname } = useLocation();
   const hideBottomNav = pathname === "/profile/rep";
 
   return (
     <div className="nav-layout">
-      <DesktopSidebar unreadCount={unreadCount} />
+      <DesktopSidebar unreadCount={unreadCount} hasActiveGig={hasActiveGig} />
       <div className="nav-layout__main">
         <div className={`nav-layout__main-fill${hideBottomNav ? " nav-layout__main-fill--no-bnav" : ""}`}>
           <Outlet />
         </div>
       </div>
-      {!hideBottomNav ? <BottomNav unreadCount={unreadCount} /> : null}
+      {!hideBottomNav ? <BottomNav unreadCount={unreadCount} hasActiveGig={hasActiveGig} /> : null}
     </div>
   );
 }
@@ -187,6 +187,15 @@ export default function App() {
     refetchOnWindowFocus: true,
   });
   const unreadCount = unreadData?.count ?? 0;
+
+  const { data: activeGigData } = useQuery({
+    queryKey: queryKeys.hasActiveGig,
+    queryFn: userHasActiveGig,
+    enabled: !!currentUserId && hasProfile && !needsAppIntro,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+  const hasActiveGig = !!activeGigData?.hasActive;
 
   useEffect(() => {
     const {
@@ -233,6 +242,7 @@ export default function App() {
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
           queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+          queryClient.invalidateQueries({ queryKey: queryKeys.hasActiveGig });
         }
       )
       .on(
@@ -241,6 +251,7 @@ export default function App() {
         () => {
           queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
           queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+          queryClient.invalidateQueries({ queryKey: queryKeys.hasActiveGig });
         }
       )
       .subscribe();
@@ -359,7 +370,7 @@ export default function App() {
     <div className="shell shell--session">
       <div className="shell-view">
         <Routes>
-          <Route element={<NavLayout unreadCount={unreadCount} />}>
+          <Route element={<NavLayout unreadCount={unreadCount} hasActiveGig={hasActiveGig} />}>
             <Route path="/" element={<Home currentUserId={currentUserId} />} />
             <Route path="/explore" element={<Explore currentUserId={currentUserId} />} />
             <Route path="/post" element={<PostGig />} />

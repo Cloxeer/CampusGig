@@ -15,6 +15,7 @@ import { queryKeys } from "../lib/queryClient";
 import { safeAppReturnTo } from "../hooks/useModalParam";
 import { useQueryTab } from "../hooks/useQueryTab";
 import { navigateBack } from "../utils/navBack";
+import { isSpotTutorialActive } from "../utils/repPathModel";
 import ProfileTabBar from "../features/profile/components/ProfileTabBar";
 import "./inventory.css";
 
@@ -27,23 +28,56 @@ import "./inventory.css";
 const INV_TABS = new Set(["tag", "border"]);
 const PREVIEW_AVATAR = 72;
 
-/** Spot cycles through these expressions each time he hops sides — a "new" Spot
- *  every pop. */
-const SPOT_MOODS = ["excited", "surprised", "attentive", "suspicious", "neutral"];
+/** Friendly hops — skip “suspicious” so he never feels like he’s watching you. */
+const SPOT_MOODS = ["excited", "surprised", "attentive", "neutral"];
+const SPOT_LINE_MS = 3800;
+const SPOT_HOP_MS = 240;
+const SPOT_IDLE_MS = 8000;
 
-/** Spot's arc on the inventory: greets once (only if you've never met), walks
-    the hints once, wraps up, then goes quiet (pester 5× or reload for more). */
-const SPOT_SCRIPT = {
-  intro: "Spot here — the name's Spot.",
-  hints: [
-    "Nice cosmetics.",
-    "Finish gigs to earn more.",
-    "Chests hide the rare stuff.",
-    "Tag plus border — very you.",
-    "This is your whole look.",
-  ],
-  closer: "Lookin' sharp.",
-};
+/** One line per hop, only while `isSpotTutorialActive` (before First Name Basis).
+ *  Gift-code beat sits on the right UNFLIPPED so he faces the header gift
+ *  (normal right-side pose mirrors him toward the avatar). */
+const SPOT_BEATS = [
+  {
+    text: "Hey — tags and borders live here.",
+    side: "left",
+    flip: false,
+    look: "camera",
+    mood: "excited",
+  },
+  {
+    text: (
+      <>
+        Got a code? Redeem it with <u>the gift box</u>.
+      </>
+    ),
+    side: "right",
+    flip: false,
+    look: "gift",
+    mood: "attentive",
+  },
+  {
+    text: "Tap what you own to wear it. Switch anytime.",
+    side: "left",
+    flip: false,
+    look: "camera",
+    mood: "neutral",
+  },
+  {
+    text: "Finish gigs to unlock more from chests.",
+    side: "right",
+    flip: true,
+    look: "camera",
+    mood: "excited",
+  },
+  {
+    text: "Have fun with it.",
+    side: "left",
+    flip: false,
+    look: "camera",
+    mood: "excited",
+  },
+];
 
 /** A border shown in the list = a mini avatar: THE SAME CosmeticRing everyone
  *  uses, wrapping a white "hole" where a photo would sit. Identical to the real
@@ -180,30 +214,60 @@ function SlotSection({ items, ownedIds, counts, equippedId, type }) {
 export default function Inventory() {
   const navigate = useNavigate();
   const location = useLocation();
-  /** Spot watches the equipped avatar/tag, hopping side to side every 8s. */
-  const spotAvatarRef = useRef(null);
+  /* Real profile photo in the preview (guests fall back to the "?" avatar).
+     Also drives Spot coaching: same First Name Basis cutoff as gig/alerts. */
+  const { data: profileData, isPending: profilePending } = useQuery({
+    queryKey: queryKeys.myProfile,
+    queryFn: getMyProfile,
+  });
+  const profile = profileData?.profile ?? null;
+  const previewAvatarUrl = profile?.avatar_url ? getAvatarUrl(profile.avatar_url) : null;
+  const spotCoach = Boolean(profile) && isSpotTutorialActive(profile.rep_score);
+
+  /** Spot hops once per script line (while coaching), then idles left↔right. */
+  const giftBtnRef = useRef(null);
+  const [spotBeat, setSpotBeat] = useState(0);
   const [spotSide, setSpotSide] = useState("left");
   const [spotShow, setSpotShow] = useState(true);
   const [spotMoodIdx, setSpotMoodIdx] = useState(0);
-  /** True while a speech bubble is open — freezes his side-hopping so he stays
-      put until you click away. */
-  const spotTalkingRef = useRef(false);
+  const guiding = spotCoach && spotBeat < SPOT_BEATS.length;
+  const pose = guiding
+    ? SPOT_BEATS[spotBeat]
+    : { side: spotSide, flip: spotSide === "right", look: "camera", mood: SPOT_MOODS[spotMoodIdx] };
   useEffect(() => {
-    let swap;
+    if (profilePending) return undefined;
+    let hop;
+    if (spotCoach && spotBeat < SPOT_BEATS.length) {
+      const dwell = setTimeout(() => {
+        setSpotShow(false);
+        hop = setTimeout(() => {
+          const n = spotBeat + 1;
+          const next = SPOT_BEATS[n];
+          setSpotBeat(n);
+          if (next) setSpotSide(next.side);
+          else setSpotSide((s) => (s === "left" ? "right" : "left"));
+          setSpotMoodIdx((i) => (i + 1) % SPOT_MOODS.length);
+          setSpotShow(true);
+        }, SPOT_HOP_MS);
+      }, SPOT_LINE_MS);
+      return () => {
+        clearTimeout(dwell);
+        clearTimeout(hop);
+      };
+    }
     const id = setInterval(() => {
-      if (spotTalkingRef.current) return; // paused while he's talking
-      setSpotShow(false); // pop out
-      swap = setTimeout(() => {
-        setSpotSide((s) => (s === "left" ? "right" : "left")); // hop while hidden
-        setSpotMoodIdx((i) => (i + 1) % SPOT_MOODS.length); // fresh expression
-        setSpotShow(true); // pop back in
-      }, 240);
-    }, 8000);
+      setSpotShow(false);
+      hop = setTimeout(() => {
+        setSpotSide((s) => (s === "left" ? "right" : "left"));
+        setSpotMoodIdx((i) => (i + 1) % SPOT_MOODS.length);
+        setSpotShow(true);
+      }, SPOT_HOP_MS);
+    }, SPOT_IDLE_MS);
     return () => {
       clearInterval(id);
-      clearTimeout(swap);
+      clearTimeout(hop);
     };
-  }, []);
+  }, [spotBeat, spotCoach, profilePending]);
   const [inv, setInv] = useState(getInventory);
   /** Which slot's catalog is on screen — swapped via the segmented control. */
   const [view, setView] = useQueryTab(INV_TABS, "tag");
@@ -226,11 +290,6 @@ export default function Inventory() {
       document.removeEventListener("pointerdown", onDoc);
     };
   }, [tradeHint]);
-
-  /* Real profile photo in the preview (guests fall back to the "?" avatar). */
-  const { data: profileData } = useQuery({ queryKey: queryKeys.myProfile, queryFn: getMyProfile });
-  const profile = profileData?.profile ?? null;
-  const previewAvatarUrl = profile?.avatar_url ? getAvatarUrl(profile.avatar_url) : null;
 
   /* Ordered by rarity (common → cosmic). Stable, so each tier tag (which leads
      the catalog) sits at the front of its own rarity group. */
@@ -293,6 +352,7 @@ export default function Inventory() {
             ) : null}
           </span>
           <button
+            ref={giftBtnRef}
             type="button"
             className="btn bg-btn bico"
             onClick={() => setRedeemOpen(true)}
@@ -312,26 +372,26 @@ export default function Inventory() {
               path (signed-in photo, guest ring, bare fallback) so the hero never
               changes size between states. */}
           <div className="invx-preview">
-            {/* Spot admires your equipped look, hopping left↔right every 8s with
-                a clean pop and a fresh expression, always facing your photo
-                (mirrored when he's on the right). Same shared component. */}
+            {/* Coach until First Name Basis (same cutoff as gig/alerts). Gift-code
+                beat: right side, unflipped, eyes on the header gift. */}
             <SpotMascot
-              key="inv-spot"
+              key={guiding ? `inv-spot-${spotBeat}` : "inv-spot-idle"}
               float={false}
               show={spotShow}
               size={60}
-              mood={SPOT_MOODS[spotMoodIdx]}
-              flip={spotSide === "right"}
-              lookAtRef={spotAvatarRef}
-              script={SPOT_SCRIPT}
-              chatId="inventory"
+              mood={pose.mood}
+              flip={pose.flip}
+              lookAt="camera"
+              lookAtRef={pose.look === "gift" ? giftBtnRef : null}
+              script={
+                guiding ? { noOpener: true, intro: pose.text, hints: [], closer: false } : null
+              }
+              chatId={guiding ? `inventory-v3-${spotBeat}` : null}
+              autoSpeak={guiding}
               bubbleSide="bottom"
-              onBubbleChange={(open) => {
-                spotTalkingRef.current = open;
-              }}
-              style={spotSide === "left" ? { left: 26, top: 30 } : { right: 26, top: 30 }}
+              style={pose.side === "left" ? { left: 26, top: 30 } : { right: 26, top: 30 }}
             />
-            <span ref={spotAvatarRef} style={{ display: "inline-flex" }}>
+            <span style={{ display: "inline-flex" }}>
             {profile ? (
               /* Your actual photo, wearing the equipped ring (same logic as
                  everywhere else — UserAvatar handles the border itself). */

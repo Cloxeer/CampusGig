@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Star, Send, Loader, Flag } from "lucide-react";
 import Stars from "../Stars";
 import UserAvatar from "../UserAvatar";
@@ -125,7 +126,7 @@ export default function ReviewSheetModal({
   const canReportReview = (r) =>
     Boolean(r?.id && currentUserId && String(r.reviewer_id || "") !== String(currentUserId));
 
-  return (
+  const sheet = (
     <>
       <div className="overlay overlay--reviews" onClick={onClose}>
         <div className="sheet sheet-full slidein" onClick={(e) => e.stopPropagation()}>
@@ -343,4 +344,6 @@ export default function ReviewSheetModal({
     )}
     </>
   );
+
+  return createPortal(sheet, document.body);
 }

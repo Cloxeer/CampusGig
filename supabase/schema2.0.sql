@@ -28,6 +28,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- ============================================================
 -- Private schema (SECURITY DEFINER bodies; NOT exposed by PostgREST)
@@ -981,7 +982,7 @@ BEGIN
   pname := public._cg_display_name(uid);
   reqname := public._cg_display_name(r.requester_id);
   PERFORM private.notify_gig(r.requester_id, 'gig_accepted', pname || ' accepted your request!', gtitle || ' · Tap to see contact info', g.id, p_request_id, r.requester_id, g.poster_id, 'requester', pname);
-  PERFORM private.notify_gig(uid, 'gig_accepted', 'You accepted ' || reqname || '''s request', gtitle || ' · Tap to see contact info', g.id, p_request_id, r.requester_id, g.poster_id, 'poster', reqname);
+  PERFORM private.notify_gig(uid, 'gig_accepted', reqname || ' is taking your gig', gtitle || ' · Tap to see contact info', g.id, p_request_id, r.requester_id, g.poster_id, 'poster', reqname);
 END;
 $$;
 
@@ -1278,6 +1279,156 @@ CREATE POLICY "Users can delete own avatar"
   USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = (SELECT auth.uid())::text);
 
 -- ============================================================
+-- Gig/review transactional mail (pg_net → send-gig-alert)
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM vault.secrets WHERE name = 'gig_alert_webhook_secret'
+  ) THEN
+    PERFORM vault.create_secret(
+      encode(gen_random_bytes(32), 'hex'),
+      'gig_alert_webhook_secret',
+      'Bearer token for Edge Function send-gig-alert'
+    );
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public._cg_authorize_gig_alert_mail(p_token text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'vault', 'pg_temp'
+AS $$
+DECLARE expected text;
+BEGIN
+  IF p_token IS NULL OR length(p_token) < 16 THEN RETURN false; END IF;
+  SELECT decrypted_secret INTO expected
+  FROM vault.decrypted_secrets WHERE name = 'gig_alert_webhook_secret';
+  RETURN expected IS NOT NULL AND expected = p_token;
+END;
+$$;
+
+CREATE TABLE IF NOT EXISTS private.gig_alert_mail_queue (
+  notification_id uuid PRIMARY KEY REFERENCES public.notifications(id) ON DELETE CASCADE,
+  send_at timestamptz NOT NULL,
+  processed_at timestamptz,
+  skip_reason text
+);
+
+CREATE OR REPLACE FUNCTION private.post_gig_alert_mail(p_notification_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'net', 'vault', 'pg_temp'
+AS $$
+DECLARE hook_token text;
+BEGIN
+  SELECT decrypted_secret INTO hook_token
+  FROM vault.decrypted_secrets WHERE name = 'gig_alert_webhook_secret';
+  IF hook_token IS NULL THEN RETURN; END IF;
+  PERFORM net.http_post(
+    url := 'https://hdiguksmsoalrxswrpfq.supabase.co/functions/v1/send-gig-alert',
+    body := jsonb_build_object('notification_id', p_notification_id),
+    params := '{}'::jsonb,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || hook_token
+    ),
+    timeout_milliseconds := 5000
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION private.enqueue_gig_alert_mail()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'net', 'vault', 'pg_temp'
+AS $$
+DECLARE role text;
+BEGIN
+  IF NEW.type NOT IN (
+    'gig_requested', 'gig_accepted', 'gig_rejected', 'gig_completed', 'review_received'
+  ) THEN RETURN NEW; END IF;
+  role := COALESCE(NEW.metadata->>'role', '');
+  IF NEW.type = 'gig_accepted' AND role = 'poster' THEN RETURN NEW; END IF;
+  IF NEW.type = 'gig_completed' THEN
+    IF NEW.metadata->>'requester_id' IS NULL OR NEW.metadata->>'gig_id' IS NULL THEN RETURN NEW; END IF;
+    INSERT INTO private.gig_alert_mail_queue (notification_id, send_at)
+    VALUES (NEW.id, now() + interval '30 seconds')
+    ON CONFLICT (notification_id) DO NOTHING;
+    RETURN NEW;
+  END IF;
+  BEGIN
+    PERFORM private.post_gig_alert_mail(NEW.id);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'enqueue_gig_alert_mail failed: %', SQLERRM;
+  END;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION private.flush_gig_alert_mail_queue()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE q_id uuid; n_user uuid; n_type text; n_meta jsonb; gig uuid;
+BEGIN
+  FOR q_id IN
+    SELECT q.notification_id FROM private.gig_alert_mail_queue q
+    WHERE q.processed_at IS NULL AND q.send_at <= now()
+    ORDER BY q.send_at LIMIT 50
+    FOR UPDATE OF q SKIP LOCKED
+  LOOP
+    n_user := NULL; n_type := NULL; n_meta := NULL;
+    SELECT n.user_id, n.type, n.metadata INTO n_user, n_type, n_meta
+    FROM public.notifications n WHERE n.id = q_id;
+    IF NOT FOUND THEN
+      UPDATE private.gig_alert_mail_queue SET processed_at = now(), skip_reason = 'not_found' WHERE notification_id = q_id;
+      CONTINUE;
+    END IF;
+    IF n_type = 'gig_completed' THEN
+      gig := NULLIF(n_meta->>'gig_id', '')::uuid;
+      IF gig IS NOT NULL AND EXISTS (
+        SELECT 1 FROM public.reviews r WHERE r.gig_id = gig AND r.reviewer_id = n_user
+      ) THEN
+        UPDATE private.gig_alert_mail_queue SET processed_at = now(), skip_reason = 'already_reviewed' WHERE notification_id = q_id;
+        CONTINUE;
+      END IF;
+    END IF;
+    BEGIN
+      PERFORM private.post_gig_alert_mail(q_id);
+      UPDATE private.gig_alert_mail_queue SET processed_at = now() WHERE notification_id = q_id;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'flush_gig_alert_mail_queue failed for %: %', q_id, SQLERRM;
+    END;
+  END LOOP;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enqueue_gig_alert_mail ON public.notifications;
+CREATE TRIGGER trg_enqueue_gig_alert_mail
+  AFTER INSERT ON public.notifications
+  FOR EACH ROW
+  EXECUTE FUNCTION private.enqueue_gig_alert_mail();
+
+DO $$
+BEGIN
+  PERFORM cron.unschedule('campusgig-flush-gig-alert-mail');
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END;
+$$;
+SELECT cron.schedule(
+  'campusgig-flush-gig-alert-mail',
+  '30 seconds',
+  $$SELECT private.flush_gig_alert_mail_queue();$$
+);
+
+-- ============================================================
 -- Function privileges (REST-callable surface locked to authenticated)
 -- ============================================================
 -- Private bodies
@@ -1315,5 +1466,10 @@ GRANT EXECUTE ON FUNCTION public.request_account_deletion() TO authenticated, se
 GRANT EXECUTE ON FUNCTION public.cancel_pending_account_deletion() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_public_stats() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.set_easy_access_passcode_record(TEXT) TO authenticated;
+
+REVOKE ALL ON FUNCTION public._cg_authorize_gig_alert_mail(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._cg_authorize_gig_alert_mail(text) TO service_role;
+REVOKE ALL ON FUNCTION private.enqueue_gig_alert_mail() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.enqueue_gig_alert_mail() TO postgres, service_role;
 
 COMMIT;

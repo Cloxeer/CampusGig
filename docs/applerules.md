@@ -1,0 +1,1 @@
+Apple’s rule here is simple: email the person who isn’t in the room, about the next thing they should do — never congratulate someone for a button they just pressed

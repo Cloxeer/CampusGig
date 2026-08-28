@@ -1,6 +1,5 @@
 import { ACTIVE_REQUEST_ALERT_TYPE } from "./notificationTypes";
 
-/** Bell stays on until this request is accepted or rejected — visiting Alerts does not dismiss it. */
 export function isActiveRequestAlert(n) {
   return n?.type === ACTIVE_REQUEST_ALERT_TYPE;
 }

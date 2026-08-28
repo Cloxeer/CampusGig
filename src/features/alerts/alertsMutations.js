@@ -20,6 +20,10 @@ export function invalidateOpenGigsQuery() {
   queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
 }
 
+export function invalidateHasActiveGigQuery() {
+  queryClient.invalidateQueries({ queryKey: queryKeys.hasActiveGig });
+}
+
 export function removeNotifFromCache(notifId) {
   updateNotificationsCache((items) => items.filter((n) => n.id !== notifId));
 }

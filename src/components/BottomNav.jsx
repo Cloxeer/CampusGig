@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Home, Search, Plus, Bell, User } from "lucide-react";
 import NavAlertDot from "./NavAlertDot";
 
-export default function BottomNav({ unreadCount = 0 }) {
+export default function BottomNav({ unreadCount = 0, hasActiveGig = false }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -33,9 +33,17 @@ export default function BottomNav({ unreadCount = 0 }) {
       <button
         className={`ni ${pathname === "/alerts" ? "on" : ""}`}
         onClick={() => navigate("/alerts")}
-        aria-label={unreadCount > 0 ? "Alerts, active" : "Alerts"}
+        aria-label={
+          unreadCount > 0 && hasActiveGig
+            ? "Alerts, unread, active gig"
+            : unreadCount > 0
+              ? "Alerts, unread"
+              : hasActiveGig
+                ? "Alerts, active gig"
+                : "Alerts"
+        }
       >
-        <NavAlertDot show={unreadCount > 0}>
+        <NavAlertDot show={unreadCount > 0} live={hasActiveGig}>
           <Bell size={18} />
         </NavAlertDot>
         <span className="nlbl">alerts</span>

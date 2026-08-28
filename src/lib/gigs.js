@@ -367,6 +367,22 @@ export async function deleteMyGig(gigId) {
   return { error };
 }
 
+/** True when the signed-in user is poster or taker on a status=active gig. */
+export async function userHasActiveGig() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { hasActive: false, error: null };
+
+  const { count, error } = await supabase
+    .from("gigs")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active")
+    .or(`poster_id.eq.${user.id},taker_id.eq.${user.id}`);
+
+  return { hasActive: (count ?? 0) > 0, error };
+}
+
 export async function getGigStatusesForNotifications(gigIds) {
   if (!gigIds.length) return {};
   const { data } = await supabase

@@ -1,3 +1,5 @@
+import LiveStatusDot from "../LiveStatusDot";
+
 const STATUS_CONFIG = {
   requested: { label: "Pending Approval", color: "var(--amber)", bg: "var(--amber-bg)", bd: "var(--amber-bd)" },
   active: { label: "Active", color: "var(--green-d)", bg: "var(--green-bg)", bd: "var(--green-bd)" },
@@ -17,7 +19,6 @@ export default function GigDetailStatusBadge({ status, expired }) {
   const isLive =
     !expired &&
     (displayStatus === "open" || displayStatus === "requested" || displayStatus === "active");
-  const dotColor = isLive ? "#22c55e" : "#a1a1aa";
 
   return (
     <div
@@ -36,7 +37,7 @@ export default function GigDetailStatusBadge({ status, expired }) {
         border: `1px solid ${cfg.bd}`,
       }}
     >
-      <div style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor }} />
+      <LiveStatusDot live={isLive} />
       {cfg.label}
     </div>
   );

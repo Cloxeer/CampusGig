@@ -11,6 +11,7 @@ import { queryClient, queryKeys } from "../lib/queryClient";
 function invalidateGigCaches(gigId) {
   queryClient.invalidateQueries({ queryKey: queryKeys.gigDetail(gigId) });
   queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
+  queryClient.invalidateQueries({ queryKey: queryKeys.hasActiveGig });
 }
 
 export function useGigDetailActions({ gigId, onStatusChange, onGigDeleted, onClose }) {

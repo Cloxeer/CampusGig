@@ -20,6 +20,7 @@ export const queryKeys = {
   completedGigs: ["completedGigs", "v2"],
   notifications: ["notifications"],
   unreadCount: ["unreadCount"],
+  hasActiveGig: ["hasActiveGig"],
   myReviews: ["myReviews"],
   myGigStats: ["myGigStats"],
   campusRank: ["campusRank"],

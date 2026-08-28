@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { CheckCircle, Loader } from "lucide-react";
 import UserAvatar from "../../../components/UserAvatar";
 import { elapsed } from "../../../utils/helpers";
@@ -6,6 +7,7 @@ import { isDeletable, isActiveRequestAlert } from "../notificationModel";
 import { resolveNotifAvatar } from "../resolveNotificationAvatar";
 import NotificationFallbackAvatar from "./NotificationFallbackAvatar";
 import SwipeRow from "./SwipeRow";
+import AlertGigAcceptedSpot from "./AlertGigAcceptedSpot";
 
 export default function SingleAlertRow({
   notification: n,
@@ -15,7 +17,9 @@ export default function SingleAlertRow({
   onRowClick,
   onDelete,
   onInlineAccept,
+  showSpotHint = false,
 }) {
+  const lookAtRef = useRef(null);
   const canDelete = isDeletable(n, gigStatusMap);
   const isGigClickable = GIG_NOTIF_TYPES.has(n.type) && n.metadata?.gig_id;
   const isReviewClickable = REVIEW_NOTIF_TYPES.has(n.type) && n.metadata?.reviewer_id;
@@ -24,13 +28,15 @@ export default function SingleAlertRow({
   const gigStatus = n.metadata?.gig_id ? gigStatusMap[n.metadata.gig_id] : null;
   const alreadyAccepted =
     gigStatus && (gigStatus.status === "active" || gigStatus.status === "completed");
+  const showSpot = showSpotHint && gigStatus?.status === "active";
 
   const user = resolveNotifAvatar(n, profileMap);
 
   return (
     <SwipeRow canDelete={canDelete} onDelete={() => onDelete(n.id)}>
       <div
-        className={`alert-row ${!n.read ? "unread" : ""}`}
+        ref={lookAtRef}
+        className={`alert-row ${!n.read ? "unread" : ""} ${showSpot ? "alert-row--spot" : ""}`}
         onClick={() => onRowClick(n)}
         style={{ cursor: isClickable ? "pointer" : "default" }}
       >
@@ -121,6 +127,7 @@ export default function SingleAlertRow({
             />
           ) : null}
         </div>
+        {showSpot ? <AlertGigAcceptedSpot lookAtRef={lookAtRef} /> : null}
       </div>
     </SwipeRow>
   );

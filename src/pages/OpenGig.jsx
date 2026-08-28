@@ -28,6 +28,7 @@ export default function OpenGig({ currentUserId }) {
   function handleStatusChange() {
     queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
     queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
+    queryClient.invalidateQueries({ queryKey: queryKeys.hasActiveGig });
   }
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function OpenGig({ currentUserId }) {
       requests={requests}
       loading={Boolean(gigId) && detailPending && gig == null}
       fetchError={detailError}
-      onRetry={() => refetch()}
+      onRefresh={() => refetch()}
       notification={notification}
       currentUserId={currentUserId}
       onClose={handleClose}

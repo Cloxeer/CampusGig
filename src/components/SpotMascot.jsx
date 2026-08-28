@@ -27,7 +27,8 @@ import "./spotMascot.css";
     corner    "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center"
               or a {top,left,right,bottom} object — used only when float   (default "bottom-right")
     size      px width/height of the mascot                          (default 96)
-    lookAt    "cursor" | {x,y} viewport point | null(idle drift)     (default "cursor")
+    lookAt    "cursor" | "camera" | {x,y} viewport point | null(idle drift)     (default "cursor")
+              "camera" = look straight at the viewer (eyes forward)
     lookAtRef a React ref to a DOM element to watch (overrides lookAt when set)
     inkColor  body color                                             (default "#0a0a0c")
     eyeColor  eye color                                              (default "#f9f9f9")
@@ -35,6 +36,9 @@ import "./spotMascot.css";
     autoSpeak if true, start the script as soon as `show` is true (no first click)
     autoAdvanceMs  while autoSpeak, walk the next script line after this many ms
               (clicking Spot or the bubble still skips ahead)
+    advanceOnPageClick  with autoSpeak, a tap on the page (not on Spot) also
+              walks the next line — same as tapping him; last tap dismisses
+    onLineChange  (index, phase) when the displayed script line changes
     ariaLabel accessible label                                      (default "Spot, the CampusGig mascot")
     className extra classes on the root
     style     extra inline style on the root
@@ -126,8 +130,12 @@ export default function SpotMascot({
   chatId = null,
   autoSpeak = false,
   autoAdvanceMs = 0,
+  advanceOnPageClick = false,
   bubbleSide = "top",
+  bubbleAlign = "center",
+  compactBubble = false,
   onBubbleChange = null,
+  onLineChange = null,
   ariaLabel = "Spot, the CampusGig mascot",
   className = "",
   style = null,
@@ -143,6 +151,8 @@ export default function SpotMascot({
   const hasChat = !!(script && chatId);
   const [bubble, setBubble] = useState(null); // { text } | null
   const lastClick = useRef(0);
+  const onLineChangeRef = useRef(onLineChange);
+  onLineChangeRef.current = onLineChange;
 
   const serveExtra = (c) => {
     if (c.ei < EXTRAS.length) {
@@ -158,22 +168,29 @@ export default function SpotMascot({
     const c = getContext(chatId);
     // compose this context's queue once: [greeting/opener, ...hints, closer]
     if (!c.queue) {
-      const met = hasMet();
-      const first = met ? nextOpener() : script.intro;
-      if (!met) markMet(); // first meeting anywhere → he now knows you
-      const closer = script.closer || nextCloser();
-      c.queue = [first, ...(script.hints || []), closer].filter(Boolean);
+      const closer = script.closer === false ? null : script.closer || nextCloser();
+      if (script.noOpener) {
+        if (!hasMet()) markMet();
+        c.queue = [script.intro, ...(script.hints || []), closer].filter(Boolean);
+      } else {
+        const met = hasMet();
+        const first = met ? nextOpener() : script.intro;
+        if (!met) markMet(); // first meeting anywhere → he now knows you
+        c.queue = [first, ...(script.hints || []), closer].filter(Boolean);
+      }
     }
     switch (c.phase) {
       case "script":
         setBubble({ text: c.queue[c.i] });
         c.i += 1;
         if (c.i >= c.queue.length) c.phase = "await-dismiss";
+        onLineChangeRef.current?.(Math.max(0, c.i - 1), c.phase);
         break;
       case "await-dismiss": // closer already shown → this click just clicks off
         setBubble(null);
         c.phase = "resting";
         c.restClicks = 0;
+        onLineChangeRef.current?.(c.queue.length - 1, c.phase);
         break;
       case "resting": // quiet; pester 5× to wake him for bonus lines
         setBubble(null);
@@ -192,17 +209,29 @@ export default function SpotMascot({
     }
   };
 
-  const handleTalkClick = (e) => {
-    e.stopPropagation();
+  const advanceTalk = () => {
     const now = Date.now();
-    if (now - lastClick.current < 300) return; // ignore accidental double-fires
+    const c = hasChat ? getContext(chatId) : null;
+    const finishing = Boolean(
+      c && (c.phase === "await-dismiss" || c.phase === "resting" || c.phase === "done")
+    );
+    // Don't swallow the tap that actually clicks him off — a 300ms gate after
+    // a fast skip left the tour half-open and the page feeling frozen.
+    if (!finishing && now - lastClick.current < 300) return false;
     lastClick.current = now;
     if (hasChat) speak();
-    if (onClick) onClick(e);
+    return true;
+  };
+
+  const handleTalkClick = (e) => {
+    e.stopPropagation();
+    if (advanceTalk() && onClick) onClick(e);
   };
 
   const speakRef = useRef(speak);
   speakRef.current = speak;
+  const advanceTalkRef = useRef(advanceTalk);
+  advanceTalkRef.current = advanceTalk;
 
   // Tutorial mode: open the first line when he pops in; restore the current
   // line if the tree remounts mid-script (session memory already advanced).
@@ -214,8 +243,10 @@ export default function SpotMascot({
       speakRef.current();
     } else if (c.queue && c.phase === "script" && c.i > 0) {
       setBubble({ text: c.queue[c.i - 1] });
+      onLineChangeRef.current?.(c.i - 1, c.phase);
     } else if (c.queue && c.phase === "await-dismiss") {
       setBubble({ text: c.queue[c.queue.length - 1] });
+      onLineChangeRef.current?.(c.queue.length - 1, c.phase);
     }
   }, [autoSpeak, show, hasChat, chatId]);
 
@@ -227,6 +258,19 @@ export default function SpotMascot({
     const t = setTimeout(() => speakRef.current(), autoAdvanceMs);
     return () => clearTimeout(t);
   }, [autoSpeak, show, hasChat, autoAdvanceMs, chatId, bubble]);
+
+  useEffect(() => {
+    if (!advanceOnPageClick || !autoSpeak || !hasChat) return undefined;
+    const onClick = (e) => {
+      const t = e.target;
+      if (!(t instanceof Element)) return;
+      if (t.closest(".spot-root, .spot-bubble")) return;
+      if (t.closest("button, a, input, textarea, select, [role='button']")) return;
+      advanceTalkRef.current();
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [advanceOnPageClick, autoSpeak, hasChat]);
 
   // let the parent pause any movement while Spot is talking
   useEffect(() => {
@@ -282,8 +326,14 @@ export default function SpotMascot({
       const gap = 10;
       const m = 8;
       const cx = r.left + r.width / 2;
-      // horizontal: centre on Spot, clamp inside the viewport
-      const left = Math.max(m, Math.min(cx - bw / 2, vw - m - bw));
+      let left;
+      if (bubbleAlign === "end") {
+        left = Math.max(m, Math.min(r.right - bw + 6, vw - m - bw));
+      } else if (bubbleAlign === "start") {
+        left = Math.max(m, Math.min(r.left - 6, vw - m - bw));
+      } else {
+        left = Math.max(m, Math.min(cx - bw / 2, vw - m - bw));
+      }
       // vertical: keep preferred side unless there isn't room, then flip
       let side = bubbleSide === "bottom" ? "bottom" : "top";
       const above = r.top;
@@ -304,7 +354,7 @@ export default function SpotMascot({
       raf = requestAnimationFrame(loop);
     });
     return () => cancelAnimationFrame(raf);
-  }, [bubble, bubbleSide]);
+  }, [bubble, bubbleSide, bubbleAlign]);
   const eyeLRef = useRef(null);
   const eyeRRef = useRef(null);
   const maskId = useRef(`spot-mask-${uid++}`).current;
@@ -415,6 +465,9 @@ export default function SpotMascot({
         const r = ref.getBoundingClientRect();
         tx = r.left + r.width / 2;
         ty = r.top + r.height / 2;
+      } else if (s.lookAt === "camera") {
+        tx = cx;
+        ty = cy;
       } else if (s.lookAt === "cursor") {
         if (mouse.current.x > -9998) {
           tx = mouse.current.x;
@@ -539,7 +592,7 @@ export default function SpotMascot({
         ? createPortal(
             <div
               ref={bubbleRef}
-              className="spot-bubble"
+              className={`spot-bubble${compactBubble ? " spot-bubble--compact" : ""}`}
               role="status"
               aria-live="polite"
               onClick={hasChat ? handleTalkClick : undefined}

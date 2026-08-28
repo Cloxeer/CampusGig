@@ -13,4 +13,5 @@ export function refreshProfileData(otherUserId) {
   queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard(100) });
   queryClient.invalidateQueries({ queryKey: queryKeys.totalUsers });
   queryClient.invalidateQueries({ queryKey: queryKeys.openGigs });
+  queryClient.invalidateQueries({ queryKey: queryKeys.hasActiveGig });
 }

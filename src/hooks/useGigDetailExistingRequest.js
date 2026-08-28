@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getMyRequestForGig } from "../lib/profile";
 
-export function useGigDetailExistingRequest(gigId, { enabled = true } = {}) {
+export function useGigDetailExistingRequest(gigId, { enabled = true, refreshKey = 0 } = {}) {
   const [request, setRequest] = useState(null);
   const [checking, setChecking] = useState(true);
 
@@ -24,7 +24,7 @@ export function useGigDetailExistingRequest(gigId, { enabled = true } = {}) {
 
     check();
     return () => { cancelled = true; };
-  }, [gigId, enabled]);
+  }, [gigId, enabled, refreshKey]);
 
   return { existingRequest: request, checkingRequest: checking };
 }

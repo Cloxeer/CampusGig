@@ -1,5 +1,6 @@
 import { MapPin, Clock, FileText, Timer, Calendar, CalendarCheck } from "lucide-react";
 import GigDetailStatusBadge from "./GigDetailStatusBadge";
+import LiveStatusDot from "../LiveStatusDot";
 import { renderGigDescription } from "../../utils/gigDescriptionMarkup";
 
 /** "Apr 10, 2026, 2:22 PM" — absolute event time, locale-aware. */
@@ -47,7 +48,10 @@ export default function GigDetailInfo({ gig, model, tick }) {
         <div className="gig-detail-price-row">
           <div className="gig-detail-price">{priceDisplay}</div>
           {model.isActive && !expired && (
-            <span className="gig-detail-inline-status gig-detail-inline-status--active">Active</span>
+            <span className="gig-detail-inline-status gig-detail-inline-status--active">
+              <LiveStatusDot />
+              Active
+            </span>
           )}
           {model.isCompleted && (
             <span className="gig-detail-inline-status gig-detail-inline-status--done">Done</span>

@@ -17,6 +17,7 @@ import {
   markSingleReadInCache,
   invalidateNotificationsQuery,
   invalidateOpenGigsQuery,
+  invalidateHasActiveGigQuery,
 } from "../alertsMutations";
 
 export function useAlertsActions() {
@@ -93,6 +94,7 @@ export function useAlertsActions() {
       invalidateNotificationsQuery();
       invalidateUnreadCount();
       invalidateOpenGigsQuery();
+      invalidateHasActiveGigQuery();
     }
     setAcceptingId(null);
   }, []);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import TopBar from "../../components/TopBar";
 import { groupNotifications, isActiveRequestAlert } from "./notificationModel";
@@ -10,6 +11,9 @@ import AlertSkeletonList from "./components/AlertSkeletonList";
 import AlertsEmptyState from "./components/AlertsEmptyState";
 import GigRequestGroupRow from "./components/GigRequestGroupRow";
 import SingleAlertRow from "./components/SingleAlertRow";
+import { getMyProfile } from "../../lib/profile";
+import { queryKeys } from "../../lib/queryClient";
+import { isSpotTutorialActive } from "../../utils/repPathModel";
 
 export default function AlertsPage() {
   const { data: alertsData, isPending: alertsPending, isError, refetch } = useAlertsQuery();
@@ -23,6 +27,10 @@ export default function AlertsPage() {
     handleGroupClick,
     handleInlineAccept,
   } = useAlertsActions();
+  const { data: profileData } = useQuery({
+    queryKey: queryKeys.myProfile,
+    queryFn: getMyProfile,
+  });
   const [olderOpen, setOlderOpen] = useState(false);
 
   const notifications = alertsData?.notifications || [];
@@ -33,6 +41,17 @@ export default function AlertsPage() {
   /* Date buckets keep a long-lived inbox tidy: recent sections stay visible,
      everything older collapses behind a count. A group dates by its newest item. */
   const buckets = groupByDateBucket(groups, (g) => new Date(g.items[0].created_at).getTime());
+
+  const spotAlertId =
+    profileData?.profile &&
+    isSpotTutorialActive(profileData.profile.rep_score) &&
+    groups.find((g) => {
+      if (g.kind !== "single") return false;
+      const n = g.items[0];
+      if (n?.type !== "gig_accepted") return false;
+      const gigId = n.metadata?.gig_id;
+      return gigId && gigStatusMap[gigId]?.status === "active";
+    })?.items[0]?.id;
 
   function renderGroup(group) {
     if (group.kind === "gig_requests") {
@@ -61,6 +80,7 @@ export default function AlertsPage() {
         onRowClick={handleNotifClick}
         onDelete={handleDelete}
         onInlineAccept={handleInlineAccept}
+        showSpotHint={n.id === spotAlertId}
       />
     );
   }
